@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI Guide - Sentinel Dispatch</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#1a1b26",
+                        "surface-container": "#24283b",
+                        "primary-container": "#d32f2f",
+                        "primary": "#ff4d4d",
+                        "on-secondary-container": "#a5c8ff",
+                        "secondary-fixed-dim": "#a5c8ff",
+                        "surface-tint": "#ba1a20",
+                        "inverse-primary": "#af101a",
+                        "surface-container-low": "#1f2335",
+                        "primary-fixed": "#ffdad6",
+                        "secondary": "#54a0fe",
+                        "error": "#ffb4ab",
+                        "on-background": "#e0e0ff",
+                        "inverse-on-surface": "#000767",
+                        "tertiary-fixed": "#9df898",
+                        "surface": "#0f172a",
+                        "primary-fixed-dim": "#ffb3ac",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#82db7e",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed": "#d4e3ff",
+                        "on-tertiary-fixed": "#002204",
+                        "on-primary-fixed": "#410003",
+                        "error-container": "#93000a",
+                        "tertiary-container": "#298030",
+                        "secondary-container": "#004786",
+                        "on-surface": "#f1efff",
+                        "surface-container-highest": "#3b4261",
+                        "on-error": "#690005",
+                        "background": "#0f172a",
+                        "surface-container-high": "#2e344e",
+                        "on-tertiary-fixed-variant": "#005312",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-container": "#daffd1",
+                        "on-secondary-fixed-variant": "#004786",
+                        "on-primary-fixed-variant": "#930010",
+                        "surface-container-lowest": "#0b0e14",
+                        "outline-variant": "#444b6a",
+                        "surface-bright": "#1a1b26",
+                        "inverse-surface": "#f1efff",
+                        "surface-variant": "#444b6a",
+                        "on-secondary-fixed": "#001c3a",
+                        "outline": "#938f99",
+                        "on-surface-variant": "#c4c6d0",
+                        "on-primary-container": "#fff2f0",
+                        "tertiary": "#82db7e",
+                        "on-error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 selection:bg-primary/30 selection:text-white min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-950/80 backdrop-blur-md flex justify-between items-center px-6 py-4 w-full border-b border-white/5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary active:scale-95 transition-transform duration-150 cursor-pointer" data-icon="menu">menu</span>
+<h1 class="text-xl font-black text-primary tracking-tighter font-['Inter']">Sentinel Dispatch</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-slate-400 hover:bg-white/10 p-2 rounded-full transition-colors active:scale-95" data-icon="notifications">notifications</button>
+</div>
+</header>
+<!-- Main Content: AI Guide Canvas -->
+<main class="flex-grow pt-20 pb-40 px-4 md:px-8 max-w-4xl mx-auto w-full flex flex-col">
+<!-- Header Context -->
+<div class="mb-8 mt-4">
+<span class="text-xs font-bold uppercase tracking-[0.1em] text-primary mb-1 block">Active Incident Support</span>
+<h2 class="text-4xl font-extrabold tracking-tight text-white">AI Guide</h2>
+</div>
+<!-- AI Chat Interface -->
+<div class="flex-grow flex flex-col gap-6">
+<!-- System Status Message (Asymmetric) -->
+<div class="flex justify-start w-full md:w-4/5">
+<div class="bg-slate-900 p-6 rounded-2xl rounded-tl-none shadow-2xl border-l-4 border-primary">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="psychology" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sentinel Intelligence</span>
+</div>
+<p class="text-slate-100 leading-relaxed font-medium">
+                        I am monitoring your current location and the incoming dispatch. How can I assist with immediate first aid or scene preparation?
+                    </p>
+</div>
+</div>
+<!-- Major Instruction Card (Bento Style) -->
+<div class="bg-slate-900 rounded-3xl p-8 shadow-2xl border border-white/5">
+<div class="flex items-start justify-between mb-6">
+<div class="flex flex-col">
+<h3 class="text-lg font-bold text-primary flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="priority_high">priority_high</span>
+                            AI Instruction: Immediate Care
+                        </h3>
+<p class="text-sm text-slate-400">Incident #4492 - Possible Trauma</p>
+</div>
+<div class="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Live Analysis</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="bg-slate-800 p-5 rounded-2xl border border-white/5">
+<span class="text-[10px] font-bold text-primary uppercase tracking-widest block mb-2">Step 01</span>
+<p class="text-white font-semibold text-lg leading-snug">Keep patient calm and stationary.</p>
+<p class="text-slate-400 text-sm mt-2">Minimize movement to prevent further injury while waiting for EMS.</p>
+</div>
+<div class="bg-slate-800 p-5 rounded-2xl border border-white/5">
+<span class="text-[10px] font-bold text-primary uppercase tracking-widest block mb-2">Step 02</span>
+<p class="text-white font-semibold text-lg leading-snug">Elevate legs 6-12 inches.</p>
+<p class="text-slate-400 text-sm mt-2">If no head or neck injury is suspected, this helps manage potential shock.</p>
+</div>
+<div class="md:col-span-2 bg-primary/10 p-5 rounded-2xl border border-primary/20">
+<span class="text-[10px] font-bold text-primary uppercase tracking-widest block mb-2">Vitals Monitoring</span>
+<p class="text-slate-100 text-sm">Observe breathing rate. If the patient becomes unresponsive, begin CPR instructions immediately.</p>
+</div>
+</div>
+</div>
+<!-- User Query Example (Right Aligned) -->
+<div class="flex justify-end w-full">
+<div class="bg-primary text-white p-4 rounded-2xl rounded-tr-none shadow-xl max-w-[80%]">
+<p class="text-sm font-medium">How do I check for a pulse on an adult?</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Action Section (Input & Nav Shell) -->
+<section class="fixed bottom-0 left-0 w-full z-50">
+<!-- Input Area Container (Above Nav) -->
+<div class="max-w-4xl mx-auto px-4 pb-4">
+<div class="glass-panel rounded-3xl p-4 shadow-2xl border border-white/10">
+<!-- Attachment Link -->
+<button class="flex items-center gap-2 mb-3 px-2 py-1 hover:bg-white/5 transition-colors rounded-lg group">
+<span class="material-symbols-outlined text-secondary text-sm group-hover:scale-110 transition-transform" data-icon="add_a_photo">add_a_photo</span>
+<span class="text-xs font-bold text-secondary tracking-tight">Attach injury photo for AI trauma assessment</span>
+</button>
+<!-- Input Row -->
+<div class="flex items-center gap-3">
+<div class="flex-grow relative">
+<input class="w-full bg-slate-800 border-none ring-1 ring-white/10 focus:ring-2 focus:ring-primary rounded-2xl py-4 px-5 text-white placeholder:text-slate-500 text-sm font-medium transition-all shadow-inner" placeholder="Ask for help, first aid steps, what to expect..." type="text"/>
+</div>
+<button class="bg-primary text-white h-14 w-14 flex items-center justify-center rounded-full shadow-lg active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="arrow_upward">arrow_upward</span>
+</button>
+</div>
+<!-- Disclaimer -->
+<div class="mt-3 px-2">
+<p class="text-[10px] text-slate-500 leading-tight italic">
+                        Sentinel AI provides guidance until EMS arrives. In case of emergency, always follow dispatcher instructions.
+                    </p>
+</div>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="bg-slate-950/90 backdrop-blur-xl w-full flex justify-around items-center px-4 pb-6 pt-3 border-t border-white/5 shadow-2xl">
+<div class="flex flex-col items-center justify-center text-slate-400 px-4 py-1.5 hover:text-primary transition-all cursor-pointer">
+<span class="material-symbols-outlined mb-1" data-icon="assignment">assignment</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-[0.05em]">Dispatch</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-400 px-4 py-1.5 hover:text-primary transition-all cursor-pointer">
+<span class="material-symbols-outlined mb-1" data-icon="explore">explore</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-[0.05em]">Navigation</span>
+</div>
+<!-- Active Tab: AI Guide -->
+<div class="flex flex-col items-center justify-center bg-[#af101a] text-white rounded-lg px-6 py-1.5 active:scale-90 transition-all duration-200 shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined mb-1" data-icon="psychology" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-[0.05em]">AI Guide</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-400 px-4 py-1.5 hover:text-primary transition-all cursor-pointer">
+<span class="material-symbols-outlined mb-1" data-icon="medical_services">medical_services</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-[0.05em]">Hospitals</span>
+</div>
+</nav>
+</section>
+<!-- Visual Polish: Decorative Ambient Background -->
+<div class="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden pointer-events-none">
+<div class="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px]"></div>
+<div class="absolute bottom-[-5%] left-[-5%] w-[30%] h-[30%] bg-secondary/10 rounded-full blur-[100px]"></div>
+</div>
+</body></html>

@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  db:
+    image: timescale/timescaledb-ha:pg15
+    container_name: smartcity_db
+    environment:
+      POSTGRES_DB: smartcity
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/home/postgres/pgdata/data
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartcity_redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  api:
+    build: 
+      context: ./backend
+    container_name: smartcity_api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@db:5432/smartcity
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=supersecretjwtkey123
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  celery_worker:
+    build:
+      context: ./backend
+    container_name: smartcity_celery
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@db:5432/smartcity
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+volumes:
+  pgdata:

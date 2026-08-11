@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-container": "#daffd1",
+                    "surface-dim": "#0e1016",
+                    "surface": "#0b0c10",
+                    "tertiary": "#82db7e",
+                    "primary": "#ba1a20",
+                    "primary-container": "#d32f2f",
+                    "on-surface-variant": "#c4c7c5",
+                    "on-tertiary-fixed-variant": "#005312",
+                    "on-secondary-fixed": "#001c3a",
+                    "surface-container": "#1e1f24",
+                    "tertiary-fixed": "#9df898",
+                    "on-secondary": "#ffffff",
+                    "secondary": "#a5c8ff",
+                    "surface-container-high": "#282a2f",
+                    "outline": "#938f99",
+                    "on-secondary-container": "#d4e3ff",
+                    "on-primary-container": "#ffdad6",
+                    "tertiary-fixed-dim": "#82db7e",
+                    "secondary-fixed": "#d4e3ff",
+                    "primary-fixed": "#ffdad6",
+                    "surface-container-low": "#191b1f",
+                    "on-primary": "#ffffff",
+                    "on-error": "#690005",
+                    "on-tertiary": "#00390a",
+                    "inverse-surface": "#e3e2e6",
+                    "surface-container-highest": "#33353a",
+                    "on-tertiary-fixed": "#002204",
+                    "error-container": "#93000a",
+                    "secondary-fixed-dim": "#a5c8ff",
+                    "surface-variant": "#44474e",
+                    "on-background": "#e3e2e6",
+                    "secondary-container": "#004786",
+                    "surface-tint": "#ffb3ac",
+                    "on-secondary-fixed-variant": "#004786",
+                    "primary-fixed-dim": "#ffb3ac",
+                    "on-primary-fixed-variant": "#930010",
+                    "outline-variant": "#44474e",
+                    "inverse-on-surface": "#1b1b1f",
+                    "tertiary-container": "#005312",
+                    "inverse-primary": "#ba1a20",
+                    "on-error-container": "#ffdad6",
+                    "on-primary-fixed": "#410003",
+                    "surface-bright": "#38393e",
+                    "on-surface": "#e3e2e6",
+                    "background": "#0b0c10",
+                    "surface-container-lowest": "#06070a",
+                    "error": "#ffb4ab"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-red-500" data-icon="emergency">emergency</span>
+<h1 class="text-xl font-black tracking-widest uppercase text-red-500">Sentinel Dispatch</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-white/10 active:scale-95 transition-transform text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden ring-2 ring-red-500/20">
+<img class="w-full h-full object-cover" data-alt="professional portrait of an emergency medical services dispatcher in uniform with headset" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6UVQ_rahZseYUIL8IywqkNzJzhcXCuSKKGL3dqTpDs1oUFneWDlahUBMdWFrHU0wnQoDOMpS9xW6z9MKWXE5UkQizqfja7A1iDeHO-X-OPlLEEZ0ID5m1dK_23OPZ781_B48INAfHElGVKPrBnZP9YBqAfXUIWNlcoKvhma-so6iXHxOm54-3mNby57v12XofJWXkKKDpKfFPCSyQBogbHJ0SsMhtikggN0iZRla3ENibsTVBOybOzIRLeK3iPnRGe0h5tHSsQ0-Q"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-4 md:px-8 max-w-7xl mx-auto space-y-8">
+<!-- Dashboard Header / Status Panel -->
+<section class="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+<div class="md:col-span-8">
+<p class="text-xs font-bold uppercase tracking-[0.2em] text-secondary mb-2">System Status: Active</p>
+<h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-on-background">AI Dispatch AI</h2>
+</div>
+<div class="md:col-span-4">
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-2xl flex justify-between items-center relative overflow-hidden border border-white/5">
+<div class="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full -mr-8 -mt-8"></div>
+<div>
+<p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Response Latency</p>
+<div class="flex items-baseline gap-2">
+<span class="text-4xl font-black text-primary tracking-tighter">4.5</span>
+<span class="text-sm font-bold text-on-surface-variant uppercase">mins</span>
+</div>
+</div>
+<div class="text-right">
+<p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Active Units</p>
+<p class="text-lg font-bold text-on-surface">12 <span class="text-sm font-medium text-tertiary">Analyzing</span></p>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left Column: Recommendations & Map Context -->
+<div class="lg:col-span-2 space-y-8">
+<!-- AI Recommendation Card (Bento Style) -->
+<div class="bg-primary-container text-on-primary-container rounded-2xl p-8 relative overflow-hidden group shadow-2xl">
+<div class="absolute -right-12 -top-12 w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-700"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-8">
+<div class="flex items-center gap-3 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20">
+<span class="material-symbols-outlined text-sm" data-icon="psychology" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="text-xs font-bold uppercase tracking-widest">Best Recommendation</span>
+</div>
+<div class="flex gap-2">
+<span class="px-3 py-1 bg-tertiary-container text-tertiary text-[10px] font-black uppercase tracking-widest rounded-lg">Fastest</span>
+<span class="px-3 py-1 bg-secondary-container text-secondary text-[10px] font-black uppercase tracking-widest rounded-lg">Closest</span>
+</div>
+</div>
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-8">
+<div class="space-y-2">
+<p class="text-sm font-medium opacity-80">Assigned Unit</p>
+<h3 class="text-5xl font-black tracking-tighter">MED-UNIT 704</h3>
+<p class="text-lg font-medium opacity-90">ALS Ambulance • Specialized Cardiac Support</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<p class="text-xs font-bold opacity-70 uppercase tracking-widest">ETA Projection</p>
+<p class="text-6xl font-black tracking-tighter">3.2<span class="text-xl ml-1">min</span></p>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
+<div class="bg-black/20 rounded-xl p-4 border border-white/5">
+<p class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1">Distance</p>
+<p class="text-xl font-bold">1.4 km</p>
+</div>
+<div class="bg-black/20 rounded-xl p-4 border border-white/5">
+<p class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1">Traffic</p>
+<p class="text-xl font-bold">Light</p>
+</div>
+<div class="bg-black/20 rounded-xl p-4 border border-white/5">
+<p class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1">Fuel Level</p>
+<p class="text-xl font-bold">88%</p>
+</div>
+<div class="bg-black/20 rounded-xl p-4 border border-white/5">
+<p class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1">Equipment</p>
+<p class="text-xl font-bold">Full ALS</p>
+</div>
+</div>
+<button class="w-full mt-8 py-5 bg-white text-primary-container font-black uppercase tracking-[0.2em] rounded-xl hover:bg-on-primary-container hover:shadow-xl active:scale-95 transition-all">
+                            Assign Unit
+                        </button>
+</div>
+</div>
+<!-- Map Context Visual (Decorative) -->
+<div class="relative h-[400px] w-full rounded-2xl overflow-hidden bg-surface-container-high shadow-lg border border-white/5">
+<img class="w-full h-full object-cover opacity-60 mix-blend-luminosity" data-alt="a dark stylized topographic map of a modern city with glowing red and blue data overlays indicating emergency vehicles" data-location="San Francisco" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7Yi7Ofar6f5CNYrhv1IZ2vC-fjyj3M6ohF_5vIr8YwwgpY6y69pvKqCq7-4ACVmD_lupLkMRiwwlsrdYIwOAZx4MnrkQ810vDAdEcHzBpJQsHzZgG-xCZAp9h6gA05jZJ3ptiY9fucWL728C0Wcf3NI0_KTT4k8EZMelu_arWyROUBRovhP-joL5Ga4Nkql6ORgtc9qNgCiGIlT-dxsEw27mO-fafSNfpUNaQ7Fisus__EF9iVzatWZaz_rcdeKfVsqh6NkhVOMup"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
+<div class="absolute bottom-6 left-6 right-6 flex justify-between items-end">
+<div class="bg-surface-container/90 backdrop-blur-md p-4 rounded-xl border border-white/10 shadow-xl">
+<p class="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Incident Location</p>
+<p class="text-sm font-bold text-on-surface">Market St &amp; 4th St, Downtown</p>
+</div>
+<div class="flex flex-col gap-2">
+<button class="p-3 bg-surface-container/90 backdrop-blur-md rounded-full shadow-lg border border-white/10 text-on-surface"><span class="material-symbols-outlined" data-icon="add">add</span></button>
+<button class="p-3 bg-surface-container/90 backdrop-blur-md rounded-full shadow-lg border border-white/10 text-on-surface"><span class="material-symbols-outlined" data-icon="remove">remove</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Nearby Units List -->
+<div class="space-y-4">
+<div class="flex justify-between items-center mb-2 px-2">
+<h4 class="text-sm font-black uppercase tracking-widest text-on-surface-variant">Nearby Units</h4>
+<span class="text-xs font-medium text-on-surface-variant/60">Sorted by AI Score</span>
+</div>
+<!-- Unit Card 1 -->
+<div class="bg-surface-container-low p-5 rounded-2xl border border-white/5 hover:border-primary/30 transition-all cursor-pointer group shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center text-secondary shadow-inner border border-white/5">
+<span class="material-symbols-outlined" data-icon="ambulance">ambulance</span>
+</div>
+<div>
+<h5 class="font-bold text-on-surface">UNIT 812</h5>
+<p class="text-xs text-on-surface-variant/80">BLS • 2 Crew</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-xl font-black text-on-background tracking-tighter">4.8m</p>
+<p class="text-[10px] font-bold text-tertiary uppercase">Available</p>
+</div>
+</div>
+<div class="flex items-center gap-4 text-xs font-medium text-on-surface-variant/70">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm" data-icon="near_me">near_me</span> 2.1 km</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm" data-icon="traffic">traffic</span> Moderate</span>
+</div>
+</div>
+<!-- Unit Card 2 -->
+<div class="bg-surface-container-low p-5 rounded-2xl border border-white/5 hover:border-primary/30 transition-all cursor-pointer shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center text-on-surface-variant/40 shadow-inner border border-white/5">
+<span class="material-symbols-outlined" data-icon="ambulance">ambulance</span>
+</div>
+<div>
+<h5 class="font-bold text-on-surface">UNIT 690</h5>
+<p class="text-xs text-on-surface-variant/80">ALS • 3 Crew</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-xl font-black text-on-background tracking-tighter">6.2m</p>
+<p class="text-[10px] font-bold text-secondary uppercase">In Transit</p>
+</div>
+</div>
+<div class="flex items-center gap-4 text-xs font-medium text-on-surface-variant/70">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm" data-icon="near_me">near_me</span> 3.4 km</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm" data-icon="traffic">traffic</span> Heavy</span>
+</div>
+</div>
+<!-- Unit Card 3 -->
+<div class="bg-surface-container-low p-5 rounded-2xl border border-white/5 hover:border-primary/30 transition-all cursor-pointer shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center text-secondary shadow-inner border border-white/5">
+<span class="material-symbols-outlined" data-icon="ambulance">ambulance</span>
+</div>
+<div>
+<h5 class="font-bold text-on-surface">UNIT 701</h5>
+<p class="text-xs text-on-surface-variant/80">BLS • 2 Crew</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-xl font-black text-on-background tracking-tighter">8.1m</p>
+<p class="text-[10px] font-bold text-tertiary uppercase">Available</p>
+</div>
+</div>
+<div class="flex items-center gap-4 text-xs font-medium text-on-surface-variant/70">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm" data-icon="near_me">near_me</span> 4.8 km</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm" data-icon="traffic">traffic</span> Light</span>
+</div>
+</div>
+<button class="w-full py-4 border-2 border-dashed border-white/10 rounded-2xl text-on-surface-variant/60 font-bold text-xs uppercase tracking-widest hover:border-primary hover:text-primary transition-colors mt-4">
+                    View All 12 Units
+                </button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-2xl bg-surface/90 backdrop-blur-xl border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+<div class="flex justify-around items-center px-4 pb-6 pt-3 w-full">
+<!-- Dispatch (Active) -->
+<a class="flex flex-col items-center justify-center bg-primary text-white rounded-xl px-5 py-2 scale-105 active:scale-90 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="dashboard_customize">dashboard_customize</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest">Dispatch</span>
+</a>
+<!-- Navigation -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-5 py-2 hover:text-red-500 active:scale-90 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="near_me">near_me</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest">Navigation</span>
+</a>
+<!-- Hospitals -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-5 py-2 hover:text-red-500 active:scale-90 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="local_hospital">local_hospital</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest">Hospitals</span>
+</a>
+<!-- Settings -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-5 py-2 hover:text-red-500 active:scale-90 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="settings">settings</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest">Settings</span>
+</a>
+</div>
+</nav>
+</body></html>

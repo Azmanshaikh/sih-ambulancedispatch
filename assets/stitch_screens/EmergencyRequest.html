@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SENTINEL DISPATCH | Emergency Response &amp; AI Guide</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed": "#002204",
+                        "on-surface-variant": "#5b403d",
+                        "surface-container-highest": "#e0e0ff",
+                        "surface": "#fbf8ff",
+                        "on-tertiary-container": "#daffd1",
+                        "inverse-primary": "#ffb3ac",
+                        "primary": "#af101a",
+                        "on-primary-fixed": "#410003",
+                        "primary-fixed": "#ffdad6",
+                        "on-secondary-container": "#003567",
+                        "surface-dim": "#d5d7ff",
+                        "primary-container": "#d32f2f",
+                        "on-tertiary-fixed-variant": "#005312",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f4f2ff",
+                        "secondary-container": "#54a0fe",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#9df898",
+                        "tertiary-container": "#298030",
+                        "secondary": "#005faf",
+                        "on-secondary-fixed-variant": "#004786",
+                        "on-secondary-fixed": "#001c3a",
+                        "on-error-container": "#93000a",
+                        "inverse-on-surface": "#f1efff",
+                        "surface-variant": "#e0e0ff",
+                        "on-primary": "#ffffff",
+                        "tertiary": "#016619",
+                        "primary-fixed-dim": "#ffb3ac",
+                        "outline-variant": "#e4beba",
+                        "on-surface": "#000767",
+                        "surface-tint": "#ba1a20",
+                        "secondary-fixed-dim": "#a5c8ff",
+                        "inverse-surface": "#1b247f",
+                        "surface-container": "#edecff",
+                        "on-primary-fixed-variant": "#930010",
+                        "on-primary-container": "#fff2f0",
+                        "on-background": "#000767",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e6ff",
+                        "secondary-fixed": "#d4e3ff",
+                        "background": "#fbf8ff",
+                        "on-error": "#ffffff",
+                        "outline": "#8f6f6c",
+                        "tertiary-fixed-dim": "#82db7e",
+                        "surface-bright": "#fbf8ff",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #020617; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { backdrop-filter: blur(20px); background: rgba(15, 23, 42, 0.8); }
+        .asymmetric-split { grid-template-columns: 1fr 1.2fr; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="text-slate-200 antialiased overflow-hidden h-screen flex">
+<!-- SideNavBar (Shared Component) -->
+<nav class="fixed left-0 top-0 h-full flex flex-col border-r border-slate-900 bg-slate-950 dark:bg-slate-950 docked left-0 h-screen w-64 z-50">
+<div class="px-6 py-8">
+<div class="text-2xl font-black text-red-600 dark:text-red-500 mb-2">SENTINEL</div>
+<div class="font-inter text-sm font-semibold uppercase tracking-widest text-red-600">Precision EMS</div>
+</div>
+<div class="flex-1 mt-4">
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer text-slate-500 hover:text-slate-200 hover:bg-slate-900 transition-all duration-300">
+<span class="material-symbols-outlined">emergency_recording</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">Dispatch</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer text-slate-500 hover:text-slate-200 hover:bg-slate-900 transition-all duration-300">
+<span class="material-symbols-outlined">map</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">Navigation</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer text-slate-500 hover:text-slate-200 hover:bg-slate-900 transition-all duration-300">
+<span class="material-symbols-outlined">local_hospital</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">Hospitals</span>
+</div>
+<!-- Active Navigation: AI Guide -->
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer text-white border-r-4 border-red-600 bg-gradient-to-r from-red-900/20 to-transparent transition-all duration-300">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">AI Guide</span>
+</div>
+</div>
+<div class="pb-8">
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer text-slate-500 hover:text-slate-200 hover:bg-slate-900 transition-all duration-300">
+<span class="material-symbols-outlined">data_thresholding</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">System Status</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer text-slate-500 hover:text-slate-200 hover:bg-slate-900 transition-all duration-300">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">Logout</span>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 ml-64 flex flex-col h-full bg-slate-950">
+<!-- TopAppBar (Shared Component) -->
+<header class="flex justify-between items-center w-full px-6 h-16 bg-slate-950/80 backdrop-blur-xl docked full-width top-0 z-40 shadow-2xl shadow-blue-900/10 border-b border-slate-900">
+<div class="flex items-center gap-6">
+<span class="text-xl font-black tracking-widest text-red-600 dark:text-red-500 uppercase">SENTINEL DISPATCH</span>
+<div class="relative group">
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+<span class="material-symbols-outlined">search</span>
+</span>
+<input class="bg-slate-900 border-none text-sm rounded-lg pl-10 pr-4 py-1.5 w-64 focus:ring-1 focus:ring-red-500 transition-all" placeholder="Search incidents..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-400 hover:bg-slate-800/50 transition-colors duration-200 active:scale-95">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-red-500 hover:bg-slate-800/50 transition-colors duration-200 active:scale-95">
+<span class="material-symbols-outlined">emergency</span>
+</button>
+<button class="p-2 text-slate-400 hover:bg-slate-800/50 transition-colors duration-200 active:scale-95">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-slate-800 overflow-hidden ml-2">
+<img alt="Chief Paramedic Profile" data-alt="Professional portrait of a chief paramedic in tactical uniform with a focused expression, neutral gray studio background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuM5hygBA_DZ6T3Ek-XHTDyvP0aR0IFSMDxEUmmrngRVjJL-TxRKAZkemqO8DHDeA9fuzaTWraFp5fv0t3-WMzUegdznV6rv1tL0Orotonj67yNOBtTUqyx3hhPAcSi4wRoQSkhPyDebA73FVt5kPa73QTt7p6h_O4TTMTERlVRkNwMt3sjFDzIHBjo_xC_neavHP-3kVIWxrK6kqG7LPVvp-gMRQWzpXWVpV49ZqlUz1BBlvLGfKIFhpMsVd6goXFi1ibPZTktuNt"/>
+</div>
+</div>
+</header>
+<!-- Dynamic Split View Canvas -->
+<div class="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] overflow-hidden">
+<!-- Left Side: Emergency Request & Classification -->
+<section class="p-8 border-r border-slate-900 overflow-y-auto space-y-8">
+<div class="flex justify-between items-start">
+<div>
+<h1 class="text-4xl font-black tracking-tight mb-2">ACTIVE INCIDENT</h1>
+<p class="text-slate-500 font-medium uppercase tracking-widest text-xs">Priority 1 • Life Threatening</p>
+</div>
+<div class="bg-red-950/30 border border-red-900/50 px-4 py-2 rounded-lg flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+<span class="text-red-500 font-bold text-sm tracking-widest">LIVE LINK</span>
+</div>
+</div>
+<!-- Bento Grid: Incident Info -->
+<div class="grid grid-cols-2 gap-4">
+<!-- Location Card -->
+<div class="col-span-2 bg-slate-900/50 p-6 rounded-2xl border border-slate-800/50 relative overflow-hidden">
+<div class="relative z-10">
+<label class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] block mb-4">Location Confirmation</label>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-red-500 text-3xl">location_on</span>
+<div>
+<h3 class="text-xl font-bold">1422 North Parkside Ave.</h3>
+<p class="text-slate-400 text-sm">Apt 4B, Sector 7G • ETA: 4m 12s</p>
+</div>
+</div>
+</div>
+<div class="absolute inset-0 opacity-20 pointer-events-none">
+<img class="w-full h-full object-cover" data-alt="Monochrome dark satellite map view of an urban residential grid with glowing orange location pin" data-location="New York City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXgNZfJ7E4K9dkhwMWvSVKuFwbXhqLC706NEYN7s6qQaJIXwIXJw0aVHL2eFwDEkO6pzdSitG9SR8MkP8pO8qsiDA7PuJr4Cu4cW_2cKHq26rzNZwyeZQtsloROHFi8i4oWAct19s6KZHxnZI_lTMV384tyM10Kf21lK4DXCBOIKmG_zQuzbUicItCbXx53Ar2UOnT4B8jau3w5lA51tsWSu0-fZ0Q3-Sw0Kz_kLeTZMb45kVj65WR0_PPf-oBbPKDq8J1-_Calo8V"/>
+</div>
+</div>
+<!-- Classification Card -->
+<div class="bg-slate-900/50 p-6 rounded-2xl border border-slate-800/50">
+<label class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] block mb-4">AI Classification</label>
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-red-500">warning</span>
+<span class="text-2xl font-black text-white">Trauma</span>
+</div>
+<div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-red-600 w-4/5"></div>
+</div>
+<p class="mt-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">Confidence: 89%</p>
+</div>
+<!-- Stats Card -->
+<div class="bg-slate-900/50 p-6 rounded-2xl border border-slate-800/50">
+<label class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] block mb-4">Vitals Estimated</label>
+<div class="flex items-baseline gap-1">
+<span class="text-4xl font-black text-white">108</span>
+<span class="text-sm font-bold text-slate-500">BPM</span>
+</div>
+<div class="flex items-center gap-2 mt-4 text-xs font-bold text-slate-400">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span>Elevated Stress Response</span>
+</div>
+</div>
+</div>
+<!-- Input Zone -->
+<div class="space-y-4 pt-4">
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Scene Narrative</label>
+<textarea class="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-slate-200 focus:ring-2 focus:ring-red-500 focus:border-transparent min-h-[160px] text-lg leading-relaxed placeholder:text-slate-700" placeholder="Describe the current scene and patient condition..."></textarea>
+<div class="flex gap-4">
+<button class="flex-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 py-4 rounded-xl flex items-center justify-center gap-3 transition-all active:scale-95 group">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-white">add_a_photo</span>
+<span class="font-bold text-sm uppercase tracking-widest">Attach Photo</span>
+</button>
+<button class="flex-[2] bg-primary hover:bg-primary-container text-white py-4 rounded-xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-xl shadow-red-900/20">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">mic</span>
+<span class="font-bold text-sm uppercase tracking-widest">Hold to Speak</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Right Side: AI Guide & First Aid -->
+<section class="bg-slate-950 p-8 flex flex-col h-full overflow-hidden">
+<div class="mb-8 flex items-center justify-between">
+<div>
+<h2 class="text-3xl font-black tracking-tight flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-500" style="font-variation-settings: 'FILL' 1;">psychology</span>
+                            SENTINEL AI
+                        </h2>
+<p class="text-slate-500 font-medium uppercase tracking-widest text-xs mt-1">Live Trauma Assessment Protocol</p>
+</div>
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full ring-2 ring-slate-950 bg-slate-800 overflow-hidden">
+<img alt="Medical Peer" data-alt="Portrait of a female doctor in a white coat" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD884UtFistYZ7Jo-2n5oUzW5vWrGvybU2mVe1-_N5JRax3zC3rSMs7XlT7r7Jj4V6ybT-e0n5DrzisuU7cXFPgnRT9HTmIR6-QUH2gz1y2YiYdMrODeGF14I5s5yITaUZN-QhFQCbIASRbUgSY15CHWUz_zcWAZFn6G1uQM01E-Hj1BiSrnbZa92DAweIxO_5BH0XjDNVD3cwVxuq-7h44l68R_y1OiNSWLnOsTwP0VEpG9WVCPqguMvWD1kNpVdHHxkjH1eabqEB9"/>
+</div>
+<div class="w-8 h-8 rounded-full ring-2 ring-slate-950 bg-slate-800 flex items-center justify-center">
+<span class="text-[10px] font-bold">+2</span>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto pr-4 space-y-6">
+<!-- AI Instructions Block -->
+<div class="space-y-4">
+<div class="flex gap-4">
+<div class="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-900/50 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-blue-400">medical_services</span>
+</div>
+<div class="bg-slate-900/50 p-6 rounded-3xl rounded-tl-none border border-slate-800/50 flex-1">
+<h4 class="text-blue-400 font-bold uppercase tracking-widest text-xs mb-3">Priority Instruction #1</h4>
+<p class="text-xl font-bold text-white mb-4">Apply direct pressure to the femoral artery immediately.</p>
+<div class="bg-slate-950/50 rounded-xl p-4 flex items-center gap-4 border border-slate-800">
+<span class="material-symbols-outlined text-red-500" style="font-variation-settings: 'FILL' 1;">emergency_share</span>
+<p class="text-sm text-slate-400 leading-relaxed italic">"Patient is experiencing rapid arterial bleeding. Use a clean cloth or sterile gauze if available."</p>
+</div>
+</div>
+</div>
+<!-- Step by Step -->
+<div class="ml-14 space-y-4 border-l-2 border-slate-900 pl-8 py-2">
+<div class="relative">
+<div class="absolute -left-[35px] top-1 w-3 h-3 rounded-full bg-blue-500 border-4 border-slate-950"></div>
+<h5 class="font-bold text-white mb-1">Check Airway Patency</h5>
+<p class="text-sm text-slate-400">Ensure the patient is breathing and the airway is not obstructed by debris.</p>
+</div>
+<div class="relative opacity-60">
+<div class="absolute -left-[35px] top-1 w-3 h-3 rounded-full bg-slate-700 border-4 border-slate-950"></div>
+<h5 class="font-bold text-slate-400 mb-1">Begin Secondary Trauma Scan</h5>
+<p class="text-sm text-slate-500">Search for occult injuries once the primary bleed is managed.</p>
+</div>
+</div>
+</div>
+<!-- Trauma Visualization Card -->
+<div class="bg-gradient-to-br from-slate-900/50 to-slate-950 p-6 rounded-3xl border border-slate-800/50">
+<div class="flex justify-between items-center mb-6">
+<label class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Trauma Assessment Map</label>
+<span class="px-2 py-1 bg-red-950 text-red-500 text-[10px] font-black rounded uppercase">Critical Path</span>
+</div>
+<div class="flex gap-8 items-center">
+<div class="relative w-32 h-48 bg-slate-900/80 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-slate-800 text-7xl select-none">accessibility_new</span>
+<!-- Hotspot indicators -->
+<div class="absolute top-24 left-16 w-4 h-4 bg-red-500/30 rounded-full flex items-center justify-center">
+<div class="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></div>
+</div>
+</div>
+<div class="flex-1 space-y-4">
+<div class="flex justify-between items-center text-sm">
+<span class="text-slate-400 font-medium">Internal Stability</span>
+<span class="text-red-400 font-bold">CRITICAL</span>
+</div>
+<div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-red-500 w-[85%]"></div>
+</div>
+<div class="flex justify-between items-center text-sm pt-2">
+<span class="text-slate-400 font-medium">Neurological Response</span>
+<span class="text-blue-400 font-bold">STABLE</span>
+</div>
+<div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-blue-500 w-[62%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- AI Quick Actions -->
+<div class="pt-6 border-t border-slate-900 mt-6 grid grid-cols-2 gap-4">
+<button class="bg-slate-900/80 hover:bg-slate-800 p-4 rounded-2xl flex flex-col items-center gap-2 transition-all group">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-blue-400">analytics</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Compare Trends</span>
+</button>
+<button class="bg-slate-900/80 hover:bg-slate-800 p-4 rounded-2xl flex flex-col items-center gap-2 transition-all group">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-green-400">history_edu</span>
+<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Log Event</span>
+</button>
+</div>
+</section>
+</div>
+</main>
+<!-- Floating HUD Elements -->
+<div class="fixed top-20 right-8 flex flex-col gap-4">
+<div class="glass-panel p-4 rounded-2xl border border-slate-800 shadow-2xl flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-red-600/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-red-500 text-xl">timer</span>
+</div>
+<div>
+<div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">On Scene Since</div>
+<div class="text-xl font-black text-white">00:08:42</div>
+</div>
+</div>
+</div>
+</body></html>

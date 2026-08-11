@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed": "#002204",
+                        "on-surface-variant": "#5b403d",
+                        "surface-container-highest": "#e0e0ff",
+                        "surface": "#fbf8ff",
+                        "on-tertiary-container": "#daffd1",
+                        "inverse-primary": "#ffb3ac",
+                        "primary": "#af101a",
+                        "on-primary-fixed": "#410003",
+                        "primary-fixed": "#ffdad6",
+                        "on-secondary-container": "#003567",
+                        "surface-dim": "#d5d7ff",
+                        "primary-container": "#d32f2f",
+                        "on-tertiary-fixed-variant": "#005312",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f4f2ff",
+                        "secondary-container": "#54a0fe",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#9df898",
+                        "tertiary-container": "#298030",
+                        "secondary": "#005faf",
+                        "on-secondary-fixed-variant": "#004786",
+                        "on-secondary-fixed": "#001c3a",
+                        "on-error-container": "#93000a",
+                        "inverse-on-surface": "#f1efff",
+                        "surface-variant": "#e0e0ff",
+                        "on-primary": "#ffffff",
+                        "tertiary": "#016619",
+                        "primary-fixed-dim": "#ffb3ac",
+                        "outline-variant": "#e4beba",
+                        "on-surface": "#000767",
+                        "surface-tint": "#ba1a20",
+                        "secondary-fixed-dim": "#a5c8ff",
+                        "inverse-surface": "#1b247f",
+                        "surface-container": "#edecff",
+                        "on-primary-fixed-variant": "#930010",
+                        "on-primary-container": "#fff2f0",
+                        "on-background": "#000767",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e6ff",
+                        "secondary-fixed": "#d4e3ff",
+                        "background": "#fbf8ff",
+                        "on-error": "#ffffff",
+                        "outline": "#8f6f6c",
+                        "tertiary-fixed-dim": "#82db7e",
+                        "surface-bright": "#fbf8ff",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f1f5f9; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- Side Navigation Bar -->
+<nav class="fixed left-0 top-0 h-full flex flex-col border-r border-slate-900 bg-slate-950 w-64 z-50">
+<div class="px-6 py-8">
+<h1 class="text-2xl font-black text-red-600 dark:text-red-500 tracking-widest uppercase">SENTINEL</h1>
+<p class="font-inter text-sm font-semibold uppercase tracking-widest text-slate-500 mt-1">Precision EMS</p>
+</div>
+<div class="flex-1 mt-4">
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer hover:bg-slate-900 transition-all duration-300 text-slate-500 hover:text-slate-200">
+<span class="material-symbols-outlined">emergency_recording</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">Dispatch</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer hover:bg-slate-900 transition-all duration-300 text-slate-500 hover:text-slate-200">
+<span class="material-symbols-outlined">map</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">Navigation</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer text-white border-r-4 border-red-600 bg-gradient-to-r from-red-900/20 to-transparent transition-all duration-300">
+<span class="material-symbols-outlined">local_hospital</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">Hospitals</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer hover:bg-slate-900 transition-all duration-300 text-slate-500 hover:text-slate-200">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">AI Guide</span>
+</div>
+</div>
+<div class="mt-auto pb-8">
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer hover:bg-slate-900 transition-all duration-300 text-slate-500 hover:text-slate-200">
+<span class="material-symbols-outlined">data_thresholding</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">System Status</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 cursor-pointer hover:bg-slate-900 transition-all duration-300 text-slate-500 hover:text-slate-200">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-inter text-sm font-semibold uppercase tracking-widest">Logout</span>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="ml-64 min-h-screen flex flex-col bg-slate-950">
+<!-- Top App Bar -->
+<header class="flex justify-between items-center w-full px-6 h-16 bg-slate-950/80 backdrop-blur-xl z-40 shadow-2xl shadow-blue-900/10">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black tracking-widest text-red-600 dark:text-red-500 uppercase">SENTINEL DISPATCH</span>
+<div class="flex items-center bg-slate-900 rounded-full px-4 py-1.5 gap-3">
+<span class="material-symbols-outlined text-slate-400 text-sm">search</span>
+<input class="bg-transparent border-none text-sm focus:ring-0 text-slate-200 w-64 placeholder-slate-500" placeholder="Search Patients or Units..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4">
+<button class="text-slate-400 hover:text-red-500 transition-colors duration-200 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute -top-1 -right-1 w-2 h-2 bg-red-600 rounded-full"></span>
+</button>
+<button class="text-slate-400 hover:text-red-500 transition-colors duration-200">
+<span class="material-symbols-outlined">emergency</span>
+</button>
+<button class="text-slate-400 hover:text-red-500 transition-colors duration-200">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-slate-700">
+<img alt="Chief Paramedic Profile" class="w-full h-full object-cover" data-alt="professional portrait of a medical director in clinical attire with a clean clinical background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFVNJRI2zWch4RFiu7KYCU-146K8QsvpNgqVR2VRU7vTczuTuNYiEoEv1KAKEFPv6rBNqAhF3RZiXu1eC_uUMgoB6Jr-F2o2ckmfknQE2udX-NDrarunn-JJ2FMToxxGlN8pfC0VuZb161Nst8SpPhjgVhVf0_ys2aAga05oItAfVrcHiL5yAQ4InvWOoj9HX8ROngkXN9k_4V5STB3Acj7sohWbvuLdZQ_uVqfvduwJqNszXAwWZU28kWYILinGa48-Xzkr3vmeCn"/>
+</div>
+</div>
+</header>
+<!-- Hospital Dashboard Content -->
+<div class="flex-1 p-6 grid grid-cols-12 gap-6 overflow-y-auto custom-scrollbar content-start">
+<!-- Left Column: Active Incoming Dispatch List & Map -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+<!-- Map View HUD -->
+<div class="relative h-[300px] rounded-xl overflow-hidden bg-slate-900 shadow-inner group">
+<img class="w-full h-full object-cover opacity-60" data-alt="high contrast dark satellite navigation map of an urban city center with highlighted emergency route lines" data-location="Chicago" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVWPaIT4zf32bYADCD9ahUYV6i5FIpCvit58LM-UvYk2pG-rOE7BBtjfIOK_CJbCUbhgMK5QTrGOVxhwfovI5fmGPTQOoXsZAQxa-y3GFUV8UB8s6eB2gD7Q6A0rL-7Nb8ywdILiCze0_tPQX4LFyWCXmvlIXZd4Xh49xOLxwtiPq2vOu_cNBD9rRJ1ScZ4YrmH-1_JDVZIuqlrg6yx_hT0WMZYt6WPiYei8LaC_lgZT3TeakZM9tnqCZI6WvWoe6qF577QKMGOU7S"/>
+<div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
+<div class="absolute top-4 left-4 glass-panel px-3 py-2 rounded-lg">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+<span class="text-[10px] font-bold tracking-widest uppercase text-slate-200">UNIT MEDIC-14 LIVE</span>
+</div>
+</div>
+<div class="absolute bottom-4 right-4 flex flex-col gap-2">
+<button class="glass-panel p-2 rounded hover:bg-slate-800 transition-colors"><span class="material-symbols-outlined text-sm">add</span></button>
+<button class="glass-panel p-2 rounded hover:bg-slate-800 transition-colors"><span class="material-symbols-outlined text-sm">remove</span></button>
+</div>
+</div>
+<!-- Incoming Units List -->
+<div class="bg-slate-900/50 rounded-xl p-6 border border-slate-900/50">
+<div class="flex justify-between items-end mb-6">
+<h3 class="font-inter text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Incoming Assets</h3>
+<span class="text-2xl font-black text-slate-200">03</span>
+</div>
+<div class="space-y-4">
+<!-- Active Alert -->
+<div class="bg-red-950/20 border-l-4 border-red-600 p-4 rounded-r-lg cursor-pointer hover:bg-red-950/30 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<span class="font-black text-red-500 tracking-tight">MEDIC-14</span>
+<span class="bg-red-600 text-[10px] font-bold px-2 py-0.5 rounded text-white uppercase">Critical</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-sm font-medium text-slate-300">Trauma / MVA</span>
+<span class="text-lg font-bold text-white">04:12 <span class="text-[10px] text-slate-500">ETA</span></span>
+</div>
+</div>
+<!-- Secondary Alert -->
+<div class="bg-slate-900 border-l-4 border-blue-600 p-4 rounded-r-lg cursor-pointer hover:bg-slate-800 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<span class="font-black text-blue-500 tracking-tight">AMB-22</span>
+<span class="bg-blue-600 text-[10px] font-bold px-2 py-0.5 rounded text-white uppercase">Stable</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-sm font-medium text-slate-300">Respiratory Distress</span>
+<span class="text-lg font-bold text-white">09:45 <span class="text-[10px] text-slate-500">ETA</span></span>
+</div>
+</div>
+<!-- Secondary Alert -->
+<div class="bg-slate-900 border-l-4 border-slate-600 p-4 rounded-r-lg cursor-pointer hover:bg-slate-800 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<span class="font-black text-slate-500 tracking-tight">FIRE-RESCUE 4</span>
+<span class="bg-slate-600 text-[10px] font-bold px-2 py-0.5 rounded text-white uppercase">Transporting</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-sm font-medium text-slate-300">Cardiac Arrest (ROSC)</span>
+<span class="text-lg font-bold text-white">12:30 <span class="text-[10px] text-slate-500">ETA</span></span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Middle Column: Live Patient Vitals & Narrative -->
+<div class="col-span-12 lg:col-span-5 flex flex-col gap-6">
+<!-- Patient Identity Header -->
+<div class="bg-slate-900 rounded-xl p-8 flex justify-between items-start border border-slate-800/50">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<span class="material-symbols-outlined text-red-500" data-weight="fill">emergency</span>
+<h2 class="text-3xl font-black text-white tracking-tight">JOHN DOE (DOE, J)</h2>
+</div>
+<p class="text-slate-500 font-medium tracking-wide uppercase text-xs flex gap-4">
+<span>MALE • 45 Y/O</span>
+<span>MRN: 948-22-104</span>
+</p>
+</div>
+<div class="text-right">
+<p class="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Assigned Bay</p>
+<span class="text-2xl font-black text-red-500">TRAUMA 1</span>
+</div>
+</div>
+<!-- Live Vitals Bento Grid -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-slate-900 p-6 rounded-xl border border-slate-800/50">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Heart Rate</span>
+<span class="material-symbols-outlined text-red-500 text-sm">favorite</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-5xl font-black text-white">114</span>
+<span class="text-xs font-bold text-slate-500 uppercase">BPM</span>
+</div>
+<div class="mt-4 h-8 flex items-end gap-0.5">
+<div class="flex-1 bg-red-600/20 h-4 rounded-t-sm"></div>
+<div class="flex-1 bg-red-600/30 h-6 rounded-t-sm"></div>
+<div class="flex-1 bg-red-600/40 h-8 rounded-t-sm"></div>
+<div class="flex-1 bg-red-600/30 h-5 rounded-t-sm"></div>
+<div class="flex-1 bg-red-600/50 h-7 rounded-t-sm"></div>
+<div class="flex-1 bg-red-600 h-8 rounded-t-sm"></div>
+</div>
+</div>
+<div class="bg-slate-900 p-6 rounded-xl border border-slate-800/50">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">SpO2</span>
+<span class="material-symbols-outlined text-blue-500 text-sm">air</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-5xl font-black text-white">92</span>
+<span class="text-xs font-bold text-slate-500 uppercase">%</span>
+</div>
+<div class="mt-4 h-8 flex items-center gap-1">
+<span class="text-[10px] font-bold text-red-500 uppercase tracking-tighter">HYPOXIC ALERT</span>
+</div>
+</div>
+<div class="bg-slate-900 p-6 rounded-xl border border-slate-800/50">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Blood Pressure</span>
+<span class="material-symbols-outlined text-emerald-500 text-sm">speed</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-4xl font-black text-white">98/64</span>
+<span class="text-xs font-bold text-slate-500 uppercase">mmHg</span>
+</div>
+<p class="mt-4 text-[10px] font-bold text-slate-400 uppercase">MAP: 75.3</p>
+</div>
+<div class="bg-slate-900 p-6 rounded-xl border border-slate-800/50">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">GCS Score</span>
+<span class="material-symbols-outlined text-amber-500 text-sm">psychology</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-5xl font-black text-white">12</span>
+<span class="text-xs font-bold text-slate-500 uppercase">/ 15</span>
+</div>
+<p class="mt-4 text-[10px] font-bold text-slate-400 uppercase">E:3 V:4 M:5</p>
+</div>
+</div>
+<!-- Paramedic Narrative -->
+<div class="bg-slate-900 rounded-xl p-8 border border-slate-800/50 flex-1">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-inter text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Paramedic Narrative</h3>
+<span class="text-[10px] font-medium text-slate-600">LAST UPDATED: 2 MIN AGO</span>
+</div>
+<div class="prose prose-invert max-w-none">
+<p class="text-slate-300 leading-relaxed font-inter">
+                            Patient was driver in high-speed side-impact MVA. Extensive vehicle intrusion. Patient extricated over 15 minutes. 
+                            Complaining of severe left-sided chest pain and dyspnea. Decreased lung sounds noted on left. 
+                            Left distal femur fracture stabilized with traction splint. 
+                        </p>
+<p class="text-slate-300 leading-relaxed font-inter mt-4">
+<span class="text-red-500 font-bold uppercase text-[10px] mr-2">INTERVENTIONS:</span>
+                            18g IV in right AC, 500cc NS bolus, 100mcg Fentanyl administered for pain. Needle decompression performed at 14:15 with immediate improvement in SpO2.
+                        </p>
+</div>
+<div class="mt-8 pt-8 border-t border-slate-800/50">
+<div class="flex gap-4">
+<div class="px-4 py-2 bg-slate-800 rounded-lg text-xs font-bold text-slate-200">TRAUMA ACTIVATION</div>
+<div class="px-4 py-2 bg-slate-800 rounded-lg text-xs font-bold text-slate-200">INTUBATION PREP</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Timeline & History -->
+<div class="col-span-12 lg:col-span-3 flex flex-col gap-6">
+<!-- Journey Timeline -->
+<div class="bg-slate-900 rounded-xl p-6 border border-slate-800/50">
+<h3 class="font-inter text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-6">Mission Timeline</h3>
+<div class="relative space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center">
+<span class="material-symbols-outlined text-xs text-slate-400">call</span>
+</div>
+<p class="text-xs font-bold text-slate-200 uppercase">14:02 Dispatch</p>
+<p class="text-[10px] text-slate-500 uppercase">Call received</p>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center">
+<span class="material-symbols-outlined text-xs text-slate-400">location_on</span>
+</div>
+<p class="text-xs font-bold text-slate-200 uppercase">14:08 On-Scene</p>
+<p class="text-[10px] text-slate-500 uppercase">Extrication started</p>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-6 h-6 rounded-full bg-red-600/20 flex items-center justify-center border border-red-500">
+<span class="material-symbols-outlined text-xs text-red-500" data-weight="fill">local_shipping</span>
+</div>
+<p class="text-xs font-bold text-red-500 uppercase">14:24 Transporting</p>
+<p class="text-[10px] text-slate-400 uppercase">In-Transit to ER</p>
+</div>
+<div class="relative pl-8 opacity-40">
+<div class="absolute left-0 top-1 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center">
+<span class="material-symbols-outlined text-xs text-slate-400">check_circle</span>
+</div>
+<p class="text-xs font-bold text-slate-200 uppercase">14:42 ETA</p>
+<p class="text-[10px] text-slate-500 uppercase">Arrival Prediction</p>
+</div>
+</div>
+</div>
+<!-- Medical History -->
+<div class="bg-slate-900 rounded-xl p-6 border border-slate-800/50 flex-1">
+<h3 class="font-inter text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-6">Patient Hx</h3>
+<div class="space-y-6">
+<div>
+<p class="text-[10px] font-black text-red-500 uppercase tracking-widest mb-2">Allergies</p>
+<p class="text-sm font-bold text-slate-200">Penicillin, Latex, Shellfish</p>
+</div>
+<div>
+<p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Known Conditions</p>
+<ul class="text-sm font-medium text-slate-300 space-y-1">
+<li>• Hypertension</li>
+<li>• Type 2 Diabetes</li>
+<li>• Previous Cardiac Stent (2019)</li>
+</ul>
+</div>
+<div>
+<p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Medications</p>
+<p class="text-sm font-medium text-slate-300">Lisinopril, Metformin, Aspirin 81mg</p>
+</div>
+<div class="mt-4 pt-6 border-t border-slate-800/50">
+<button class="w-full py-3 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">clinical_notes</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Full Records</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Notification Bottom Bar (Specific Action) -->
+<footer class="h-20 bg-slate-950 border-t border-slate-900 px-8 flex items-center justify-between z-40">
+<div class="flex items-center gap-6">
+<div class="flex flex-col">
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Team Status</span>
+<span class="text-sm font-bold text-slate-200">Surgeon Paged • Blood Type O- Standby</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-6 py-2.5 bg-slate-800 text-slate-200 text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-slate-700 transition-colors">
+                    Request Info
+                </button>
+<button class="px-6 py-2.5 bg-red-600 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-900/20">
+                    Acknowledge Arrival
+                </button>
+</div>
+</footer>
+</main>
+</body></html>

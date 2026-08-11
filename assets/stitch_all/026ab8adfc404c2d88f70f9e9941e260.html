@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-container": "#daffd1",
+                        "surface-dim": "#d5d7ff",
+                        "surface": "#fbf8ff",
+                        "tertiary": "#016619",
+                        "primary": "#af101a",
+                        "primary-container": "#d32f2f",
+                        "on-surface-variant": "#5b403d",
+                        "on-tertiary-fixed-variant": "#005312",
+                        "on-secondary-fixed": "#001c3a",
+                        "surface-container": "#edecff",
+                        "tertiary-fixed": "#9df898",
+                        "on-secondary": "#ffffff",
+                        "secondary": "#005faf",
+                        "surface-container-high": "#e6e6ff",
+                        "outline": "#8f6f6c",
+                        "on-secondary-container": "#003567",
+                        "on-primary-container": "#fff2f0",
+                        "tertiary-fixed-dim": "#82db7e",
+                        "secondary-fixed": "#d4e3ff",
+                        "primary-fixed": "#ffdad6",
+                        "surface-container-low": "#f4f2ff",
+                        "on-primary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#1b247f",
+                        "surface-container-highest": "#e0e0ff",
+                        "on-tertiary-fixed": "#002204",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#a5c8ff",
+                        "surface-variant": "#e0e0ff",
+                        "on-background": "#000767",
+                        "secondary-container": "#54a0fe",
+                        "surface-tint": "#ba1a20",
+                        "on-secondary-fixed-variant": "#004786",
+                        "primary-fixed-dim": "#ffb3ac",
+                        "on-primary-fixed-variant": "#930010",
+                        "outline-variant": "#e4beba",
+                        "inverse-on-surface": "#f1efff",
+                        "tertiary-container": "#298030",
+                        "inverse-primary": "#ffb3ac",
+                        "on-error-container": "#93000a",
+                        "on-primary-fixed": "#410003",
+                        "surface-bright": "#fbf8ff",
+                        "on-surface": "#000767",
+                        "background": "#fbf8ff",
+                        "surface-container-lowest": "#ffffff",
+                        "error": "#ba1a1a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            backdrop-filter: blur(20px);
+            background-color: rgba(251, 248, 255, 0.8);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-background antialiased pb-24">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl shadow-2xl shadow-blue-900/10 flex items-center justify-between px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-red-700 dark:text-red-500 text-2xl">emergency</span>
+<h1 class="font-inter tracking-tight headline-md font-black tracking-widest uppercase text-red-700 dark:text-red-500">Sentinel Dispatch</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-slate-500">notifications</span>
+<div class="h-8 w-8 rounded-full bg-slate-200 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="professional medical paramedic in uniform looking at the camera with a neutral expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-xq8LfrAWLXgsb06O444D45uKxmWptIEvYLwLUPWBoApsBbk_Ei8R2YWJY8veRJNAl9FUemTxXxRiKL4LVuk1LPQ78UfBIfKEWaAayjpnvRlK27fFaU6HJtv0jOknnaIc8pgxayiPiSY-vGFKL-iFkh6MosPzBF8STDRX5--wvpoSJfc7iQtDqSx3Su2KJdU45UFHFmSIkFjxB1RZGbj_lOhVvKx7w8Nh2qVXyCwt0VtJ4gmqmbr4X6YbXDuqayJ44ZcJhchC0Pxd"/>
+</div>
+</div>
+</header>
+<main class="pt-24 px-6 max-w-5xl mx-auto space-y-8">
+<!-- Context Header -->
+<section class="space-y-2">
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest text-primary">Live Recommendation Engine</span>
+<div class="flex justify-between items-end">
+<h2 class="text-4xl font-bold tracking-tight text-on-surface">Nearest Hospitals</h2>
+<div class="flex items-center gap-2 bg-tertiary/10 px-3 py-1.5 rounded-xl border border-tertiary/20">
+<span class="material-symbols-outlined text-tertiary text-sm" style="font-variation-settings: 'FILL' 1;">circle</span>
+<span class="text-xs font-bold text-tertiary uppercase tracking-wider">Unit 704 Active</span>
+</div>
+</div>
+</section>
+<!-- AI Priority Hero Card (Bento Style) -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="md:col-span-2 relative overflow-hidden rounded-3xl bg-primary-container p-8 text-white shadow-2xl">
+<div class="absolute top-0 right-0 p-4">
+<span class="material-symbols-outlined text-6xl opacity-20" style="font-variation-settings: 'FILL' 1;">clinical_notes</span>
+</div>
+<div class="relative z-10 space-y-6">
+<div>
+<span class="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">AI Top Pick</span>
+<h3 class="mt-4 text-3xl font-extrabold leading-tight">Recommended: St. Jude Medical</h3>
+<p class="text-primary-fixed text-sm font-medium">98% match based on patient's Cardiac profile and current traffic telemetry.</p>
+</div>
+<div class="flex gap-8">
+<div>
+<p class="text-[10px] uppercase tracking-widest opacity-70 mb-1">Travel Time</p>
+<p class="text-2xl font-black">12 mins</p>
+</div>
+<div>
+<p class="text-[10px] uppercase tracking-widest opacity-70 mb-1">ICU Capacity</p>
+<p class="text-2xl font-black">5/10 Beds</p>
+</div>
+</div>
+<button class="w-full md:w-auto bg-white text-primary font-bold px-8 py-4 rounded-xl active:scale-95 transition-transform">
+                        Notify &amp; Select Hospital
+                    </button>
+</div>
+</div>
+<div class="bg-surface-container-low rounded-3xl p-8 flex flex-col justify-between">
+<div class="space-y-4">
+<span class="material-symbols-outlined text-secondary text-3xl">map</span>
+<p class="text-sm font-medium leading-relaxed text-on-surface-variant">Real-time routing is calculating ETA via 4th St due to construction on Broadway.</p>
+</div>
+<div class="w-full h-32 rounded-2xl overflow-hidden mt-6 relative">
+<img class="w-full h-full object-cover" data-alt="simplified map visualization of city streets with a red navigation path and hospital pin icons" data-location="Chicago" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-TzT_M3dA7xupkRtsUXVXAhX6L2ke5_PmMHC4hUQyDAGVpGNznfO4FiT0wFTRckhV8lTI6gtTW0tCweaPoH9_nxI-h3M1odt1OWcaTSxb6Z_xd1urgiRI-RkFvAFtbWq8b88WxWAZiCTDYU5NPo6KZ9ANtGepBJC_Cet27bIc98EjSINad2aPhpJgVR92MYAmol4A9n8ih_7cXnGKxlKtQHToN33bm9zTJH02MEn2nCktLKnjWLiodzCuuVufZti68Hzwx8MNL7K9"/>
+<div class="absolute inset-0 bg-secondary/20 flex items-center justify-center">
+<span class="bg-white/90 px-3 py-1 rounded-lg text-[10px] font-bold text-on-surface">View Map</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Selection List -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<h3 class="text-lg font-bold text-on-surface">Alternative Destinations</h3>
+<span class="text-xs font-semibold text-slate-500">Sorted by Specialty Match</span>
+</div>
+<div class="space-y-3">
+<!-- Hospital Item 1 -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-slate-100">
+<div class="flex items-start gap-4">
+<div class="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-400" style="font-variation-settings: 'FILL' 1;">local_hospital</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">General Mercy Hospital</h4>
+<div class="flex items-center gap-3 mt-1">
+<span class="text-[10px] font-bold bg-secondary/10 text-secondary px-2 py-0.5 rounded-full uppercase tracking-tighter">Trauma Level II</span>
+<span class="text-xs text-slate-500">Match: Trauma Care</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12">
+<div class="space-y-1">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Availability</p>
+<p class="text-sm font-black text-on-surface">8/10 ICU</p>
+</div>
+<div class="space-y-1">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Travel</p>
+<p class="text-sm font-black text-on-surface">18 mins</p>
+</div>
+<div class="hidden md:block space-y-1">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Match</p>
+<p class="text-sm font-black text-tertiary">91%</p>
+</div>
+</div>
+<button class="bg-slate-100 text-slate-700 font-bold px-6 py-3 rounded-xl hover:bg-primary hover:text-white transition-colors text-sm">
+                        Notify &amp; Select
+                    </button>
+</div>
+<!-- Hospital Item 2 -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-slate-100">
+<div class="flex items-start gap-4">
+<div class="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-400" style="font-variation-settings: 'FILL' 1;">local_hospital</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">Saint Anne Cardiac Center</h4>
+<div class="flex items-center gap-3 mt-1">
+<span class="text-[10px] font-bold bg-tertiary/10 text-tertiary px-2 py-0.5 rounded-full uppercase tracking-tighter">Specialty Match</span>
+<span class="text-xs text-slate-500">Cardiac Center</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12">
+<div class="space-y-1">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Availability</p>
+<p class="text-sm font-black text-error">2/10 ICU</p>
+</div>
+<div class="space-y-1">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Travel</p>
+<p class="text-sm font-black text-on-surface">24 mins</p>
+</div>
+<div class="hidden md:block space-y-1">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Match</p>
+<p class="text-sm font-black text-tertiary">85%</p>
+</div>
+</div>
+<button class="bg-slate-100 text-slate-700 font-bold px-6 py-3 rounded-xl hover:bg-primary hover:text-white transition-colors text-sm">
+                        Notify &amp; Select
+                    </button>
+</div>
+<!-- Hospital Item 3 -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 opacity-60">
+<div class="flex items-start gap-4">
+<div class="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-400">lock_clock</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">Westside Medical Hub</h4>
+<div class="flex items-center gap-3 mt-1">
+<span class="text-[10px] font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-tighter">Diverted</span>
+<span class="text-xs text-slate-500">Over Capacity</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12">
+<div class="space-y-1">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Availability</p>
+<p class="text-sm font-black text-error">0/10 ICU</p>
+</div>
+<div class="space-y-1">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Travel</p>
+<p class="text-sm font-black text-on-surface">15 mins</p>
+</div>
+<div class="hidden md:block space-y-1">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Match</p>
+<p class="text-sm font-black text-slate-400">Low</p>
+</div>
+</div>
+<button class="bg-slate-200 text-slate-400 font-bold px-6 py-3 rounded-xl text-sm cursor-not-allowed" disabled="">
+                        Unavailable
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-2xl bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-[0_-10px_40px_rgba(0,7,103,0.08)] flex justify-around items-center px-4 pb-6 pt-3">
+<div class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 px-5 py-2 hover:text-red-600 dark:hover:text-red-400 active:scale-90 transition-all duration-300 ease-out">
+<span class="material-symbols-outlined">dashboard_customize</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Dispatch</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 px-5 py-2 hover:text-red-600 dark:hover:text-red-400 active:scale-90 transition-all duration-300 ease-out">
+<span class="material-symbols-outlined">near_me</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Navigation</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-red-700 text-white dark:bg-red-600 rounded-xl px-5 py-2 scale-105 active:scale-90 transition-all duration-300 ease-out">
+<span class="material-symbols-outlined">local_hospital</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Hospitals</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 px-5 py-2 hover:text-red-600 dark:hover:text-red-400 active:scale-90 transition-all duration-300 ease-out">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Settings</span>
+</div>
+</nav>
+</body></html>

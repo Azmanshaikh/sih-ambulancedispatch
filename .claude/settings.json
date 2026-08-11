@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)",
+      "Bash(dir /s /b \"c:\\\\Projects\\\\AI-Smart-City-incseption\")",
+      "Bash(findstr /E \"\\\\.\\(ts|tsx|js|jsx|py|env\\)$\")",
+      "Bash(dir /s \"c:\\\\Projects\\\\AI-Smart-City-incseption\")",
+      "Bash(findstr /E \"^Directory|supabase|auth\")",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Projects\\\\AI-Smart-City-incseption\" -Recurse -Directory | Where-Object {$_.Name -match \"auth|supabase|config\"} | Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Projects\\\\AI-Smart-City-incseption\\\\frontend\\\\src\" -Recurse -File -Filter \"*.{tsx,ts,jsx,js}\")",
+      "Bash(Select-Object -ExpandProperty FullName)"
+    ]
+  }
+}

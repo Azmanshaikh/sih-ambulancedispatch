@@ -1,0 +1,20 @@
+{
+  "name": "sentinel-dispatch",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "gen:envjs": "node scripts/generate-env-js.cjs",
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "backend": "c:/Projects/AI-Smart-City-incseption/.conda/python.exe -m uvicorn backend.main:app --reload --port 8000"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.4",
+    "autoprefixer": "^10.5.0",
+    "tailwindcss": "^4.2.4",
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.1"
+  }
+}
