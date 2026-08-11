@@ -3,9 +3,9 @@ version: '3.8'
 services:
   db:
     image: timescale/timescaledb-ha:pg15
-    container_name: smartcity_db
+    container_name: jeevan_db
     environment:
-      POSTGRES_DB: smartcity
+      POSTGRES_DB: jeevan
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgrespassword
     ports:
@@ -16,7 +16,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: smartcity_redis
+    container_name: jeevan_redis
     ports:
       - "6379:6379"
     restart: always
@@ -24,14 +24,14 @@ services:
   api:
     build: 
       context: ./backend
-    container_name: smartcity_api
+    container_name: jeevan_api
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@db:5432/smartcity
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@db:5432/jeevan
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=supersecretjwtkey123
     depends_on:
@@ -42,12 +42,12 @@ services:
   celery_worker:
     build:
       context: ./backend
-    container_name: smartcity_celery
+    container_name: jeevan_celery
     command: celery -A app.tasks.celery_app worker --loglevel=info
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@db:5432/smartcity
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@db:5432/jeevan
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - db

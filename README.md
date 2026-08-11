@@ -1,4 +1,4 @@
-# AI Smart City — Sentinel Dispatch
+# JEEVAN — JEEVAN
 
 FastAPI backend + Vite/React frontend for a smart ambulance dispatch / routing prototype.
 

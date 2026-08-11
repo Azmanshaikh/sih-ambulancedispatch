@@ -3,7 +3,7 @@
 ## Project Structure
 
 ```
-sentinel-dispatch/
+jeevan/
 ├── backend/          # FastAPI Python backend
 │   ├── main.py       # API entry point, dispatch pipeline
 │   ├── models.py     # Pydantic request/response models

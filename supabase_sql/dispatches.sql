@@ -1,4 +1,4 @@
--- Sentinel Dispatch: initial persistence (dispatch history)
+-- JEEVAN: initial persistence (dispatch history)
 -- Run this in Supabase SQL Editor.
 
 create table if not exists public.dispatches (
