@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { useEffect } from 'react';
 
@@ -10,7 +10,7 @@ const createCustomIcon = (iconClass) => L.divIcon({
   iconSize: [24, 24],
 });
 
-export default function MapWidget({ id, className, markers = [] }) {
+export default function MapWidget({ id, className, markers = [], route = null }) {
   // Fix for React Leaflet missing default icon
   useEffect(() => {
     delete L.Icon.Default.prototype._getIconUrl;
@@ -39,6 +39,9 @@ export default function MapWidget({ id, className, markers = [] }) {
             {marker.popup && <Popup>{marker.popup}</Popup>}
           </Marker>
         ))}
+        {route && route.length > 0 && (
+          <Polyline positions={route} pathOptions={{ color: '#3b82f6', weight: 5, opacity: 0.8 }} />
+        )}
       </MapContainer>
     </div>
   );

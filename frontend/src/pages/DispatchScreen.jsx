@@ -1,7 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import MapWidget from '../components/MapWidget';
 
 export default function DispatchScreen() {
+  const [route, setRoute] = useState([]);
+  const [markers, setMarkers] = useState([]);
+  const [dispatchStatus, setDispatchStatus] = useState('Standby');
+
+  const handleSimulateDispatch = async () => {
+    setDispatchStatus('Calculating Route...');
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      // Mock an incident location near Connaught Place, New Delhi
+      const incidentLat = 28.6289;
+      const incidentLng = 77.2065;
+
+      const res = await fetch(`${backendUrl}/tracking/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incident_lat: incidentLat, incident_lng: incidentLng })
+      });
+      const result = await res.json();
+      
+      if (result.status === 'success' && result.data) {
+        const { route: routeCoords, ambulance_id, eta_seconds } = result.data;
+        setRoute(routeCoords);
+        setMarkers([{ position: [incidentLat, incidentLng], popup: 'Emergency Incident' }]);
+        setDispatchStatus(`Dispatched ${ambulance_id} - ETA: ${Math.round(eta_seconds / 60)} mins`);
+      } else {
+        setDispatchStatus('Routing Failed');
+      }
+    } catch (err) {
+      console.error(err);
+      setDispatchStatus('Error API unreachable');
+    }
+  };
   return (
     <div className="h-full flex flex-col" style={{ overflow: 'hidden' }}>
       <div className="p-5 grid grid-cols-12 gap-5 h-full overflow-hidden">
@@ -28,17 +60,22 @@ export default function DispatchScreen() {
           <section className="flex flex-col gap-3 flex-1 min-h-0">
             <div className="flex justify-between items-center">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Active Fleet</h3>
-              <span className="text-[10px] text-red-500 font-bold">Loading…</span>
+              <span className="text-[10px] text-red-500 font-bold">{dispatchStatus}</span>
             </div>
             <div className="space-y-2.5 overflow-y-auto no-sb flex-1">
-              <div className="text-xs text-slate-600 italic">Fetching units…</div>
+              <button 
+                onClick={handleSimulateDispatch}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors shadow-lg shadow-blue-900/20"
+              >
+                Simulate Dispatch
+              </button>
             </div>
           </section>
         </div>
 
         {/* CENTER: LIVE MAP */}
         <div className="col-span-6 relative rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
-          <MapWidget id="dash-map" />
+          <MapWidget id="dash-map" route={route} markers={markers} />
           
           <div className="absolute inset-0 pointer-events-none z-10" style={{ padding: '1rem' }}>
             <div className="flex justify-between items-start pointer-events-auto">

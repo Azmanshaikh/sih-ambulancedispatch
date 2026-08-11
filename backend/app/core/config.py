@@ -7,8 +7,11 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "supersecretjwtkey123"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    GOOGLE_MAPS_API_KEY: str | None = None
+    TOMTOM_API_KEY: str | None = None
 
     class Config:
-        env_file = ".env"
+        env_file = "../.env"
+        extra = "ignore"
 
 settings = Settings()

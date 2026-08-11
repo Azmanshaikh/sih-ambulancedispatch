@@ -1,7 +1,24 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import List
+from pydantic import BaseModel
+from app.services.dispatch_optimizer import get_optimal_ambulance
 
 router = APIRouter(prefix="/tracking", tags=["Tracking"])
+
+class DispatchRequest(BaseModel):
+    incident_lat: float
+    incident_lng: float
+
+@router.post("/dispatch")
+async def simulate_dispatch(req: DispatchRequest):
+    # Mock some available ambulances for demonstration
+    mock_ambulances = [
+        {"id": "AMB-101", "location": (28.6139, 77.2090)},
+        {"id": "AMB-205", "location": (28.6250, 77.2100)},
+        {"id": "AMB-309", "location": (28.6000, 77.1900)},
+    ]
+    result = get_optimal_ambulance(req.incident_lat, req.incident_lng, mock_ambulances)
+    return {"status": "success", "data": result}
 
 class ConnectionManager:
     def __init__(self):
