@@ -7,10 +7,47 @@ export default function NewRequestScreen() {
   const [narrative, setNarrative] = useState('');
   const [age, setAge] = useState('adult');
   const [isRaining, setIsRaining] = useState('false');
+  const [reportFile, setReportFile] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleSubmit = () => {
     // Basic mock submission
     navigate('/');
+  };
+
+  const handleAnalyzeReport = async () => {
+    if (!description && !reportFile) {
+      alert("Please provide a description or upload a report.");
+      return;
+    }
+    
+    setIsAnalyzing(true);
+    setAnalysisResult('');
+    
+    const formData = new FormData();
+    if (description) formData.append('text', description);
+    if (reportFile) formData.append('image', reportFile);
+    
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const res = await fetch(`${backendUrl}/ai/analyze-report`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await res.json();
+      if (data.status === 'success') {
+        setAnalysisResult(data.analysis);
+      } else {
+        setAnalysisResult(`Error: ${data.detail || data.message}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setAnalysisResult('Failed to connect to the analysis service.');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -37,8 +74,32 @@ export default function NewRequestScreen() {
             </div>
             
             <div className="space-y-3 pt-2">
-              <h3 className="text-sm font-black uppercase tracking-widest text-red-500">Quick Triage</h3>
-              <div className="space-y-3 text-slate-400 text-xs italic">AI will analyze description to generate triage questions...</div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-red-500">Quick Triage & AI Analysis</h3>
+              
+              <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/50 space-y-3">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Upload Medical Report (Image)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => setReportFile(e.target.files[0])}
+                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 cursor-pointer"
+                />
+                
+                <button
+                  onClick={handleAnalyzeReport}
+                  disabled={isAnalyzing}
+                  className="w-full py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50"
+                >
+                  {isAnalyzing ? 'Analyzing with NVIDIA AI...' : 'Analyze Report & Description'}
+                </button>
+              </div>
+
+              {analysisResult && (
+                <div className="bg-slate-900 shadow-inner rounded-xl p-4 text-sm text-slate-200 border border-blue-500/50 mt-4 max-h-60 overflow-y-auto whitespace-pre-wrap">
+                  <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">AI Assessment Result</h4>
+                  {analysisResult}
+                </div>
+              )}
             </div>
           </div>
 

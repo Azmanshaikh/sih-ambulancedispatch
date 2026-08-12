@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.db import engine, Base
-from app.api import auth, tracking
+from app.api import auth, tracking, ai
 import contextlib
 
 @contextlib.asynccontextmanager
@@ -27,6 +27,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(tracking.router)
+app.include_router(ai.router)
 
 @app.get("/health")
 async def health_check():

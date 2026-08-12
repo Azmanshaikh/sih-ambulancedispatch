@@ -78,12 +78,12 @@ body {
 .bot-vbar:nth-child(4) { animation-delay: .3s; }
 .bot-vbar:nth-child(5) { animation-delay: .4s; }
 
-/* ── Leaflet dark overrides ── */
+/* ── Leaflet overrides ── */
 .leaflet-container {
-  background: #0f172a !important;
+  background: #e8f4f8 !important;
 }
 .leaflet-tile {
-  filter: invert(1) hue-rotate(180deg) brightness(0.82) saturate(0.7);
+  /* No inversion — using colorful tiles */
 }
 .leaflet-control-zoom a {
   background: #1e293b !important;
