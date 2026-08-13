@@ -1,52 +1,60 @@
 <script lang="ts">
   import '../app.css';
   import TopNav from '$lib/components/TopNav.svelte';
-  import HospitalLoginModal from '$lib/components/HospitalLoginModal.svelte';
-  import WelcomeModal from '$lib/components/WelcomeModal.svelte';
-  import { onMount } from 'svelte';
   import type { Snippet } from 'svelte';
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
+  import { auth, homeFor, initAuth } from '$lib/auth.svelte';
 
   interface Props { children: Snippet; }
   let { children }: Props = $props();
 
-  let isLoginModalOpen = $state(false);
-  let isWelcomeModalOpen = $state(false);
-  let gpsStatus = $state('Acquiring GPS…');
+  let gpsStatus = $state('BMSIT College, Yelahanka');
 
-  onMount(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => gpsStatus = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`,
-        () => gpsStatus = 'GPS denied — using default'
-      );
-    } else {
-      gpsStatus = 'GPS not supported';
+  const PUBLIC = ['/login', '/auth/callback'];
+
+  const STAFF_PATHS = ['/', '/request', '/navigation', '/hospitals', '/notifications', '/staff/approvals'];
+  const PATIENT_PATHS = ['/patient', '/ai-guide'];
+  const DRIVER_PATHS = ['/driver'];
+
+  function allowed(pathname: string, role?: string | null) {
+    if (PUBLIC.includes(pathname)) return true;
+    if (role === 'staff') return STAFF_PATHS.includes(pathname) || pathname.startsWith('/staff/');
+    if (role === 'driver') return DRIVER_PATHS.includes(pathname);
+    return PATIENT_PATHS.includes(pathname);
+  }
+
+  onMount(async () => {
+    await initAuth();
+    const path = page.url.pathname;
+    if (!auth.session && !PUBLIC.includes(path)) {
+      goto('/login', { replaceState: true });
+      return;
+    }
+    if (auth.session && path === '/login') {
+      goto(homeFor(auth.profile?.role), { replaceState: true });
+      return;
+    }
+    if (auth.session && !allowed(path, auth.profile?.role)) {
+      goto(homeFor(auth.profile?.role), { replaceState: true });
     }
   });
 
-  function handleLoginSuccess() {
-    isLoginModalOpen = false;
-    isWelcomeModalOpen = true;
-  }
+  $effect(() => {
+    if (!auth.ready) return;
+    const path = page.url.pathname;
+    if (!auth.session && !PUBLIC.includes(path)) goto('/login', { replaceState: true });
+    else if (auth.session && path === '/login') goto(homeFor(auth.profile?.role), { replaceState: true });
+    else if (auth.session && !allowed(path, auth.profile?.role)) goto(homeFor(auth.profile?.role), { replaceState: true });
+  });
 </script>
 
-<TopNav
-  onHospitalLoginClick={() => (isLoginModalOpen = true)}
-  {gpsStatus}
-/>
+{#if !PUBLIC.includes(page.url.pathname)}
+  <TopNav {gpsStatus} />
+{/if}
 
-<HospitalLoginModal
-  isOpen={isLoginModalOpen}
-  onClose={() => (isLoginModalOpen = false)}
-  onLoginSuccess={handleLoginSuccess}
-/>
-
-<WelcomeModal
-  isOpen={isWelcomeModalOpen}
-  onClose={() => (isWelcomeModalOpen = false)}
-/>
-
-<main style="padding-top: 88px; flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; height: 100vh;">
+<main style="padding-top: {PUBLIC.includes(page.url.pathname) ? '0' : '88px'}; flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; height: 100vh;">
   <div class="flex-1 overflow-hidden relative h-full">
     {@render children()}
   </div>

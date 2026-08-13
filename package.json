@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
-    "backend": "cross-env PYTHONPATH=./backend uvicorn app.main:app --reload --port 8000"
+    "backend": "cross-env PYTHONPATH=./backend uvicorn app.main:app --reload --reload-dir backend --port 8000"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.4",

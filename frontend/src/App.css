@@ -202,9 +202,9 @@ body {
 
 /* ── Custom map icons ── */
 .amb-icon {
-  font-size: 2rem;
-  filter: drop-shadow(0 2px 8px rgba(220,38,38,.9));
-  animation: bob 2s ease-in-out infinite;
+  font-size: 1.25rem;
+  filter: drop-shadow(0 2px 6px rgba(220,38,38,.75));
+  animation: bob 2.4s ease-in-out infinite;
 }
 @keyframes bob {
   0%, 100% { transform: translateY(0); }
@@ -213,6 +213,34 @@ body {
 .hosp-icon {
   font-size: 1.8rem;
   filter: drop-shadow(0 2px 6px rgba(59,130,246,.7));
+}
+.hosp-building {
+  filter: drop-shadow(0 2px 5px rgba(29, 78, 216, 0.65));
+}
+.hosp-selected .hosp-building {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.9));
+}
+.amb-marker {
+  background: transparent !important;
+  border: none !important;
+}
+.eta-badge-wrap {
+  background: transparent !important;
+  border: none !important;
+}
+.eta-badge {
+  background: #dc2626;
+  color: #fff;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45);
+  border: 2px solid #fff;
 }
 .user-icon {
   font-size: 1.4rem;

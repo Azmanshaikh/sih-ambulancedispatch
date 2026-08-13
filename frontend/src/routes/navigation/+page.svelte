@@ -1,12 +1,43 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
+  import { apiFetch } from '$lib/auth.svelte';
+
+  const BMSIT: [number, number] = [13.1344, 77.5693];
+  let markers = $state<any[]>([
+    { position: BMSIT, popup: '📍 BMSIT College, Yelahanka', type: 'incident' },
+  ]);
+
+  onMount(async () => {
+    try {
+      const res = await apiFetch('/tracking/fleet');
+      const data = await res.json();
+      const fleet = (data.ambulances || []).map((a: any) => ({
+        position: [a.lat, a.lng],
+        popup: `🚑 ${a.id} · ${a.label}`,
+        type: 'ambulance',
+      }));
+      const hospitals = (data.hospitals || []).map((h: any) => ({
+        position: [h.lat, h.lng],
+        popup: `🏥 ${h.name}`,
+        type: 'hospital',
+      }));
+      markers = [
+        { position: BMSIT, popup: '📍 BMSIT College, Yelahanka', type: 'incident' },
+        ...hospitals,
+        ...fleet,
+      ];
+    } catch (err) {
+      console.error(err);
+    }
+  });
 </script>
 
 <svelte:head><title>JEEVAN — Navigation</title></svelte:head>
 
 <div class="h-full flex flex-col">
   <div class="flex-1 relative map-wrap rounded-none">
-    <MapWidget id="nav-map" clazz="absolute inset-0" />
+    <MapWidget id="nav-map" clazz="absolute inset-0" {markers} center={BMSIT} />
 
     <!-- HUD overlay -->
     <div class="absolute top-5 left-5 space-y-3 z-10 pointer-events-none">

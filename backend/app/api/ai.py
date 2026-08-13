@@ -1,11 +1,68 @@
-from fastapi import APIRouter, HTTPException, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
 from pydantic import BaseModel
 import httpx
 import base64
-from typing import Optional
+from typing import Any, Optional
 from app.core.config import settings
+from app.core.security import get_current_user
 
 router = APIRouter(prefix="/ai", tags=["AI"])
+
+
+class ChatBody(BaseModel):
+    message: str
+    history: list[dict[str, str]] = []
+
+
+@router.post("/chat")
+async def chat(body: ChatBody, _user: dict[str, Any] = Depends(get_current_user)):
+    if not settings.NVIDIA_API_KEY:
+        raise HTTPException(status_code=500, detail="NVIDIA_API_KEY not configured in .env")
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="Message required")
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are JEEVAN, an emergency first-aid assistant for patients in Bengaluru. "
+                "Give short, calm, practical steps. You are not a doctor. "
+                "If symptoms sound life-threatening, tell them to stay on the line and request an ambulance in the app."
+            ),
+        }
+    ]
+    for turn in body.history[-8:]:
+        role = turn.get("role") if turn.get("role") in ("user", "assistant") else "user"
+        messages.append({"role": role, "content": turn.get("content") or ""})
+    messages.append({"role": "user", "content": body.message.strip()})
+
+    headers = {
+        "Authorization": f"Bearer {settings.NVIDIA_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": settings.NVIDIA_MODEL,
+        "messages": messages,
+        "max_tokens": 400,
+        "temperature": 0.3,
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.NVIDIA_BASE_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=45.0,
+            )
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail="AI provider error")
+        result = response.json()
+        content = result["choices"][0]["message"]["content"]
+        return {"status": "success", "reply": content}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/analyze-report")
 async def analyze_report(

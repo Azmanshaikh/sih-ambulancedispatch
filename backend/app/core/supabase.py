@@ -1,24 +1,128 @@
-from supabase import create_client, Client
-from app.core.config import settings
+from __future__ import annotations
+
 import logging
+from typing import Any
+
+import requests
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-def get_supabase_client() -> Client | None:
-    """
-    Initializes and returns the Supabase client.
-    Returns None if SUPABASE_URL or SUPABASE_SERVICE_KEY is not configured.
-    """
-    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
-        logger.warning("Supabase URL or Service Key missing. Supabase client will not be initialized.")
+supabase_client = None
+
+try:
+    from supabase import create_client
+
+    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_KEY:
+        supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+except Exception as e:
+    logger.warning("Supabase Python SDK unavailable (%s); using REST fallback.", e)
+    supabase_client = None
+
+
+def _rest_headers(prefer: str | None = None) -> dict[str, str]:
+    key = settings.SUPABASE_SERVICE_KEY or settings.SUPABASE_ANON_KEY or ""
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+    if prefer:
+        headers["Prefer"] = prefer
+    return headers
+
+
+def auth_user_from_token(access_token: str) -> dict[str, Any] | None:
+    if not settings.SUPABASE_URL:
         return None
-        
+    url = f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/user"
+    key = settings.SUPABASE_ANON_KEY or settings.VITE_SUPABASE_ANON_KEY or settings.SUPABASE_SERVICE_KEY or ""
     try:
-        supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-        return supabase
+        res = requests.get(
+            url,
+            headers={"Authorization": f"Bearer {access_token}", "apikey": key},
+            timeout=8,
+        )
+        if res.status_code != 200:
+            return None
+        return res.json()
     except Exception as e:
-        logger.error(f"Failed to initialize Supabase client: {e}")
+        logger.error("auth user lookup failed: %s", e)
         return None
 
-# Singleton instance
-supabase_client = get_supabase_client()
+
+def rest_select(table: str, params: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    if not settings.SUPABASE_URL or not (settings.SUPABASE_SERVICE_KEY or settings.SUPABASE_ANON_KEY):
+        return []
+    url = f"{settings.SUPABASE_URL.rstrip('/')}/rest/v1/{table}"
+    try:
+        res = requests.get(url, headers=_rest_headers(), params=params or {}, timeout=8)
+        if res.status_code >= 400:
+            logger.warning("REST select %s failed: %s", table, res.text)
+            return []
+        data = res.json()
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        logger.error("REST select failed: %s", e)
+        return []
+
+
+def rest_upsert(table: str, row: dict[str, Any]) -> dict[str, Any] | None:
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
+        return None
+    url = f"{settings.SUPABASE_URL.rstrip('/')}/rest/v1/{table}?on_conflict=id"
+    try:
+        res = requests.post(
+            url,
+            headers=_rest_headers("resolution=merge-duplicates,return=representation"),
+            json=row,
+            timeout=8,
+        )
+        if res.status_code >= 400:
+            logger.warning("REST upsert %s failed: %s", table, res.text)
+            return None
+        data = res.json()
+        if isinstance(data, list) and data:
+            return data[0]
+        if isinstance(data, dict):
+            return data
+    except Exception as e:
+        logger.error("REST upsert failed: %s", e)
+    return None
+
+
+def rest_insert(table: str, row: dict[str, Any]) -> dict[str, Any] | None:
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
+        return None
+    url = f"{settings.SUPABASE_URL.rstrip('/')}/rest/v1/{table}"
+    try:
+        res = requests.post(
+            url,
+            headers=_rest_headers("return=representation"),
+            json=row,
+            timeout=8,
+        )
+        if res.status_code >= 400:
+            logger.warning("REST insert %s failed: %s", table, res.text)
+            return None
+        data = res.json()
+        if isinstance(data, list) and data:
+            return data[0]
+        if isinstance(data, dict):
+            return data
+    except Exception as e:
+        logger.error("REST insert failed: %s", e)
+    return None
+
+
+def rest_update(table: str, match: dict[str, str], row: dict[str, Any]) -> None:
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
+        return
+    url = f"{settings.SUPABASE_URL.rstrip('/')}/rest/v1/{table}"
+    try:
+        res = requests.patch(url, headers=_rest_headers(), params=match, json=row, timeout=8)
+        if res.status_code >= 400:
+            logger.warning("REST update %s failed: %s", table, res.text)
+    except Exception as e:
+        logger.error("REST update failed: %s", e)

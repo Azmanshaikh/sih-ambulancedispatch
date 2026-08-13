@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { apiFetch } from '$lib/auth.svelte';
 
   interface Hospital {
     id: number;
@@ -8,6 +9,8 @@
     total_beds: number;
     specializations: string[];
     phone: string;
+    lat?: number;
+    lng?: number;
   }
 
   let hospitals = $state<Hospital[]>([]);
@@ -15,8 +18,7 @@
 
   onMount(async () => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/hospitals`);
+      const response = await apiFetch('/hospitals');
       if (!response.ok) throw new Error('Unable to load hospitals');
       hospitals = await response.json();
     } catch (error) {
@@ -55,7 +57,7 @@
                   <span class="text-[10px] bg-red-900/50 text-red-400 px-2 py-0.5 rounded uppercase tracking-widest border border-red-800/50">Top Pick</span>
                 {/if}
               </h3>
-              <p class="text-xs text-slate-400 mt-1">{h.specializations.join(', ')}</p>
+              <p class="text-xs text-slate-400 mt-1">{h.specializations.join(', ')}{#if h.lat} · Yelahanka / North Bengaluru{/if}</p>
             </div>
             <div class="text-right">
               <div class="text-xl font-black text-green-400">{h.available_beds} <span class="text-xs text-slate-500">/ {h.total_beds} Beds</span></div>

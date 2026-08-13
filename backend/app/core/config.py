@@ -1,14 +1,19 @@
-from pydantic_settings import BaseSettings
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_ROOT = Path(__file__).resolve().parents[3]
+_BACKEND = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "JEEVAN"
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgrespassword@localhost:5432/jeevan"
     SUPABASE_URL: str | None = None
     SUPABASE_SERVICE_KEY: str | None = None
+    SUPABASE_ANON_KEY: str | None = None
+    VITE_SUPABASE_ANON_KEY: str | None = None
+    STAFF_BOOTSTRAP_EMAILS: str = ""
     REDIS_URL: str = "redis://localhost:6379/0"
-    SECRET_KEY: str = "supersecretjwtkey123"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     GOOGLE_MAPS_API_KEY: str | None = None
     TOMTOM_API_KEY: str | None = None
     NVIDIA_API_KEY: str | None = None
@@ -16,8 +21,15 @@ class Settings(BaseSettings):
     NVIDIA_VISION_MODEL: str = "microsoft/phi-3-vision-128k-instruct"
     NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_file=(
+            str(_ROOT / ".env"),
+            str(_BACKEND / ".env"),
+            ".env",
+        ),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
 
 settings = Settings()

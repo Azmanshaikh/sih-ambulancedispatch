@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { apiFetch } from '$lib/auth.svelte';
 
   let description = $state('');
   let narrative = $state('');
@@ -20,8 +21,7 @@
     if (description) formData.append('text', description);
     if (reportFile) formData.append('image', reportFile);
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-      const res = await fetch(`${backendUrl}/ai/analyze-report`, { method: 'POST', body: formData });
+      const res = await apiFetch('/ai/analyze-report', { method: 'POST', body: formData });
       const data = await res.json();
       analysisResult = data.status === 'success' ? data.analysis : `Error: ${data.detail || data.message}`;
     } catch (err) {
@@ -47,7 +47,7 @@
       <p style="margin: 0 0 12px 18px; font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.3em;">AI-Powered Triage &amp; Fleet Assignment</p>
       <div style="display: inline-flex; align-items: center; gap: 8px; border: 2px solid #DC2626; padding: 6px 14px; background: rgba(220,38,38,0.06); border-radius: 0; margin-left: 18px;">
         <span style="font-size: 13px;">🛰️</span>
-        <span style="font-size: 10px; font-weight: 700; color: #DC2626; text-transform: uppercase; letter-spacing: 0.1em;">Detecting your location…</span>
+        <span style="font-size: 10px; font-weight: 700; color: #DC2626; text-transform: uppercase; letter-spacing: 0.1em;">📍 BMSIT College, Avalahalli, Yelahanka</span>
       </div>
     </div>
 
@@ -185,7 +185,15 @@
           <button onclick={() => goto('/')} class="btn btn-ghost" style="flex: 1; padding: 14px;">
             Cancel
           </button>
-          <button onclick={() => goto('/')} class="btn btn-primary" style="flex: 2; padding: 14px; font-size: 12px; letter-spacing: 0.2em; box-shadow: 0 6px 20px rgba(220,38,38,0.35);">
+          <button
+            onclick={() => {
+              sessionStorage.setItem('jeevan_weather', isRaining);
+              sessionStorage.setItem('jeevan_dispatch_now', '1');
+              goto('/');
+            }}
+            class="btn btn-primary"
+            style="flex: 2; padding: 14px; font-size: 12px; letter-spacing: 0.2em; box-shadow: 0 6px 20px rgba(220,38,38,0.35);"
+          >
             🚑 Initiate Dispatch
           </button>
         </div>
