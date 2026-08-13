@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
 
     class Config:
-        env_file = "../.env"
+        env_file = ".env"
         extra = "ignore"
 
 settings = Settings()
