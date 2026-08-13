@@ -4,14 +4,100 @@
   --font-sans: "Inter", sans-serif;
   --font-headline: "Inter", sans-serif;
   --font-body: "Inter", sans-serif;
+  --font-display: "Orbitron", sans-serif;
+  --font-nav: "Rajdhani", sans-serif;
+  --font-mono: "Share Tech Mono", monospace;
+}
+
+/* ── Ambulance Dispatch: White & Red Theme ── */
+:root {
+  --clr-bg:        #F5F5F5;
+  --clr-surface:   #FFFFFF;
+  --clr-surface2:  #F0F0F0;
+  --clr-border:    #E0E0E0;
+  --clr-primary:   #DC2626;
+  --clr-primary-h: #B91C1C;
+  --clr-text:      #1A1A1A;
+  --clr-muted:     #6B6B6B;
+  --clr-subtle:    #9CA3AF;
 }
 
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #020617;
-  color: #e2e8f0;
+  background-color: var(--clr-bg);
+  color: var(--clr-text);
   margin: 0;
   overflow: hidden;
+}
+
+/* ── Sharp Rectangle Button System ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 0;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 10px 20px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.btn-primary {
+  background: var(--clr-primary);
+  color: #FFFFFF;
+  border-color: var(--clr-primary);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--clr-primary-h);
+  border-color: var(--clr-primary-h);
+  box-shadow: 0 4px 16px rgba(220,38,38,0.4);
+}
+.btn-secondary {
+  background: #FFFFFF;
+  color: var(--clr-primary);
+  border-color: var(--clr-primary);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(220,38,38,0.06);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--clr-muted);
+  border-color: var(--clr-border);
+}
+.btn-ghost:hover:not(:disabled) {
+  color: var(--clr-text);
+  border-color: #9CA3AF;
+  background: var(--clr-surface2);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Sharp rectangular nav tab labels ── */
+.nav-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* ── Orbitron: brand / screen headings ── */
+.font-display {
+  font-family: 'Orbitron', sans-serif;
+}
+
+/* ── Share Tech Mono: monospaced telemetry ── */
+.font-mono-tech {
+  font-family: 'Share Tech Mono', monospace;
 }
 
 .material-symbols-outlined {
@@ -20,9 +106,10 @@ body {
 }
 
 .glass {
-  background: rgba(15, 23, 42, 0.88);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(220,38,38,0.15);
 }
 
 .no-sb::-webkit-scrollbar {
@@ -39,8 +126,8 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 6px;
+  background: #DC2626;
+  border-radius: 0;
 }
 
 @keyframes fadeUp {
@@ -78,31 +165,33 @@ body {
 
 /* ── Leaflet overrides ── */
 .leaflet-container {
-  background: #e8f4f8 !important;
+  background: #f0f0f0 !important;
 }
 .leaflet-control-zoom a {
-  background: #1e293b !important;
-  color: #94a3b8 !important;
-  border-color: #334155 !important;
+  background: #FFFFFF !important;
+  color: #1A1A1A !important;
+  border-color: #E0E0E0 !important;
+  border-radius: 0 !important;
 }
 .leaflet-control-zoom a:hover {
-  background: #334155 !important;
+  background: #DC2626 !important;
+  color: #FFFFFF !important;
 }
 .leaflet-control-attribution {
   display: none !important;
 }
 .leaflet-popup-content-wrapper {
-  background: #1e293b;
-  color: #e2e8f0;
-  border-radius: 12px;
-  border: 1px solid #334155;
-  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  background: #FFFFFF;
+  color: #1A1A1A;
+  border-radius: 0;
+  border: 2px solid #DC2626;
+  box-shadow: 0 8px 32px rgba(220,38,38,.2);
 }
 .leaflet-popup-tip {
-  background: #1e293b;
+  background: #FFFFFF;
 }
 .leaflet-popup-close-button {
-  color: #94a3b8 !important;
+  color: #DC2626 !important;
   font-size: 1.2rem !important;
 }
 .leaflet-popup-content {
@@ -145,14 +234,14 @@ body {
   to { stroke-dashoffset: -50; }
 }
 .custom-popup .leaflet-popup-content-wrapper {
-  background: rgba(15, 23, 42, 0.95);
+  background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  border: 2px solid #DC2626;
+  border-radius: 0;
+  box-shadow: 0 10px 40px rgba(220,38,38,0.25);
 }
 .custom-popup .leaflet-popup-tip {
-  background: rgba(15, 23, 42, 0.95);
+  background: rgba(255, 255, 255, 0.97);
 }
 @keyframes siren-blink {
   0%, 100% { opacity: 1; transform: scale(1); filter: brightness(1.2); }

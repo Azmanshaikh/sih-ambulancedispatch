@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "gen:envjs": "node scripts/generate-env-js.cjs",
     "dev": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
     "backend": "cross-env PYTHONPATH=./backend uvicorn app.main:app --reload --port 8000"

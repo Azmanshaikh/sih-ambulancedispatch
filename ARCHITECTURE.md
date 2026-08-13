@@ -11,7 +11,7 @@ jeevan/
 │   ├── routing.py    # OSMnx + NetworkX route computation
 │   ├── ml_engine.py  # Random Forest ETA + severity adjustment
 │   └── simulator.py  # Background ambulance movement simulator
-├── frontend/         # Static HTML/JS frontend
+├── frontend/         # SvelteKit frontend
 │   ├── index.html    # Landing / emergency request form
 │   ├── dashboard.html
 │   ├── hospitals.html
@@ -25,7 +25,7 @@ jeevan/
 ## Tech Stack
 
 - Backend: FastAPI + Uvicorn, OSMnx, NetworkX, scikit-learn
-- Frontend: Static HTML/JS served via http-server
+- Frontend: SvelteKit + Vite
 - Real-time: WebSocket (`/ws`) for live ambulance position updates
 
 ---

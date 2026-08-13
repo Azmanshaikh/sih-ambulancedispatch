@@ -1,6 +1,6 @@
 # JEEVAN — JEEVAN
 
-FastAPI backend + Vite/React frontend for a smart ambulance dispatch / routing prototype.
+FastAPI backend + SvelteKit frontend for a smart ambulance dispatch / routing prototype.
 
 ## Quickstart
 
@@ -26,7 +26,7 @@ Backend URLs:
 - API: http://localhost:8000
 - Swagger: http://localhost:8000/docs
 
-### 2) Frontend (Vite)
+### 2) Frontend (SvelteKit/Vite)
 
 1. Install frontend dependencies:
 
@@ -46,24 +46,6 @@ Frontend URL (default Vite): http://localhost:5173
 Notes:
 
 - In development, API/WebSocket traffic is proxied to `http://localhost:8000` (see `frontend/vite.config.js`), so you can usually leave `VITE_BACKEND_URL` empty.
-- If you are serving the static HTML pages (anything that reads `window.ENV.BACKEND_URL` from `env.js`), generate `env.js` by setting `BACKEND_URL` in your shell and running:
-
-	```bash
-	npm run gen:envjs
-	```
-
-	PowerShell example:
-
-	```powershell
-	$env:BACKEND_URL = "http://localhost:8000"
-	npm run gen:envjs
-	```
-
-	Bash example:
-
-	```bash
-	BACKEND_URL=http://localhost:8000 npm run gen:envjs
-	```
 
 ## Environment variables
 
@@ -74,10 +56,6 @@ Create a `.env` file in the repo root (the backend loads it via `python-dotenv`,
 - (Usually optional in dev) `VITE_BACKEND_URL`
 	- If unset, the frontend uses the Vite dev proxy for `/api` and `/ws`.
 	- If set, it should be the full backend origin (example: `VITE_BACKEND_URL=http://localhost:8000`).
-
-- (Static HTML only) `BACKEND_URL` (preferred) or `VITE_BACKEND_URL`
-	- Used by `scripts/generate-env-js.cjs` to generate `window.ENV.BACKEND_URL` in `env.js`.
-	- Example: `BACKEND_URL=http://localhost:8000`
 
 ### Supabase (optional, but many flows expect it)
 
@@ -130,7 +108,6 @@ OpenRouter (report generation):
 
 - `npm run backend` — start FastAPI (reload) on port 8000
 - `npm run dev` — start Vite dev server (frontend)
-- `npm run gen:envjs` — generate `env.js` files from `BACKEND_URL`
 
 ## Generate a 30s report explainer video (local)
 

@@ -13,13 +13,17 @@
   let hospitals = $state<Hospital[]>([]);
   let loading = $state(true);
 
-  onMount(() => {
-    setTimeout(() => {
-      hospitals = [
-        { id: 1, name: 'City General Hospital', available_beds: 12, total_beds: 50, specializations: ['Trauma', 'Cardiac'], phone: '555-0101' }
-      ];
+  onMount(async () => {
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/hospitals`);
+      if (!response.ok) throw new Error('Unable to load hospitals');
+      hospitals = await response.json();
+    } catch (error) {
+      console.error(error);
+    } finally {
       loading = false;
-    }, 1000);
+    }
   });
 </script>
 
