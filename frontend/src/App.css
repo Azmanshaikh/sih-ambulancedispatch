@@ -22,12 +22,34 @@
   --clr-subtle:    #9CA3AF;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--clr-bg);
   color: var(--clr-text);
   margin: 0;
   overflow: hidden;
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+
+.app-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+  height: 100dvh;
+  height: 100svh;
+}
+
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior: none;
+  }
 }
 
 /* ── Sharp Rectangle Button System ── */

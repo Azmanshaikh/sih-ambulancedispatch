@@ -1,6 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import TopNav from '$lib/components/TopNav.svelte';
+  import InstallApp from '$lib/components/InstallApp.svelte';
   import type { Snippet } from 'svelte';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -66,8 +67,13 @@
   <TopNav {gpsStatus} />
 {/if}
 
-<main style="padding-top: {NO_NAV.includes(page.url.pathname) ? '0' : '88px'}; flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; height: 100vh;">
+<main
+  class="app-shell"
+  style="padding-top: {NO_NAV.includes(page.url.pathname) ? 'env(safe-area-inset-top)' : 'calc(88px + env(safe-area-inset-top))'};"
+>
   <div class="flex-1 overflow-hidden relative h-full">
     {@render children()}
   </div>
 </main>
+
+<InstallApp />
