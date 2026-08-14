@@ -5,7 +5,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { auth, homeFor, initAuth } from '$lib/auth.svelte';
+  import { auth, homeFor, initAuth, needsOnboarding } from '$lib/auth.svelte';
 
   interface Props { children: Snippet; }
   let { children }: Props = $props();
@@ -13,13 +13,15 @@
   let gpsStatus = $state('BMSIT College, Yelahanka');
 
   const PUBLIC = ['/login', '/auth/callback'];
+  const NO_NAV = ['/login', '/auth/callback', '/choose-role'];
 
   const STAFF_PATHS = ['/', '/request', '/navigation', '/hospitals', '/notifications', '/staff/approvals'];
-  const PATIENT_PATHS = ['/patient', '/ai-guide'];
-  const DRIVER_PATHS = ['/driver'];
+  const PATIENT_PATHS = ['/patient'];
+  const DRIVER_PATHS = ['/driver', '/hospitals'];
 
   function allowed(pathname: string, role?: string | null) {
     if (PUBLIC.includes(pathname)) return true;
+    if (needsOnboarding()) return pathname === '/choose-role';
     if (role === 'staff') return STAFF_PATHS.includes(pathname) || pathname.startsWith('/staff/');
     if (role === 'driver') return DRIVER_PATHS.includes(pathname);
     return PATIENT_PATHS.includes(pathname);
@@ -36,6 +38,14 @@
       goto(homeFor(auth.profile?.role), { replaceState: true });
       return;
     }
+    if (auth.session && path === '/choose-role' && !needsOnboarding()) {
+      goto(homeFor(auth.profile?.role), { replaceState: true });
+      return;
+    }
+    if (auth.session && needsOnboarding() && path !== '/choose-role') {
+      goto('/choose-role', { replaceState: true });
+      return;
+    }
     if (auth.session && !allowed(path, auth.profile?.role)) {
       goto(homeFor(auth.profile?.role), { replaceState: true });
     }
@@ -46,15 +56,17 @@
     const path = page.url.pathname;
     if (!auth.session && !PUBLIC.includes(path)) goto('/login', { replaceState: true });
     else if (auth.session && path === '/login') goto(homeFor(auth.profile?.role), { replaceState: true });
+    else if (auth.session && path === '/choose-role' && !needsOnboarding()) goto(homeFor(auth.profile?.role), { replaceState: true });
+    else if (auth.session && needsOnboarding() && path !== '/choose-role') goto('/choose-role', { replaceState: true });
     else if (auth.session && !allowed(path, auth.profile?.role)) goto(homeFor(auth.profile?.role), { replaceState: true });
   });
 </script>
 
-{#if !PUBLIC.includes(page.url.pathname)}
+{#if !NO_NAV.includes(page.url.pathname)}
   <TopNav {gpsStatus} />
 {/if}
 
-<main style="padding-top: {PUBLIC.includes(page.url.pathname) ? '0' : '88px'}; flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; height: 100vh;">
+<main style="padding-top: {NO_NAV.includes(page.url.pathname) ? '0' : '88px'}; flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; height: 100vh;">
   <div class="flex-1 overflow-hidden relative h-full">
     {@render children()}
   </div>

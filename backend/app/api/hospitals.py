@@ -20,5 +20,5 @@ class Hospital(BaseModel):
 
 
 @router.get("", response_model=list[Hospital])
-async def list_hospitals(_user=Depends(require_roles("staff"))) -> list[Hospital]:
+async def list_hospitals(_user=Depends(require_roles("staff", "driver"))) -> list[Hospital]:
     return [Hospital(**h) for h in get_hospitals()]

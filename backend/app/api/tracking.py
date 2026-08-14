@@ -69,6 +69,7 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
                 "pregnant": req.pregnant,
                 "notes": req.notes,
             },
+            patient_email=patient_email,
         )
 
     result["incident"] = {

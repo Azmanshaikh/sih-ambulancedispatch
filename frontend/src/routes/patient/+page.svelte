@@ -1,62 +1,37 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { auth, apiFetch, refreshProfile } from '$lib/auth.svelte';
+  import MapWidget from '$lib/components/MapWidget.svelte';
+  import { auth, apiFetch } from '$lib/auth.svelte';
 
   const BMSIT = { name: 'BMSIT College, Avalahalli, Yelahanka', lat: 13.1344, lng: 77.5693 };
 
-  let hr = $state(72);
-  let spo2 = $state(98);
-  let chatInput = $state('');
-  let messages = $state<{ role: string; content: string }[]>([
-    { role: 'assistant', content: 'I am JEEVAN first-aid assist. Tell me what you feel. For a true emergency, tap Request ambulance.' },
-  ]);
-  let chatting = $state(false);
+  let vitals = $state({
+    heart_rate: 72,
+    spo2: 98,
+    bp_sys: 118,
+    bp_dia: 76,
+    temperature_c: 36.8,
+    resp_rate: 16,
+  });
   let requesting = $state(false);
   let requestMsg = $state('');
-  let roleMsg = $state('');
-  let cardiac = $state(false);
-  let diabetes = $state(false);
-  let epilepsy = $state(false);
-  let pregnant = $state(false);
+  let markers = $state<any[]>([
+    { position: [BMSIT.lat, BMSIT.lng] as [number, number], popup: `📍 ${BMSIT.name}`, type: 'incident' },
+  ]);
+  let route = $state<[number, number][]>([]);
+  let etaLabel = $state('');
 
   async function loadVitals() {
     const res = await apiFetch('/accounts/vitals');
     if (!res.ok) return;
     const data = await res.json();
-    hr = data.vitals?.heart_rate ?? hr;
-    spo2 = data.vitals?.spo2 ?? spo2;
+    if (data.vitals) vitals = { ...vitals, ...data.vitals };
   }
 
-  async function sendChat() {
-    const text = chatInput.trim();
-    if (!text || chatting) return;
-    chatInput = '';
-    messages = [...messages, { role: 'user', content: text }];
-    chatting = true;
-    try {
-      const res = await apiFetch('/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history: messages.slice(0, -1) }),
-      });
-      const data = await res.json();
-      messages = [...messages, { role: 'assistant', content: data.reply || data.detail || 'No reply' }];
-    } catch {
-      messages = [...messages, { role: 'assistant', content: 'Could not reach the assistant.' }];
-    } finally {
-      chatting = false;
-    }
-  }
-
-  async function requestHelp() {
+  async function emergencySos() {
     requesting = true;
     requestMsg = '';
     try {
-      await apiFetch('/accounts/records', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardiac, diabetes, epilepsy, pregnant }),
-      });
       const res = await apiFetch('/tracking/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,36 +41,24 @@
           address: BMSIT.name,
           patient_name: auth.profile?.full_name || auth.profile?.email,
           patient_email: auth.profile?.email,
-          cardiac,
-          diabetes,
-          epilepsy,
-          pregnant,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Dispatch failed');
-      requestMsg = `Ambulance ${data.data?.ambulance_id} assigned → ${data.data?.hospital_name} (${data.data?.eta_minutes} min)`;
+      if (!res.ok) throw new Error(data.detail || 'SOS failed');
+      requestMsg = `SOS sent · ${data.data?.ambulance_id} → ${data.data?.hospital_name} (${data.data?.eta_minutes} min)`;
+      const payload = data.data;
+      if (payload?.route?.length) route = payload.route;
+      if (payload?.eta_minutes != null) etaLabel = `${payload.eta_minutes} min`;
+      const hosp = payload?.hospital;
+      markers = [
+        { position: [BMSIT.lat, BMSIT.lng], popup: `📍 You · ${BMSIT.name}`, type: 'incident' },
+        hosp?.lat ? { position: [hosp.lat, hosp.lng], popup: `🏥 ${hosp.name}`, type: 'hospital_selected' } : null,
+      ].filter(Boolean);
     } catch (e: any) {
-      requestMsg = e?.message || 'Could not request help';
+      requestMsg = e?.message || 'Could not send SOS';
     } finally {
       requesting = false;
     }
-  }
-
-  async function askRole(role: 'driver' | 'staff') {
-    roleMsg = '';
-    const res = await apiFetch('/accounts/request-role', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requested_role: role }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      roleMsg = data.detail || 'Request failed';
-      return;
-    }
-    await refreshProfile();
-    roleMsg = `Staff must approve your ${role} access.`;
   }
 
   onMount(() => {
@@ -107,62 +70,47 @@
 
 <svelte:head><title>JEEVAN — Patient</title></svelte:head>
 
-<div class="h-full overflow-y-auto p-6" style="background:#F5F5F5;">
-  <div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-5">
+<div class="h-full overflow-hidden p-4 grid grid-cols-1 lg:grid-cols-12 gap-4" style="background:#F5F5F5;">
+  <div class="lg:col-span-4 flex flex-col gap-4 overflow-y-auto">
+    <button
+      class="btn btn-primary"
+      style="width:100%;padding:22px;font-size:18px;letter-spacing:0.2em;"
+      disabled={requesting}
+      onclick={emergencySos}
+    >
+      {requesting ? 'SENDING SOS…' : 'EMERGENCY SOS'}
+    </button>
+    {#if requestMsg}<p class="text-xs text-slate-700">{requestMsg}</p>{/if}
+
     <section class="bg-white border-2 border-[#E0E0E0] p-5">
-      <h2 class="text-sm font-black uppercase tracking-widest text-red-600 mb-1">Heartbeat (mock sensor)</h2>
-      <p class="text-[10px] text-slate-500 uppercase mb-4">Random walk vitals for demo — staff sees the same feed</p>
+      <h2 class="text-sm font-black uppercase tracking-widest text-red-600 mb-1">Vitals</h2>
+      <p class="text-[10px] text-slate-500 uppercase mb-4">Mock sensor · random live values</p>
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <div class="text-4xl font-black text-[#1A1A1A]">{hr}<span class="text-sm text-slate-500 ml-1">bpm</span></div>
+          <div class="text-3xl font-black">{vitals.heart_rate}<span class="text-xs text-slate-500 ml-1">bpm</span></div>
           <div class="text-[10px] uppercase tracking-widest text-slate-500">Heart rate</div>
         </div>
         <div>
-          <div class="text-4xl font-black text-[#1A1A1A]">{spo2}<span class="text-sm text-slate-500 ml-1">%</span></div>
+          <div class="text-3xl font-black">{vitals.spo2}<span class="text-xs text-slate-500 ml-1">%</span></div>
           <div class="text-[10px] uppercase tracking-widest text-slate-500">SpO2</div>
         </div>
-      </div>
-    </section>
-
-    <section class="bg-white border-2 border-[#E0E0E0] p-5">
-      <h2 class="text-sm font-black uppercase tracking-widest text-red-600 mb-3">Request ambulance</h2>
-      <p class="text-xs text-slate-500 mb-3">Pickup defaults to BMSIT College, Yelahanka.</p>
-      <div class="grid grid-cols-2 gap-2 text-xs mb-3">
-        <label><input type="checkbox" bind:checked={cardiac} /> Cardiac history</label>
-        <label><input type="checkbox" bind:checked={diabetes} /> Diabetes</label>
-        <label><input type="checkbox" bind:checked={epilepsy} /> Epilepsy</label>
-        <label><input type="checkbox" bind:checked={pregnant} /> Pregnant</label>
-      </div>
-      <button class="btn btn-primary" style="width:100%;padding:12px;" disabled={requesting} onclick={requestHelp}>
-        {requesting ? 'Dispatching…' : 'Request ambulance'}
-      </button>
-      {#if requestMsg}<p class="text-xs mt-2 text-slate-700">{requestMsg}</p>{/if}
-    </section>
-
-    <section class="bg-white border-2 border-[#E0E0E0] p-5 lg:col-span-2 flex flex-col" style="min-height:280px;">
-      <h2 class="text-sm font-black uppercase tracking-widest text-red-600 mb-3">AI chatbot</h2>
-      <div class="flex-1 overflow-y-auto space-y-2 mb-3" style="max-height:240px;">
-        {#each messages as m}
-          <div class="text-sm p-2 {m.role === 'user' ? 'bg-red-50 text-right' : 'bg-slate-100'}">{m.content}</div>
-        {/each}
-      </div>
-      <div class="flex gap-2">
-        <input class="flex-1 border-2 border-[#E0E0E0] px-3 py-2 text-sm" bind:value={chatInput} placeholder="Describe symptoms…" onkeydown={(e) => e.key === 'Enter' && sendChat()} />
-        <button class="btn btn-primary" onclick={sendChat} disabled={chatting}>Send</button>
-      </div>
-    </section>
-
-    <section class="bg-white border-2 border-[#E0E0E0] p-5 lg:col-span-2">
-      <h2 class="text-sm font-black uppercase tracking-widest text-slate-600 mb-2">Need Driver or Staff access?</h2>
-      {#if auth.profile?.requested_role}
-        <p class="text-xs text-amber-700">Waiting for staff approval: {auth.profile.requested_role}</p>
-      {:else}
-        <div class="flex gap-2">
-          <button class="btn btn-secondary" onclick={() => askRole('driver')}>Request driver</button>
-          <button class="btn btn-secondary" onclick={() => askRole('staff')}>Request staff</button>
+        <div>
+          <div class="text-2xl font-black">{vitals.bp_sys}/{vitals.bp_dia}</div>
+          <div class="text-[10px] uppercase tracking-widest text-slate-500">Blood pressure</div>
         </div>
-      {/if}
-      {#if roleMsg}<p class="text-xs mt-2">{roleMsg}</p>{/if}
+        <div>
+          <div class="text-2xl font-black">{vitals.temperature_c}<span class="text-xs text-slate-500 ml-1">°C</span></div>
+          <div class="text-[10px] uppercase tracking-widest text-slate-500">Temperature</div>
+        </div>
+        <div>
+          <div class="text-2xl font-black">{vitals.resp_rate}<span class="text-xs text-slate-500 ml-1">/min</span></div>
+          <div class="text-[10px] uppercase tracking-widest text-slate-500">Respiration</div>
+        </div>
+      </div>
     </section>
+  </div>
+
+  <div class="lg:col-span-8 relative min-h-[320px] border-2 border-[#E0E0E0] overflow-hidden">
+    <MapWidget id="patient-map" {markers} {route} {etaLabel} center={[BMSIT.lat, BMSIT.lng]} />
   </div>
 </div>

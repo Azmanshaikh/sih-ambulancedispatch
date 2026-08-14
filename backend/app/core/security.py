@@ -33,6 +33,12 @@ def _user_from_bearer(authorization: str | None) -> dict[str, Any]:
 
     bootstrap = email.lower() in _bootstrap_emails()
     profile = ensure_profile(str(user_id), email, full_name, bootstrap_staff=bootstrap)
+    if bootstrap:
+        profile["onboarded"] = True
+    elif profile.get("role") in ("driver", "staff") and profile.get("status") == "active":
+        profile["onboarded"] = True
+    else:
+        profile.setdefault("onboarded", False)
     return {"id": str(user_id), "email": email, "full_name": full_name, "profile": profile, "token": token}
 
 
@@ -43,7 +49,8 @@ def get_current_user(authorization: str | None = Header(default=None)) -> dict[s
 def require_roles(*roles: str):
     def _dep(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
         role = (user.get("profile") or {}).get("role")
-        if role not in roles:
+        status_flag = (user.get("profile") or {}).get("status")
+        if status_flag != "active" or role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed for this role")
         return user
 

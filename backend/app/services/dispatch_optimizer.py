@@ -150,27 +150,6 @@ class DispatchOptimizer:
             "eta_seconds": best_time if best_time != float("inf") else 0,
         }
 
-    def _weather_factor(self, is_raining: bool) -> float:
-        return 1.22 if is_raining else 1.0
-
-    def _occupancy_factor(self, hospital: Dict[str, Any]) -> float:
-        total = max(int(hospital.get("total_beds") or 1), 1)
-        available = max(int(hospital.get("available_beds") or 0), 0)
-        if available <= 0:
-            return 1.55
-        fill = 1.0 - (available / total)
-        return 1.0 + 0.18 * fill
-
-    def _specialty_factor(self, hospital: Dict[str, Any]) -> float:
-        specs = {s.lower() for s in hospital.get("specializations") or []}
-        if {"emergency", "trauma"} & specs:
-            return 0.90
-        if {"icu", "cardiac", "neuro"} & specs:
-            return 0.96
-        if "oncology" in specs and not ({"emergency", "trauma"} & specs):
-            return 1.18
-        return 1.04
-
     def _peak_traffic_factor(self) -> float:
         hour = datetime.now().hour
         if 8 <= hour <= 11 or 17 <= hour <= 21:
@@ -226,7 +205,6 @@ class DispatchOptimizer:
     ) -> dict:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        weather = self._weather_factor(is_raining)
         peak = self._peak_traffic_factor()
         self._detect_tomtom()
         pickup = self._pick_ambulance(incident_location, ambulances)
@@ -236,10 +214,8 @@ class DispatchOptimizer:
             duration, coords, source = self._route(incident_location, dest)
             if duration == float("inf") or not coords:
                 return None
-            occupancy = self._occupancy_factor(hosp)
-            specialty = self._specialty_factor(hosp)
             extra_traffic = 1.0 if source == "tomtom-live-traffic" else peak
-            transport = duration * weather * occupancy * specialty * extra_traffic
+            transport = duration * extra_traffic
             pickup_s = float(pickup["pickup_seconds"]) if pickup else 0.0
             effective = pickup_s + transport
             return {
@@ -250,9 +226,6 @@ class DispatchOptimizer:
                 "pickup_seconds": pickup_s,
                 "eta_seconds": effective,
                 "source": source,
-                "weather_factor": weather,
-                "occupancy_factor": occupancy,
-                "specialty_factor": specialty,
             }
 
         scored: list[dict[str, Any]] = []
@@ -274,13 +247,10 @@ class DispatchOptimizer:
                 "hospital": nearest,
                 "route": [incident_location, (nearest["lat"], nearest["lng"])],
                 "raw_seconds": 720,
-                "transport_seconds": 720 * weather,
+                "transport_seconds": 720,
                 "pickup_seconds": float(pickup["pickup_seconds"]) if pickup else 0.0,
-                "eta_seconds": 720 * weather,
+                "eta_seconds": 720,
                 "source": "straight-line-fallback",
-                "weather_factor": weather,
-                "occupancy_factor": self._occupancy_factor(nearest),
-                "specialty_factor": self._specialty_factor(nearest),
             }
 
         assigned = pickup["ambulance"] if pickup else None
@@ -295,11 +265,10 @@ class DispatchOptimizer:
         transport_min = round(float(best.get("transport_seconds") or eta) / 60, 1)
         specs = ", ".join(hospital.get("specializations") or [])
         reason = (
-            f"{hospital.get('name')} is the lowest total mission time "
+            f"{hospital.get('name')} is the fastest destination "
             f"({pickup_min} min pickup + {transport_min} min to hospital) "
-            f"after live routing, {'rain delay' if is_raining else 'clear weather'}, "
-            f"ER/trauma fit ({specs}), and bed occupancy "
-            f"({hospital.get('available_beds')}/{hospital.get('total_beds')})."
+            f"using live traffic routing. Auto-assigned — no staff hospital pick."
+            + (f" Specialties: {specs}." if specs else "")
         )
         return {
             "ambulance_id": assigned["id"] if assigned else None,
@@ -316,10 +285,6 @@ class DispatchOptimizer:
             "confidence": confidence,
             "reason": reason,
             "constraints": {
-                "weather": "raining" if is_raining else "clear",
-                "weather_factor": best["weather_factor"],
-                "occupancy_factor": round(best["occupancy_factor"], 3),
-                "specialty_factor": round(best.get("specialty_factor") or 1.0, 3),
                 "routing": best["source"],
                 "traffic": "live" if best["source"] == "tomtom-live-traffic" else "estimated-peak",
             },

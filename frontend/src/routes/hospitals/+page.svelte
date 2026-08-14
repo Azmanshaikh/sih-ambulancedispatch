@@ -57,7 +57,10 @@
                   <span class="text-[10px] bg-red-900/50 text-red-400 px-2 py-0.5 rounded uppercase tracking-widest border border-red-800/50">Top Pick</span>
                 {/if}
               </h3>
-              <p class="text-xs text-slate-400 mt-1">{h.specializations.join(', ')}{#if h.lat} · Yelahanka / North Bengaluru{/if}</p>
+              <p class="text-xs text-slate-400 mt-1">{h.specializations.join(', ')}</p>
+              {#if h.lat != null && h.lng != null}
+                <p class="text-[11px] text-slate-500 mt-2 font-mono">{h.lat.toFixed(4)}, {h.lng.toFixed(4)}</p>
+              {/if}
             </div>
             <div class="text-right">
               <div class="text-xl font-black text-green-400">{h.available_beds} <span class="text-xs text-slate-500">/ {h.total_beds} Beds</span></div>

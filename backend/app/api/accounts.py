@@ -5,7 +5,17 @@ from pydantic import BaseModel
 
 from app.core.security import get_current_user, require_roles
 from app.services.fleet import BMSIT, get_ambulances
-from app.services.profiles import decide_request, list_profiles, list_requests, request_role, set_driver_ambulance
+from app.services.otp import issue_otp, list_active_otps, verify_otp
+from app.services.profiles import (
+    activate_patient,
+    activate_verified_role,
+    decide_request,
+    list_profiles,
+    list_requests,
+    mark_otp_pending,
+    request_role,
+    set_driver_ambulance,
+)
 from app.services.runtime_state import (
     ack_alert,
     enrich_mission,
@@ -13,6 +23,7 @@ from app.services.runtime_state import (
     get_medical_record,
     get_mission_for_ambulance,
     list_alerts,
+    list_dispatch_cases,
     set_medical_record,
     set_mission_phase,
     tick_vitals,
@@ -24,6 +35,14 @@ router = APIRouter(prefix="/accounts", tags=["Accounts"])
 
 class RoleRequestBody(BaseModel):
     requested_role: Literal["driver", "staff"]
+
+
+class ChooseRoleBody(BaseModel):
+    role: Literal["patient", "driver", "staff"]
+
+
+class VerifyOtpBody(BaseModel):
+    code: str
 
 
 class DecideBody(BaseModel):
@@ -45,7 +64,63 @@ class PhaseBody(BaseModel):
 
 @router.get("/me")
 async def me(user: dict[str, Any] = Depends(get_current_user)):
-    return {"status": "success", "user": {"id": user["id"], "email": user["email"], **(user.get("profile") or {})}}
+    profile = user.get("profile") or {}
+    needs_onboarding = profile.get("status") != "active" or not profile.get("onboarded")
+    if profile.get("role") in ("driver", "staff") and profile.get("status") == "active":
+        needs_onboarding = False
+    if profile.get("onboarded") is True and profile.get("status") == "active":
+        needs_onboarding = False
+    return {
+        "status": "success",
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            **profile,
+            "needs_onboarding": needs_onboarding,
+        },
+    }
+
+
+@router.post("/choose-role")
+async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_current_user)):
+    profile = user.get("profile") or {}
+    if profile.get("onboarded") and profile.get("status") == "active":
+        return {"status": "success", "user": profile, "otp_sent": False}
+
+    if body.role == "patient":
+        row = activate_patient(user["id"])
+        row["onboarded"] = True
+        return {"status": "success", "user": row, "otp_sent": False}
+
+    pending = mark_otp_pending(user["id"], body.role)
+    issue_otp(user["id"], user["email"], pending.get("full_name"), body.role)
+    pending["onboarded"] = False
+    return {
+        "status": "success",
+        "user": pending,
+        "otp_sent": True,
+        "message": "OTP sent to staff. Ask them for the code.",
+    }
+
+
+@router.post("/verify-otp")
+async def confirm_otp(body: VerifyOtpBody, user: dict[str, Any] = Depends(get_current_user)):
+    try:
+        row = verify_otp(user["id"], body.code)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    ambulance_id = None
+    if row["requested_role"] == "driver":
+        units = [a for a in get_ambulances() if a.get("status") == "available"]
+        ambulance_id = (units[0]["id"] if units else None) or (get_ambulances()[0]["id"] if get_ambulances() else None)
+    profile = activate_verified_role(user["id"], row["requested_role"], ambulance_id)
+    profile["onboarded"] = True
+    return {"status": "success", "user": profile}
+
+
+@router.get("/otps")
+async def staff_otps(_user: dict[str, Any] = Depends(require_roles("staff"))):
+    return {"status": "success", "otps": list_active_otps()}
 
 
 @router.post("/request-role")
@@ -160,6 +235,11 @@ async def save_record(body: RecordBody, user: dict[str, Any] = Depends(get_curre
     return {"status": "success", "record": record}
 
 
+@router.get("/cases")
+async def staff_cases(_user: dict[str, Any] = Depends(require_roles("staff"))):
+    return {"status": "success", "cases": list_dispatch_cases()}
+
+
 @router.get("/monitor")
 async def staff_monitor(user: dict[str, Any] = Depends(require_roles("staff"))):
     mission = enrich_mission(get_latest_mission())
@@ -184,4 +264,5 @@ async def staff_monitor(user: dict[str, Any] = Depends(require_roles("staff"))):
         "driver": (mission or {}).get("driver_location"),
         "mission": mission,
         "fleet": get_ambulances(),
+        "cases": list_dispatch_cases(),
     }

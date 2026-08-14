@@ -17,7 +17,7 @@ def _now() -> str:
 def ensure_profile(user_id: str, email: str, full_name: str | None, bootstrap_staff: bool = False) -> dict[str, Any]:
     existing = get_profile(user_id)
     if existing:
-        if bootstrap_staff and existing.get("role") != "staff":
+        if bootstrap_staff and (existing.get("role") != "staff" or existing.get("status") != "active"):
             existing["role"] = "staff"
             existing["status"] = "active"
             existing["requested_role"] = None
@@ -30,9 +30,10 @@ def ensure_profile(user_id: str, email: str, full_name: str | None, bootstrap_st
         "email": email,
         "full_name": full_name or email.split("@")[0],
         "role": role,
-        "status": "active",
+        "status": "active" if bootstrap_staff else "pending",
         "requested_role": None,
         "ambulance_id": None,
+        "onboarded": True if bootstrap_staff else False,
         "updated_at": _now(),
     }
     _save_profile(row)
@@ -40,32 +41,42 @@ def ensure_profile(user_id: str, email: str, full_name: str | None, bootstrap_st
 
 
 def get_profile(user_id: str) -> dict[str, Any] | None:
+    prev = _profiles.get(user_id) or {}
+    row = None
     if supabase_client is not None:
         try:
             res = supabase_client.table("profiles").select("*").eq("id", user_id).limit(1).execute()
             if res.data:
                 row = res.data[0]
-                _profiles[user_id] = row
-                return row
         except Exception:
-            pass
-    rows = rest_select("profiles", {"id": f"eq.{user_id}", "select": "*"})
-    if rows:
-        _profiles[user_id] = rows[0]
-        return rows[0]
-    return _profiles.get(user_id)
+            row = None
+    if row is None:
+        rows = rest_select("profiles", {"id": f"eq.{user_id}", "select": "*"})
+        row = rows[0] if rows else None
+    if row is None:
+        return prev or None
+    if "onboarded" in prev:
+        row["onboarded"] = prev["onboarded"]
+    else:
+        row.setdefault("onboarded", False)
+    _profiles[user_id] = row
+    return row
+
+
+_DB_KEYS = {"id", "email", "full_name", "role", "status", "requested_role", "ambulance_id", "updated_at"}
 
 
 def _save_profile(row: dict[str, Any]) -> dict[str, Any]:
     row["updated_at"] = _now()
     _profiles[row["id"]] = row
+    payload = {k: row.get(k) for k in _DB_KEYS}
     if supabase_client is not None:
         try:
-            supabase_client.table("profiles").upsert(row).execute()
+            supabase_client.table("profiles").upsert(payload).execute()
             return row
         except Exception:
             pass
-    rest_upsert("profiles", row)
+    rest_upsert("profiles", payload)
     return row
 
 
@@ -208,6 +219,43 @@ def decide_request(request_id: str | int, reviewer_id: str, approve: bool, ambul
             {"status": new_status, "reviewed_by": reviewer_id, "reviewed_at": row["reviewed_at"]},
         )
     return {"request": row, "profile": profile}
+
+
+def activate_patient(user_id: str) -> dict[str, Any]:
+    profile = get_profile(user_id)
+    if not profile:
+        raise ValueError("profile missing")
+    profile["role"] = "patient"
+    profile["status"] = "active"
+    profile["requested_role"] = None
+    profile["onboarded"] = True
+    return _save_profile(profile)
+
+
+def activate_verified_role(user_id: str, role: str, ambulance_id: str | None = None) -> dict[str, Any]:
+    profile = get_profile(user_id)
+    if not profile:
+        raise ValueError("profile missing")
+    if role not in ("driver", "staff"):
+        raise ValueError("invalid role")
+    profile["role"] = role
+    profile["status"] = "active"
+    profile["requested_role"] = None
+    profile["onboarded"] = True
+    if role == "driver" and ambulance_id:
+        profile["ambulance_id"] = ambulance_id
+    return _save_profile(profile)
+
+
+def mark_otp_pending(user_id: str, requested_role: str) -> dict[str, Any]:
+    profile = get_profile(user_id)
+    if not profile:
+        raise ValueError("profile missing")
+    profile["status"] = "pending"
+    profile["requested_role"] = requested_role
+    if requested_role != "driver":
+        profile["ambulance_id"] = None
+    return _save_profile(profile)
 
 
 def set_driver_ambulance(user_id: str, ambulance_id: str | None) -> dict[str, Any]:

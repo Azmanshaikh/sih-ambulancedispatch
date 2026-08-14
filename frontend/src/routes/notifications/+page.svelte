@@ -6,7 +6,7 @@
   let alerts = $state<any[]>([]);
   let monitor = $state<any>(null);
   let markers = $state<any[]>([]);
-  let route = $state<[number, number][]>([]);
+  let cases = $state<any[]>([]);
 
   function flagList(rec: any) {
     if (!rec) return 'None noted';
@@ -27,6 +27,7 @@
     }
     if (mRes.ok) {
       monitor = await mRes.json();
+      cases = monitor.cases || [];
       const p = monitor.patient || {};
       const d = monitor.driver || {};
       const h = monitor.mission?.hospital || {};
@@ -52,7 +53,11 @@
 
   let unread = $derived(alerts.filter((a) => !a.read));
   let latest = $derived(unread[0] || alerts[0]);
-  let history = $derived(monitor?.patient?.history || []);
+  let history = $derived(
+    monitor?.patient?.history?.length
+      ? monitor.patient.history
+      : (cases[0]?.medical?.history || [])
+  );
 </script>
 
 <svelte:head><title>JEEVAN — Notifications</title></svelte:head>
@@ -127,6 +132,20 @@
 
     <div class="col-span-12 lg:col-span-3 flex flex-col gap-4">
       <div class="bg-slate-900/40 rounded-xl p-5 border border-slate-800/30">
+        <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Stored cases</h3>
+        {#if cases.length === 0}
+          <p class="text-xs text-slate-600 mb-4">No saved dispatches yet.</p>
+        {:else}
+          <div class="space-y-2 max-h-40 overflow-y-auto mb-4">
+            {#each cases as c}
+              <div class="text-[11px] text-slate-300 border border-slate-800 p-2">
+                <p class="font-bold">{c.patient_name || c.patient_email || 'Patient'}</p>
+                <p class="text-slate-500">{c.patient_email}</p>
+                <p>→ {c.hospital_name} · {c.ambulance_id}</p>
+              </div>
+            {/each}
+          </div>
+        {/if}
         <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Past records</h3>
         {#if history.length === 0}
           <p class="text-xs text-slate-600">No prior records.</p>

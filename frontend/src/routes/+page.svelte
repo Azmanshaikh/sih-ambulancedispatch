@@ -11,10 +11,8 @@
 
   let route = $state<[number, number][]>([]);
   let markers = $state<any[]>([]);
-  let dispatchStatus = $state('Standby');
+  let dispatchStatus = $state('Waiting for SOS');
   let etaLabel = $state('');
-  let isRaining = $state(false);
-  let weather = $state('false');
   let ambulances = $state<any[]>([]);
   let hospitals = $state<any[]>([]);
   let selectedHospital = $state<any>(null);
@@ -25,9 +23,28 @@
   let candidates = $state<any[]>([]);
   let pickupMinutes = $state<number | null>(null);
   let transportMinutes = $state<number | null>(null);
-  let dispatching = $state(false);
   let monitor = $state<any>(null);
   let availableCount = $derived(ambulances.filter((a) => a.status === 'available').length);
+
+  function applyPayload(payload: any) {
+    if (!payload) return;
+    const routeCoords: [number, number][] = payload.route || payload.pickup_route || [];
+    route = routeCoords.length > 1 ? routeCoords : [];
+    selectedHospital = payload.hospital;
+    assignedUnit = payload.ambulance_id || '';
+    constraints = payload.constraints;
+    confidence = payload.confidence ?? null;
+    reason = payload.reason || '';
+    candidates = payload.candidates || [];
+    pickupMinutes = payload.pickup_minutes ?? null;
+    transportMinutes = payload.transport_minutes ?? null;
+    const mins = payload.eta_minutes ?? Math.round((payload.eta_seconds || 0) / 60);
+    if (mins) etaLabel = `${mins} min`;
+    if (payload.hospital_name) {
+      dispatchStatus = `Auto → ${payload.hospital_name} · ${assignedUnit || 'unit'}`;
+    }
+    markers = buildMarkers();
+  }
 
   function buildMarkers(fleet = ambulances, hosp = hospitals, extra: any[] = []) {
     const hospitalId = selectedHospital?.id;
@@ -64,76 +81,24 @@
     }
   }
 
-  async function handleSimulateDispatch() {
-    dispatching = true;
-    dispatchStatus = 'Scoring traffic · weather · capacity…';
-    selectedHospital = null;
-    etaLabel = '';
-    confidence = null;
-    reason = '';
-    candidates = [];
-    try {
-      const res = await apiFetch('/tracking/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          incident_lat: BMSIT.lat,
-          incident_lng: BMSIT.lng,
-          is_raining: isRaining,
-          address: BMSIT.name,
-        }),
-      });
-      const result = await res.json();
-      const payload = result.data;
-      if (result.status !== 'success' || !payload) throw new Error('Bad response');
-
-      const routeCoords: [number, number][] = payload.route || [];
-      route = routeCoords.length > 1 ? routeCoords : [];
-      selectedHospital = payload.hospital;
-      assignedUnit = payload.ambulance_id || '';
-      constraints = payload.constraints;
-      confidence = payload.confidence ?? null;
-      reason = payload.reason || '';
-      candidates = payload.candidates || [];
-      pickupMinutes = payload.pickup_minutes ?? null;
-      transportMinutes = payload.transport_minutes ?? null;
-      const mins = payload.eta_minutes ?? Math.round((payload.eta_seconds || 0) / 60);
-      etaLabel = `${mins} min to hospital`;
-      dispatchStatus = `→ ${payload.hospital_name} · ${mins} min`;
-      markers = buildMarkers();
-    } catch (err) {
-      console.error(err);
-      dispatchStatus = 'Dispatch failed — check backend';
-    } finally {
-      dispatching = false;
-    }
-  }
-
   async function loadMonitor() {
     try {
       const res = await apiFetch('/accounts/monitor');
-      if (res.ok) monitor = await res.json();
+      if (!res.ok) return;
+      monitor = await res.json();
+      if (monitor?.mission) applyPayload(monitor.mission);
     } catch {
       /* ignore */
     }
   }
 
   onMount(() => {
-    const storedWeather = sessionStorage.getItem('jeevan_weather');
-    if (storedWeather === 'true') {
-      isRaining = true;
-      weather = 'true';
-    }
-    const auto = sessionStorage.getItem('jeevan_dispatch_now');
-    sessionStorage.removeItem('jeevan_dispatch_now');
-
     loadFleet();
     loadMonitor();
     const timer = setInterval(() => {
       loadFleet();
       loadMonitor();
     }, 2500);
-    if (auto === '1') handleSimulateDispatch();
     return () => clearInterval(timer);
   });
 </script>
@@ -167,21 +132,7 @@
           <span class="text-[10px] text-red-500 font-bold">{dispatchStatus}</span>
         </div>
 
-        <label class="flex items-center justify-between bg-slate-900/50 border border-slate-800 px-3 py-2 rounded-lg text-[11px] text-slate-300">
-          <span>Weather constraint</span>
-          <select bind:value={weather} onchange={() => (isRaining = weather === 'true')} class="bg-slate-800 text-white text-[11px] px-2 py-1 rounded border border-slate-700">
-            <option value="false">Clear</option>
-            <option value="true">Raining</option>
-          </select>
-        </label>
-
-        <button
-          onclick={handleSimulateDispatch}
-          disabled={dispatching}
-          class="w-full py-2.5 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white rounded-lg text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-red-900/40 active:scale-95 disabled:opacity-50"
-        >
-          {dispatching ? 'Optimizing route…' : '🚨 Initiate Dispatch'}
-        </button>
+        <p class="text-[10px] text-slate-400">Fastest unit and hospital are assigned automatically from patient SOS using traffic routing. Staff does not pick a hospital.</p>
 
         <div class="space-y-1.5 overflow-y-auto no-sb flex-1">
           {#each ambulances as a}
@@ -240,7 +191,7 @@
           {/if}
           {#if constraints}
             <p class="text-[10px] text-blue-300 mt-2 uppercase tracking-wide">
-              {constraints.routing} · {constraints.traffic} traffic · {constraints.weather}
+              {constraints.routing} · {constraints.traffic} traffic
             </p>
           {/if}
           {#if assignedUnit}
@@ -261,8 +212,8 @@
           <div class="flex gap-3">
             <div class="h-9 w-9 shrink-0 bg-blue-600/20 rounded-lg flex items-center justify-center border border-blue-500/30 text-blue-400 font-bold text-xs">—</div>
             <div>
-              <p class="text-xs font-bold text-white">Awaiting dispatch</p>
-              <p class="text-[10px] text-slate-400 mt-1">Route BMSIT → nearest hospital using live constraints.</p>
+              <p class="text-xs font-bold text-white">Waiting for patient SOS</p>
+              <p class="text-[10px] text-slate-400 mt-1">The fastest ambulance and hospital are assigned automatically from traffic.</p>
             </div>
           </div>
         {/if}

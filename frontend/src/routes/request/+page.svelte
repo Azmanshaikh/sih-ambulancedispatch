@@ -5,10 +5,10 @@
   let description = $state('');
   let narrative = $state('');
   let age = $state('adult');
-  let isRaining = $state('false');
   let reportFile = $state<File | null>(null);
   let analysisResult = $state('');
   let isAnalyzing = $state(false);
+  let dispatching = $state(false);
 
   async function handleAnalyzeReport() {
     if (!description && !reportFile) {
@@ -149,24 +149,15 @@
             ></textarea>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div>
-              <label for="age-select" style="display: block; font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px;">Age Group</label>
-              <select id="age-select" bind:value={age} style="width: 100%; background: #F5F5F5; border: 2px solid #E0E0E0; border-radius: 0; padding: 8px 10px; font-size: 13px; color: #1A1A1A; outline: none; font-family: 'Inter', sans-serif;">
-                <option value="infant">Infant (0-1)</option>
-                <option value="child">Child (2-12)</option>
-                <option value="teen">Teen (13-17)</option>
-                <option value="adult">Adult (18-60)</option>
-                <option value="elderly">Elderly (60+)</option>
-              </select>
-            </div>
-            <div>
-              <label for="weather-select" style="display: block; font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px;">Weather</label>
-              <select id="weather-select" bind:value={isRaining} style="width: 100%; background: #F5F5F5; border: 2px solid #E0E0E0; border-radius: 0; padding: 8px 10px; font-size: 13px; color: #1A1A1A; outline: none; font-family: 'Inter', sans-serif;">
-                <option value="false">Clear</option>
-                <option value="true">Raining</option>
-              </select>
-            </div>
+          <div>
+            <label for="age-select" style="display: block; font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px;">Age Group</label>
+            <select id="age-select" bind:value={age} style="width: 100%; background: #F5F5F5; border: 2px solid #E0E0E0; border-radius: 0; padding: 8px 10px; font-size: 13px; color: #1A1A1A; outline: none; font-family: 'Inter', sans-serif;">
+              <option value="infant">Infant (0-1)</option>
+              <option value="child">Child (2-12)</option>
+              <option value="teen">Teen (13-17)</option>
+              <option value="adult">Adult (18-60)</option>
+              <option value="elderly">Elderly (60+)</option>
+            </select>
           </div>
 
           <div style="padding-top: 12px; border-top: 2px solid #E0E0E0;">
@@ -186,15 +177,29 @@
             Cancel
           </button>
           <button
-            onclick={() => {
-              sessionStorage.setItem('jeevan_weather', isRaining);
-              sessionStorage.setItem('jeevan_dispatch_now', '1');
-              goto('/');
+            disabled={dispatching}
+            onclick={async () => {
+              dispatching = true;
+              try {
+                await apiFetch('/tracking/dispatch', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    incident_lat: 13.1344,
+                    incident_lng: 77.5693,
+                    address: 'BMSIT College, Avalahalli, Yelahanka',
+                    notes: [description, narrative].filter(Boolean).join('\n'),
+                  }),
+                });
+              } finally {
+                dispatching = false;
+                goto('/');
+              }
             }}
             class="btn btn-primary"
             style="flex: 2; padding: 14px; font-size: 12px; letter-spacing: 0.2em; box-shadow: 0 6px 20px rgba(220,38,38,0.35);"
           >
-            🚑 Initiate Dispatch
+            {dispatching ? 'Assigning fastest unit…' : 'Auto-assign fastest unit'}
           </button>
         </div>
       </div>
