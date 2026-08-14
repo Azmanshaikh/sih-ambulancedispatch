@@ -7,40 +7,98 @@
   let markers = $state<any[]>([]);
   let route = $state<[number, number][]>([]);
   let etaLabel = $state('');
+  let alertBanner = $state<any>(null);
+  let lastAlertId = $state('');
 
-  async function loadMission() {
-    const res = await apiFetch('/accounts/mission');
-    if (!res.ok) return;
-    const data = await res.json();
-    mission = data.mission;
-    if (!mission) {
+  function applyMission(m: any) {
+    mission = m;
+    if (!m) {
       markers = [];
       route = [];
       etaLabel = '';
       return;
     }
-    const pickup = mission.pickup || {};
-    const hosp = mission.hospital || {};
-    const drv = mission.driver_location || {};
-    markers = [
-      pickup.lat ? { position: [pickup.lat, pickup.lng], popup: `Pickup · ${mission.pickup_person}`, type: 'incident' } : null,
-      hosp.lat ? { position: [hosp.lat, hosp.lng], popup: `Hospital · ${mission.destination}`, type: 'hospital_selected' } : null,
-      drv.lat ? { position: [drv.lat, drv.lng], popup: `Unit ${mission.ambulance_id}`, type: 'ambulance' } : null,
-    ].filter(Boolean);
-    route = mission.route || [];
-    etaLabel = mission.eta_label || '';
+    const pickup = m.pickup || {};
+    const hosp = m.hospital || {};
+    const drv = m.driver_location || {};
+    const phase = m.phase || 'pickup';
+    const pts: any[] = [];
+    if (drv.lat) pts.push({ position: [drv.lat, drv.lng], popup: `Unit ${m.ambulance_id}`, type: 'ambulance' });
+    if (pickup.lat) pts.push({ position: [pickup.lat, pickup.lng], popup: `Pickup · ${m.pickup_person}`, type: 'incident' });
+    if (phase === 'drop' && hosp.lat) {
+      pts.push({ position: [hosp.lat, hosp.lng], popup: `Hospital · ${m.destination}`, type: 'hospital_selected' });
+    }
+    markers = pts;
+    route = m.route || (phase === 'pickup' ? m.pickup_route : m.drop_route) || [];
+    etaLabel = m.eta_label || '';
+  }
+
+  async function loadMission() {
+    const res = await apiFetch('/accounts/mission');
+    if (!res.ok) return;
+    const data = await res.json();
+    applyMission(data.mission);
+  }
+
+  async function loadAlerts() {
+    const res = await apiFetch('/accounts/alerts');
+    if (!res.ok) return;
+    const data = await res.json();
+    const unread = (data.alerts || []).find((a: any) => !a.read);
+    if (unread && unread.id !== lastAlertId) {
+      alertBanner = unread;
+      lastAlertId = unread.id;
+    }
+  }
+
+  async function ackAlert() {
+    if (!alertBanner) return;
+    await apiFetch(`/accounts/alerts/${alertBanner.id}/ack`, { method: 'POST' });
+    alertBanner = null;
+  }
+
+  async function arrivedPickup() {
+    await apiFetch('/accounts/mission/phase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phase: 'drop' }),
+    });
+    await loadMission();
   }
 
   onMount(() => {
     loadMission();
-    const t = setInterval(loadMission, 4000);
+    loadAlerts();
+    const t = setInterval(() => {
+      loadMission();
+      loadAlerts();
+    }, 2000);
     return () => clearInterval(t);
   });
 </script>
 
 <svelte:head><title>JEEVAN — Driver mission</title></svelte:head>
 
-<div class="h-full flex flex-col">
+<div class="h-full flex flex-col relative">
+  {#if alertBanner}
+    <div class="absolute inset-0 z-30 flex items-center justify-center" style="background:rgba(127,29,29,0.88);">
+      <div class="bg-white p-8 max-w-md w-[90%] border-4 border-[#DC2626] text-center">
+        <p class="text-[11px] font-black uppercase tracking-[0.3em] text-red-600 mb-2">{alertBanner.title}</p>
+        <h2 class="text-2xl font-black mb-3">You are assigned this job</h2>
+        <p class="text-sm text-slate-700 mb-2">{alertBanner.body}</p>
+        {#if alertBanner.pickup}
+          <p class="text-xs uppercase tracking-widest text-slate-500 mt-3">Pickup</p>
+          <p class="font-bold">{alertBanner.pickup}</p>
+        {/if}
+        {#if alertBanner.drop}
+          <p class="text-xs uppercase tracking-widest text-slate-500 mt-3">Drop</p>
+          <p class="font-bold">{alertBanner.drop}</p>
+        {/if}
+        <button class="btn btn-primary mt-6 w-full py-3" onclick={ackAlert}>Acknowledge</button>
+      </div>
+    </div>
+  {/if}
+
   <div class="flex-1 relative">
     <MapWidget id="driver-map" clazz="absolute inset-0" {markers} {route} {etaLabel} />
     <div class="absolute top-5 left-5 z-10 w-80 pointer-events-none">
@@ -48,13 +106,20 @@
         {#if !mission}
           <p class="text-[10px] font-bold uppercase tracking-widest text-red-500">Standby</p>
           <h2 class="text-xl font-bold mb-2">No assignment</h2>
-          <p class="text-xs text-slate-500">You will see pickup, heading, and hospital here when staff dispatches a job.</p>
+          <p class="text-xs text-slate-500">You will be alerted when a patient requests dispatch.</p>
         {:else}
-          <p class="text-[10px] font-bold uppercase tracking-widest text-red-500">Pickup</p>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-red-500">
+            {mission.phase === 'drop' ? 'Heading to drop' : 'Heading to pickup'}
+          </p>
           <h2 class="text-lg font-bold mb-2">{mission.pickup_person}</h2>
-          <p class="text-xs text-slate-600 mb-3">Heading to {mission.heading}</p>
-          <p class="text-[10px] font-bold uppercase tracking-widest text-red-500">Final destination</p>
-          <p class="text-sm font-bold">{mission.destination}</p>
+          {#if mission.phase !== 'drop'}
+            <p class="text-xs text-slate-600 mb-3">Go to {mission.pickup_name}</p>
+            <button class="btn btn-primary w-full" onclick={arrivedPickup}>Arrived at pickup</button>
+          {:else}
+            <p class="text-xs text-slate-600 mb-1">Patient on board</p>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-red-500 mt-3">Final destination</p>
+            <p class="text-sm font-bold">{mission.destination}</p>
+          {/if}
           <p class="text-xs text-slate-500 mt-2">ETA {mission.eta_minutes ?? '—'} min · {mission.ambulance_id}</p>
         {/if}
       </div>

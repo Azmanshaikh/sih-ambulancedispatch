@@ -11,7 +11,7 @@ from app.services.fleet import (
     get_ambulances,
     get_hospitals,
 )
-from app.services.runtime_state import save_mission, set_medical_record
+from app.services.runtime_state import push_alert, save_mission, set_medical_record
 
 router = APIRouter(prefix="/tracking", tags=["Tracking"])
 
@@ -22,6 +22,7 @@ class DispatchRequest(BaseModel):
     is_raining: bool = False
     address: str = BMSIT["name"]
     patient_name: str | None = None
+    patient_email: str | None = None
     cardiac: bool = False
     diabetes: bool = False
     epilepsy: bool = False
@@ -57,6 +58,7 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
     role = (user.get("profile") or {}).get("role")
     patient_id = user["id"] if role == "patient" else None
     patient_name = req.patient_name or (user.get("profile") or {}).get("full_name") or user.get("email")
+    patient_email = req.patient_email or user.get("email")
     if patient_id:
         set_medical_record(
             patient_id,
@@ -74,18 +76,46 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
         "lng": req.incident_lng,
         "address": req.address,
     }
-    save_mission(
+    mission = save_mission(
         {
             **result,
             "patient_id": patient_id,
             "patient_name": patient_name,
+            "patient_email": patient_email,
             "pickup": {"name": req.address, "lat": req.incident_lat, "lng": req.incident_lng},
             "ambulance_id": result.get("ambulance_id"),
             "hospital_name": result.get("hospital_name"),
             "hospital": result.get("hospital"),
             "route": result.get("route") or [],
+            "pickup_route": result.get("pickup_route") or [],
             "eta_minutes": result.get("eta_minutes"),
+            "pickup_minutes": result.get("pickup_minutes"),
+            "transport_minutes": result.get("transport_minutes"),
+            "phase": "pickup",
         }
+    )
+    hospital_name = result.get("hospital_name") or "hospital"
+    unit = result.get("ambulance_id") or "unit"
+    push_alert(
+        "driver",
+        "JOB ASSIGNED",
+        f"Pick up {patient_name} at {req.address}, then drop at {hospital_name}.",
+        ambulance_id=result.get("ambulance_id"),
+        mission_id=mission.get("id"),
+        extra={"pickup": req.address, "drop": hospital_name, "patient_name": patient_name},
+    )
+    push_alert(
+        "staff",
+        "PATIENT EN ROUTE",
+        f"{patient_name} ({patient_email}) is going to {hospital_name} on {unit}.",
+        ambulance_id=result.get("ambulance_id"),
+        mission_id=mission.get("id"),
+        extra={
+            "patient_name": patient_name,
+            "patient_email": patient_email,
+            "hospital_name": hospital_name,
+            "ambulance_id": unit,
+        },
     )
     return {"status": "success", "data": result}
 

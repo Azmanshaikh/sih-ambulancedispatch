@@ -308,6 +308,7 @@ class DispatchOptimizer:
             "hospital_id": hospital.get("id"),
             "hospital_name": hospital.get("name"),
             "route": best["route"],
+            "pickup_route": (pickup or {}).get("pickup_route") or [],
             "eta_seconds": eta,
             "eta_minutes": round(eta / 60, 1),
             "pickup_minutes": pickup_min,

@@ -65,6 +65,7 @@
           incident_lng: BMSIT.lng,
           address: BMSIT.name,
           patient_name: auth.profile?.full_name || auth.profile?.email,
+          patient_email: auth.profile?.email,
           cardiac,
           diabetes,
           epilepsy,

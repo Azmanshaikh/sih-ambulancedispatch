@@ -207,8 +207,15 @@
               <span class="text-xs font-bold tracking-widest uppercase text-white">Yelahanka Live Feed</span>
             </div>
           </div>
-          <div class="glass px-3 py-1.5 rounded-xl border border-yellow-500/30 text-[10px] text-yellow-400 font-bold uppercase tracking-widest max-w-[220px] text-right">
-            📍 {BMSIT.name}
+          <div class="flex flex-col items-end gap-2">
+            {#if monitor?.unread_alerts}
+              <a href="/notifications" class="glass px-3 py-1.5 rounded-xl border border-red-500/50 text-[10px] text-red-400 font-bold uppercase tracking-widest">
+                {monitor.unread_alerts} staff alert{monitor.unread_alerts === 1 ? '' : 's'}
+              </a>
+            {/if}
+            <div class="glass px-3 py-1.5 rounded-xl border border-yellow-500/30 text-[10px] text-yellow-400 font-bold uppercase tracking-widest max-w-[220px] text-right">
+              📍 {BMSIT.name}
+            </div>
           </div>
         </div>
       </div>

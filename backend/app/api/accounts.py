@@ -7,12 +7,16 @@ from app.core.security import get_current_user, require_roles
 from app.services.fleet import BMSIT, get_ambulances
 from app.services.profiles import decide_request, list_profiles, list_requests, request_role, set_driver_ambulance
 from app.services.runtime_state import (
+    ack_alert,
     enrich_mission,
     get_latest_mission,
     get_medical_record,
     get_mission_for_ambulance,
+    list_alerts,
     set_medical_record,
+    set_mission_phase,
     tick_vitals,
+    unread_count,
 )
 
 router = APIRouter(prefix="/accounts", tags=["Accounts"])
@@ -33,6 +37,10 @@ class RecordBody(BaseModel):
     epilepsy: bool = False
     pregnant: bool = False
     notes: str = ""
+
+
+class PhaseBody(BaseModel):
+    phase: Literal["pickup", "drop"]
 
 
 @router.get("/me")
@@ -80,22 +88,65 @@ async def driver_mission(user: dict[str, Any] = Depends(require_roles("driver"))
         mission = enrich_mission(get_latest_mission())
     if not mission:
         return {"status": "success", "mission": None}
+    phase = mission.get("phase") or "pickup"
+    pickup_route = mission.get("pickup_route") or []
+    drop_route = mission.get("drop_route") or mission.get("route") or []
+    active_route = pickup_route if phase == "pickup" else drop_route
+    eta = mission.get("pickup_minutes") if phase == "pickup" else mission.get("transport_minutes")
+    if eta is None:
+        eta = mission.get("eta_minutes")
     return {
         "status": "success",
         "mission": {
+            "id": mission.get("id"),
+            "phase": phase,
             "pickup_name": (mission.get("pickup") or {}).get("name") or BMSIT["name"],
             "pickup_person": mission.get("patient_name") or "Assigned patient",
-            "heading": (mission.get("pickup") or {}).get("name") or BMSIT["name"],
+            "heading": ((mission.get("pickup") or {}).get("name") or BMSIT["name"]) if phase == "pickup" else mission.get("hospital_name"),
             "destination": mission.get("hospital_name"),
             "hospital": mission.get("hospital"),
-            "route": mission.get("route") or [],
-            "eta_minutes": mission.get("eta_minutes"),
-            "eta_label": f"{mission.get('eta_minutes')} min" if mission.get("eta_minutes") is not None else None,
+            "route": active_route,
+            "pickup_route": pickup_route,
+            "drop_route": drop_route,
+            "eta_minutes": eta,
+            "eta_label": f"{eta} min" if eta is not None else None,
             "ambulance_id": mission.get("ambulance_id"),
             "driver_location": mission.get("driver_location"),
             "pickup": mission.get("pickup"),
         },
     }
+
+
+@router.post("/mission/phase")
+async def driver_phase(body: PhaseBody, user: dict[str, Any] = Depends(require_roles("driver"))):
+    profile = user.get("profile") or {}
+    mission = set_mission_phase(body.phase, profile.get("ambulance_id"))
+    if not mission:
+        raise HTTPException(status_code=404, detail="No active mission")
+    return {"status": "success", "phase": mission.get("phase")}
+
+
+@router.get("/alerts")
+async def get_alerts(user: dict[str, Any] = Depends(get_current_user)):
+    role = (user.get("profile") or {}).get("role")
+    if role not in ("driver", "staff"):
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
+    amb_id = (user.get("profile") or {}).get("ambulance_id")
+    alerts = list_alerts(role, amb_id if role == "driver" else None)
+    if role == "driver" and amb_id and not alerts:
+        alerts = list_alerts("driver")
+    return {"status": "success", "alerts": alerts, "unread": unread_count(role, amb_id if role == "driver" else None)}
+
+
+@router.post("/alerts/{alert_id}/ack")
+async def acknowledge_alert(alert_id: str, user: dict[str, Any] = Depends(get_current_user)):
+    role = (user.get("profile") or {}).get("role")
+    if role not in ("driver", "staff"):
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
+    alert = ack_alert(alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return {"status": "success", "alert": alert}
 
 
 @router.get("/vitals")
@@ -118,14 +169,17 @@ async def staff_monitor(user: dict[str, Any] = Depends(require_roles("staff"))):
     pickup = (mission or {}).get("pickup") or BMSIT
     return {
         "status": "success",
+        "unread_alerts": unread_count("staff"),
         "patient": {
             "id": patient_id,
             "name": (mission or {}).get("patient_name"),
+            "email": (mission or {}).get("patient_email"),
             "lat": pickup.get("lat") if isinstance(pickup, dict) else BMSIT["lat"],
             "lng": pickup.get("lng") if isinstance(pickup, dict) else BMSIT["lng"],
             "address": pickup.get("name") if isinstance(pickup, dict) else BMSIT["name"],
             "vitals": vitals,
             "record": record,
+            "history": (record or {}).get("history") or [],
         },
         "driver": (mission or {}).get("driver_location"),
         "mission": mission,
