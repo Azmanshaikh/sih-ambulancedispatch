@@ -11,7 +11,7 @@ from app.services.fleet import (
     get_ambulances,
     get_hospitals,
 )
-from app.services.runtime_state import push_alert, save_mission, set_medical_record
+from app.services.runtime_state import get_latest_mission, push_alert, save_mission, set_medical_record, set_mission_phase
 
 router = APIRouter(prefix="/tracking", tags=["Tracking"])
 
@@ -44,6 +44,9 @@ async def live_fleet(_user: dict[str, Any] = Depends(require_roles("staff"))):
 async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends(require_roles("staff", "patient"))):
     ambulances = get_ambulances()
     hospitals = get_hospitals()
+    previous = get_latest_mission()
+    if previous and previous.get("phase") != "complete":
+        set_mission_phase("complete", previous.get("ambulance_id"))
     result = await asyncio.to_thread(
         get_optimal_hospital_dispatch,
         req.incident_lat,
@@ -53,7 +56,13 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
         req.is_raining,
     )
     if result.get("ambulance_id"):
-        assign_ambulance(result["ambulance_id"])
+        pickup = result.get("pickup_route") or []
+        drop = result.get("route") or []
+        assign_ambulance(
+            result["ambulance_id"],
+            [(float(p[0]), float(p[1])) for p in pickup if p],
+            [(float(p[0]), float(p[1])) for p in drop if p],
+        )
 
     role = (user.get("profile") or {}).get("role")
     patient_id = user["id"] if role == "patient" else None

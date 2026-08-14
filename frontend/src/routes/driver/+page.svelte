@@ -5,7 +5,8 @@
 
   let mission = $state<any>(null);
   let markers = $state<any[]>([]);
-  let route = $state<[number, number][]>([]);
+  let pickupRoute = $state<[number, number][]>([]);
+  let dropRoute = $state<[number, number][]>([]);
   let etaLabel = $state('');
   let alertBanner = $state<any>(null);
   let lastAlertId = $state('');
@@ -14,22 +15,21 @@
     mission = m;
     if (!m) {
       markers = [];
-      route = [];
+      pickupRoute = [];
+      dropRoute = [];
       etaLabel = '';
       return;
     }
     const pickup = m.pickup || {};
     const hosp = m.hospital || {};
     const drv = m.driver_location || {};
-    const phase = m.phase || 'pickup';
     const pts: any[] = [];
     if (drv.lat) pts.push({ position: [drv.lat, drv.lng], popup: `Unit ${m.ambulance_id}`, type: 'ambulance' });
     if (pickup.lat) pts.push({ position: [pickup.lat, pickup.lng], popup: `Pickup · ${m.pickup_person}`, type: 'incident' });
-    if (phase === 'drop' && hosp.lat) {
-      pts.push({ position: [hosp.lat, hosp.lng], popup: `Hospital · ${m.destination}`, type: 'hospital_selected' });
-    }
+    if (hosp.lat) pts.push({ position: [hosp.lat, hosp.lng], popup: `Hospital · ${m.destination}`, type: 'hospital_selected' });
     markers = pts;
-    route = m.route || (phase === 'pickup' ? m.pickup_route : m.drop_route) || [];
+    pickupRoute = m.pickup_route || [];
+    dropRoute = m.drop_route || [];
     etaLabel = m.eta_label || '';
   }
 
@@ -62,6 +62,15 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phase: 'drop' }),
+    });
+    await loadMission();
+  }
+
+  async function endTrip() {
+    await apiFetch('/accounts/mission/phase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phase: 'complete' }),
     });
     await loadMission();
   }
@@ -100,7 +109,7 @@
   {/if}
 
   <div class="flex-1 relative">
-    <MapWidget id="driver-map" clazz="absolute inset-0" {markers} {route} {etaLabel} />
+    <MapWidget id="driver-map" clazz="absolute inset-0" {markers} {pickupRoute} {dropRoute} {etaLabel} showLegend />
     <div class="absolute top-5 left-5 z-10 w-80 pointer-events-none">
       <div class="glass p-5 rounded-xl border border-slate-800/60 shadow-2xl pointer-events-auto" style="background:rgba(255,255,255,0.95);">
         {#if !mission}
@@ -109,16 +118,24 @@
           <p class="text-xs text-slate-500">You will be alerted when a patient requests dispatch.</p>
         {:else}
           <p class="text-[10px] font-bold uppercase tracking-widest text-red-500">
-            {mission.phase === 'drop' ? 'Heading to drop' : 'Heading to pickup'}
+            {mission.phase === 'complete' ? 'Trip complete' : mission.phase === 'drop' ? 'Heading to drop' : 'Heading to pickup'}
           </p>
           <h2 class="text-lg font-bold mb-2">{mission.pickup_person}</h2>
-          {#if mission.phase !== 'drop'}
-            <p class="text-xs text-slate-600 mb-3">Go to {mission.pickup_name}</p>
-            <button class="btn btn-primary w-full" onclick={arrivedPickup}>Arrived at pickup</button>
+          {#if mission.phase === 'complete'}
+            <p class="text-xs text-slate-600">Patient handed over. A trip report was generated for staff and the patient.</p>
           {:else}
-            <p class="text-xs text-slate-600 mb-1">Patient on board</p>
-            <p class="text-[10px] font-bold uppercase tracking-widest text-red-500 mt-3">Final destination</p>
-            <p class="text-sm font-bold">{mission.destination}</p>
+            {#if mission.phase !== 'drop'}
+              <p class="text-xs text-slate-600 mb-3">Go to {mission.pickup_name}</p>
+              <button class="btn btn-primary w-full mb-2" onclick={arrivedPickup}>Arrived at pickup</button>
+            {:else}
+              <p class="text-xs text-slate-600 mb-1">Patient on board</p>
+              <p class="text-[10px] font-bold uppercase tracking-widest text-red-500 mt-3">Final destination</p>
+              <p class="text-sm font-bold mb-3">{mission.destination}</p>
+            {/if}
+            <button class="btn w-full border-2 border-[#DC2626] text-[#DC2626] font-black uppercase tracking-widest py-3" onclick={endTrip}>
+              End trip / Trip complete
+            </button>
+            <p class="text-[10px] text-slate-500 mt-2">Auto-completes when the unit reaches hospital if you do not tap this.</p>
           {/if}
           <p class="text-xs text-slate-500 mt-2">ETA {mission.eta_minutes ?? '—'} min · {mission.ambulance_id}</p>
         {/if}

@@ -16,14 +16,22 @@ from app.services.profiles import (
     request_role,
     set_driver_ambulance,
 )
+from app.services.patient_care import (
+    generate_trip_report,
+    get_health_profile,
+    list_reports_for,
+    save_health_profile,
+)
 from app.services.runtime_state import (
     ack_alert,
     enrich_mission,
     get_latest_mission,
     get_medical_record,
     get_mission_for_ambulance,
+    get_mission_for_patient,
     list_alerts,
     list_dispatch_cases,
+    save_mission,
     set_medical_record,
     set_mission_phase,
     tick_vitals,
@@ -58,8 +66,33 @@ class RecordBody(BaseModel):
     notes: str = ""
 
 
+class VisitItem(BaseModel):
+    hospital: str = ""
+    when: str = ""
+    reason: str = ""
+
+
+class DoctorItem(BaseModel):
+    name: str = ""
+    specialty: str = ""
+    notes: str = ""
+
+
+class HealthProfileBody(BaseModel):
+    allergies: str = ""
+    medicines: str = ""
+    conditions: str = ""
+    cardiac: bool = False
+    diabetes: bool = False
+    epilepsy: bool = False
+    pregnant: bool = False
+    visits: list[VisitItem] = []
+    doctors: list[DoctorItem] = []
+    notes: str = ""
+
+
 class PhaseBody(BaseModel):
-    phase: Literal["pickup", "drop"]
+    phase: Literal["pickup", "drop", "complete"]
 
 
 @router.get("/me")
@@ -156,17 +189,26 @@ async def bind_ambulance(user_id: str, body: DecideBody, user: dict[str, Any] = 
 
 
 @router.get("/mission")
-async def driver_mission(user: dict[str, Any] = Depends(require_roles("driver"))):
+async def live_mission(user: dict[str, Any] = Depends(get_current_user)):
     profile = user.get("profile") or {}
-    mission = enrich_mission(get_mission_for_ambulance(profile.get("ambulance_id")))
-    if not mission:
+    role = profile.get("role")
+    if role == "driver":
+        mission = enrich_mission(get_mission_for_ambulance(profile.get("ambulance_id")))
+        if not mission:
+            mission = enrich_mission(get_latest_mission())
+    elif role == "patient":
+        mission = enrich_mission(get_mission_for_patient(user["id"]))
+        if not mission:
+            mission = enrich_mission(get_latest_mission())
+    elif role == "staff":
         mission = enrich_mission(get_latest_mission())
+    else:
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
     if not mission:
         return {"status": "success", "mission": None}
     phase = mission.get("phase") or "pickup"
     pickup_route = mission.get("pickup_route") or []
     drop_route = mission.get("drop_route") or mission.get("route") or []
-    active_route = pickup_route if phase == "pickup" else drop_route
     eta = mission.get("pickup_minutes") if phase == "pickup" else mission.get("transport_minutes")
     if eta is None:
         eta = mission.get("eta_minutes")
@@ -180,7 +222,7 @@ async def driver_mission(user: dict[str, Any] = Depends(require_roles("driver"))
             "heading": ((mission.get("pickup") or {}).get("name") or BMSIT["name"]) if phase == "pickup" else mission.get("hospital_name"),
             "destination": mission.get("hospital_name"),
             "hospital": mission.get("hospital"),
-            "route": active_route,
+            "route": pickup_route if phase == "pickup" else drop_route,
             "pickup_route": pickup_route,
             "drop_route": drop_route,
             "eta_minutes": eta,
@@ -188,17 +230,24 @@ async def driver_mission(user: dict[str, Any] = Depends(require_roles("driver"))
             "ambulance_id": mission.get("ambulance_id"),
             "driver_location": mission.get("driver_location"),
             "pickup": mission.get("pickup"),
+            "report": mission.get("report"),
         },
     }
 
 
 @router.post("/mission/phase")
-async def driver_phase(body: PhaseBody, user: dict[str, Any] = Depends(require_roles("driver"))):
+async def mission_phase(body: PhaseBody, user: dict[str, Any] = Depends(require_roles("driver", "staff"))):
     profile = user.get("profile") or {}
-    mission = set_mission_phase(body.phase, profile.get("ambulance_id"))
+    amb_id = profile.get("ambulance_id") if profile.get("role") == "driver" else None
+    mission = set_mission_phase(body.phase, amb_id)
     if not mission:
         raise HTTPException(status_code=404, detail="No active mission")
-    return {"status": "success", "phase": mission.get("phase")}
+    report = mission.get("report")
+    if body.phase == "complete" and not report:
+        report = await generate_trip_report(mission)
+        mission["report"] = report
+        save_mission(mission)
+    return {"status": "success", "phase": mission.get("phase"), "report_id": (report or {}).get("id")}
 
 
 @router.get("/alerts")
@@ -235,6 +284,42 @@ async def save_record(body: RecordBody, user: dict[str, Any] = Depends(get_curre
     return {"status": "success", "record": record}
 
 
+@router.get("/health-profile")
+async def read_health_profile(user: dict[str, Any] = Depends(get_current_user), patient_id: str | None = None):
+    role = (user.get("profile") or {}).get("role")
+    target = user["id"]
+    if patient_id and role == "staff":
+        target = patient_id
+    elif patient_id and patient_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Not allowed")
+    return {"status": "success", "profile": get_health_profile(target)}
+
+
+@router.put("/health-profile")
+async def write_health_profile(body: HealthProfileBody, user: dict[str, Any] = Depends(require_roles("patient"))):
+    row = save_health_profile(user["id"], body.model_dump())
+    set_medical_record(
+        user["id"],
+        {
+            "cardiac": body.cardiac,
+            "diabetes": body.diabetes,
+            "epilepsy": body.epilepsy,
+            "pregnant": body.pregnant,
+            "notes": body.notes,
+        },
+        patient_email=user.get("email"),
+    )
+    return {"status": "success", "profile": row}
+
+
+@router.get("/reports")
+async def trip_reports(user: dict[str, Any] = Depends(get_current_user)):
+    role = (user.get("profile") or {}).get("role")
+    if role not in ("staff", "patient"):
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
+    return {"status": "success", "reports": list_reports_for(user)}
+
+
 @router.get("/cases")
 async def staff_cases(_user: dict[str, Any] = Depends(require_roles("staff"))):
     return {"status": "success", "cases": list_dispatch_cases()}
@@ -263,6 +348,8 @@ async def staff_monitor(user: dict[str, Any] = Depends(require_roles("staff"))):
         },
         "driver": (mission or {}).get("driver_location"),
         "mission": mission,
+        "health_profile": get_health_profile(patient_id) if patient_id else {},
+        "reports": list_reports_for(user),
         "fleet": get_ambulances(),
         "cases": list_dispatch_cases(),
     }

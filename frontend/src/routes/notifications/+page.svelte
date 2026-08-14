@@ -7,6 +7,9 @@
   let monitor = $state<any>(null);
   let markers = $state<any[]>([]);
   let cases = $state<any[]>([]);
+  let pickupRoute = $state<[number, number][]>([]);
+  let dropRoute = $state<[number, number][]>([]);
+  let reports = $state<any[]>([]);
 
   function flagList(rec: any) {
     if (!rec) return 'None noted';
@@ -36,12 +39,23 @@
         d.lat ? { position: [d.lat, d.lng], popup: `Driver · ${d.id}`, type: 'ambulance' } : null,
         h.lat ? { position: [h.lat, h.lng], popup: `Hospital · ${h.name}`, type: 'hospital_selected' } : null,
       ].filter(Boolean);
-      route = monitor.mission?.drop_route || monitor.mission?.route || [];
+      pickupRoute = monitor.mission?.pickup_route || [];
+      dropRoute = monitor.mission?.drop_route || monitor.mission?.route || [];
+      reports = monitor.reports || [];
     }
   }
 
   async function ack(id: string) {
     await apiFetch(`/accounts/alerts/${id}/ack`, { method: 'POST' });
+    await load();
+  }
+
+  async function endTrip() {
+    await apiFetch('/accounts/mission/phase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phase: 'complete' }),
+    });
     await load();
   }
 
@@ -67,7 +81,7 @@
 
     <div class="col-span-12 lg:col-span-4 flex flex-col gap-4">
       <div class="relative rounded-xl overflow-hidden border border-slate-800 map-wrap" style="height: 220px;">
-        <MapWidget id="notif-map" clazz="absolute inset-0" {markers} {route} />
+        <MapWidget id="notif-map" clazz="absolute inset-0" {markers} {pickupRoute} {dropRoute} showLegend />
         <div class="absolute top-3 left-3 glass px-3 py-1.5 rounded-lg border border-slate-700/50 z-10">
           <div class="flex items-center gap-2">
             <div class="w-2 h-2 bg-red-500 rounded-full blink"></div>
@@ -111,6 +125,10 @@
             is going to
             <strong>{latest.hospital_name || monitor?.mission?.hospital_name || 'hospital'}</strong>
           </p>
+          {#if monitor?.mission && monitor.mission.phase !== 'complete'}
+            <button class="btn btn-primary mt-4 w-full" onclick={endTrip}>End trip / Trip complete</button>
+            <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">Auto-completes at hospital if you skip this</p>
+          {/if}
         {:else}
           <h2 class="text-2xl font-black text-white tracking-tight uppercase">Awaiting dispatch</h2>
           <p class="text-slate-500 font-medium tracking-wide uppercase text-xs mt-1">Alerts appear when a patient requests an ambulance</p>
@@ -124,6 +142,10 @@
           <p class="text-xs text-slate-400">{monitor.patient.email || 'no email'}</p>
           <p class="text-xs text-slate-300 mt-3">HR {monitor.patient.vitals?.heart_rate ?? '—'} bpm · SpO2 {monitor.patient.vitals?.spo2 ?? '—'}%</p>
           <p class="text-xs text-slate-400 mt-1">Current: {flagList(monitor.patient.record)}</p>
+          {#if monitor.health_profile}
+            <p class="text-xs text-slate-300 mt-3">Allergies: {monitor.health_profile.allergies || 'none noted'}</p>
+            <p class="text-xs text-slate-300">Medicines: {monitor.health_profile.medicines || 'none noted'}</p>
+          {/if}
         {:else}
           <p class="text-sm text-slate-600">No active patient.</p>
         {/if}
@@ -132,6 +154,19 @@
 
     <div class="col-span-12 lg:col-span-3 flex flex-col gap-4">
       <div class="bg-slate-900/40 rounded-xl p-5 border border-slate-800/30">
+        <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Trip reports</h3>
+        {#if reports.length === 0}
+          <p class="text-xs text-slate-600 mb-4">Reports appear when a driver ends a trip.</p>
+        {:else}
+          <div class="space-y-3 max-h-64 overflow-y-auto mb-4">
+            {#each reports as r}
+              <div class="text-[11px] text-slate-200 border border-slate-800 p-2">
+                <p class="font-bold">{r.patient_name || 'Patient'} → {r.hospital_name}</p>
+                <pre class="whitespace-pre-wrap font-sans mt-1 text-slate-300">{r.body}</pre>
+              </div>
+            {/each}
+          </div>
+        {/if}
         <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Stored cases</h3>
         {#if cases.length === 0}
           <p class="text-xs text-slate-600 mb-4">No saved dispatches yet.</p>

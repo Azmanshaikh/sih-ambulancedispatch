@@ -16,7 +16,7 @@
   const NO_NAV = ['/login', '/auth/callback', '/choose-role'];
 
   const STAFF_PATHS = ['/', '/request', '/navigation', '/hospitals', '/notifications', '/staff/approvals'];
-  const PATIENT_PATHS = ['/patient'];
+  const PATIENT_PATHS = ['/patient', '/ai-guide', '/ai-call'];
   const DRIVER_PATHS = ['/driver', '/hospitals'];
 
   function allowed(pathname: string, role?: string | null) {

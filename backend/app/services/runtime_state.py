@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from app.services.fleet import BMSIT, get_ambulance
+from app.services.fleet import BMSIT, get_ambulance, follow_drop_leg, release_ambulance
 from app.core.supabase import rest_insert, rest_select, rest_update, rest_upsert
 
 _missions: dict[str, dict[str, Any]] = {}
@@ -155,6 +155,7 @@ def save_mission(mission: dict[str, Any]) -> dict[str, Any]:
     patient_id = mission.get("patient_id")
     mission.setdefault("phase", "pickup")
     mission.setdefault("id", str(uuid.uuid4()))
+    mission.setdefault("phase_started_at", _now())
     if amb_id:
         _missions[f"amb:{amb_id}"] = mission
     if patient_id:
@@ -198,6 +199,7 @@ def get_latest_mission() -> dict[str, Any] | None:
         "pickup_minutes": row.get("pickup_minutes"),
         "transport_minutes": row.get("transport_minutes"),
         "phase": row.get("phase") or "pickup",
+        "report": row.get("report") or (row.get("medical") or {}).get("report"),
     }
     _missions["latest"] = mission
     if mission.get("ambulance_id"):
@@ -208,16 +210,68 @@ def get_latest_mission() -> dict[str, Any] | None:
 
 
 def set_mission_phase(phase: str, ambulance_id: str | None = None) -> dict[str, Any] | None:
-    if phase not in ("pickup", "drop"):
-        raise ValueError("phase must be pickup or drop")
+    if phase not in ("pickup", "drop", "complete"):
+        raise ValueError("phase must be pickup, drop, or complete")
     mission = get_mission_for_ambulance(ambulance_id) if ambulance_id else get_latest_mission()
     if not mission:
         mission = get_latest_mission()
     if not mission:
         return None
+    if mission.get("phase") == "complete" and phase != "complete":
+        return mission
+    prev = mission.get("phase")
     mission["phase"] = phase
+    if prev != phase:
+        mission["phase_started_at"] = _now()
+    amb_id = mission.get("ambulance_id")
+    if phase == "drop":
+        follow_drop_leg(amb_id)
+    if phase == "complete":
+        mission["completed_at"] = _now()
+        release_ambulance(amb_id)
     save_mission(mission)
     return mission
+
+
+def _phase_age_seconds(mission: dict[str, Any]) -> float:
+    raw = mission.get("phase_started_at") or mission.get("created_at")
+    if not raw:
+        return 0.0
+    try:
+        started = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - started).total_seconds()
+    except Exception:
+        return 0.0
+
+
+def apply_fleet_events(events: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Auto-advance pickup → drop → complete when the mock unit reaches each stop."""
+    mission = get_latest_mission()
+    if not mission or mission.get("phase") == "complete":
+        return None
+    changed = None
+    for event in events or []:
+        if event.get("ambulance_id") and event.get("ambulance_id") != mission.get("ambulance_id"):
+            continue
+        arrived = event.get("arrived")
+        phase = mission.get("phase") or "pickup"
+        if arrived == "pickup" and phase == "pickup":
+            changed = set_mission_phase("drop", mission.get("ambulance_id"))
+            mission = changed or mission
+        elif arrived == "drop" and phase in ("pickup", "drop"):
+            changed = set_mission_phase("complete", mission.get("ambulance_id"))
+            mission = changed or mission
+    # Demo fallback: finish each leg even if the route feed is empty.
+    if mission and mission.get("phase") != "complete":
+        age = _phase_age_seconds(mission)
+        phase = mission.get("phase") or "pickup"
+        if phase == "pickup" and age >= 22:
+            changed = set_mission_phase("drop", mission.get("ambulance_id"))
+        elif phase == "drop" and age >= 22:
+            changed = set_mission_phase("complete", mission.get("ambulance_id"))
+    return changed
 
 
 def enrich_mission(mission: dict[str, Any] | None) -> dict[str, Any] | None:

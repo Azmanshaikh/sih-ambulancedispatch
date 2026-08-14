@@ -173,18 +173,84 @@ def get_ambulance(ambulance_id: str) -> dict[str, Any] | None:
     return None
 
 
-def assign_ambulance(ambulance_id: str) -> None:
+def assign_ambulance(
+    ambulance_id: str,
+    pickup_path: list[tuple[float, float]] | None = None,
+    drop_path: list[tuple[float, float]] | None = None,
+) -> None:
     for unit in _fleet:
-        if unit["id"] == ambulance_id:
-            unit["status"] = "dispatched"
-            break
+        if unit["id"] != ambulance_id:
+            continue
+        unit["status"] = "dispatched"
+        unit["pickup_path"] = list(pickup_path or [])
+        unit["drop_path"] = list(drop_path or [])
+        unit["path"] = list(pickup_path or [])
+        unit["path_i"] = 0
+        unit["leg"] = "pickup"
+        if unit["path"]:
+            unit["lat"] = float(unit["path"][0][0])
+            unit["lng"] = float(unit["path"][0][1])
+        break
 
 
-def tick_fleet() -> None:
-    """Small GPS drift so units look live-tracked around Yelahanka."""
+def release_ambulance(ambulance_id: str | None) -> None:
+    if not ambulance_id:
+        return
+    for unit in _fleet:
+        if unit["id"] != ambulance_id:
+            continue
+        unit["status"] = "available"
+        unit["path"] = []
+        unit["pickup_path"] = []
+        unit["drop_path"] = []
+        unit["path_i"] = 0
+        unit["leg"] = None
+        break
+
+
+def follow_drop_leg(ambulance_id: str | None) -> None:
+    if not ambulance_id:
+        return
+    for unit in _fleet:
+        if unit["id"] != ambulance_id:
+            continue
+        unit["status"] = "dispatched"
+        unit["leg"] = "drop"
+        unit["path"] = list(unit.get("drop_path") or [])
+        unit["path_i"] = 0
+        if unit["path"]:
+            unit["lat"] = float(unit["path"][0][0])
+            unit["lng"] = float(unit["path"][0][1])
+        break
+
+
+def _advance_along_path(unit: dict[str, Any]) -> str | None:
+    path = unit.get("path") or []
+    if len(path) < 2:
+        return None
+    remaining = max(1, len(path) - 1 - int(unit.get("path_i") or 0))
+    step = max(1, remaining // 10)
+    unit["path_i"] = min(int(unit.get("path_i") or 0) + step, len(path) - 1)
+    pt = path[unit["path_i"]]
+    unit["lat"] = float(pt[0])
+    unit["lng"] = float(pt[1])
+    if unit["path_i"] >= len(path) - 1:
+        return unit.get("leg") or "pickup"
+    return None
+
+
+def tick_fleet() -> list[dict[str, Any]]:
+    """Idle units drift near base. Assigned units follow pickup then drop routes."""
     if not _fleet:
         init_fleet()
+    events: list[dict[str, Any]] = []
     for unit in _fleet:
+        arrived = _advance_along_path(unit) if unit.get("status") == "dispatched" and unit.get("path") else None
+        if arrived:
+            events.append({"ambulance_id": unit["id"], "arrived": arrived})
+            continue
+        if unit.get("path"):
+            continue
         if unit["status"] == "busy":
             step = 0.00008
         elif unit["status"] == "dispatched":
@@ -194,10 +260,10 @@ def tick_fleet() -> None:
         unit["heading"] += random.uniform(-0.6, 0.6)
         unit["lat"] += math.cos(unit["heading"]) * step
         unit["lng"] += math.sin(unit["heading"]) * step
-        # Keep each unit near its home base (~3.5 km)
         dlat = unit["lat"] - unit["home_lat"]
         dlng = unit["lng"] - unit["home_lng"]
         if (dlat * dlat + dlng * dlng) > (0.032**2):
             unit["heading"] = math.atan2(-dlng, -dlat)
             unit["lat"] = unit["home_lat"] + dlat * 0.85
             unit["lng"] = unit["home_lng"] + dlng * 0.85
+    return events

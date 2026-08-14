@@ -4,8 +4,6 @@ from typing import Any, Dict, List, Tuple
 
 import requests
 
-from app.services.routing import a_star_search
-
 
 class DispatchOptimizer:
     def __init__(self):
@@ -113,41 +111,22 @@ class DispatchOptimizer:
         if not ambulances:
             return {"ambulance_id": None, "route": []}
 
-        best_ambulance_id = None
-        best_time = float("inf")
-        best_route: List[Tuple[float, float]] = []
-
-        for amb in ambulances:
-            amb_loc = amb.get("location", (0, 0))
-            travel_time, route_coords, _source = self._route(amb_loc, incident_location)
-            if travel_time < best_time:
-                best_time = travel_time
-                best_ambulance_id = amb.get("id")
-                best_route = route_coords
-
-        if best_time == float("inf"):
-            incident_node = self._find_nearest_node(incident_location)
-            for amb in ambulances:
-                amb_loc = amb.get("location", (0, 0))
-                amb_node = self._find_nearest_node(amb_loc)
-                path, cost = a_star_search(
-                    start=amb_node,
-                    goal=incident_node,
-                    graph=self.mock_graph,
-                    node_coordinates=self.mock_coords,
-                )
-                if cost < best_time:
-                    best_time = cost
-                    best_ambulance_id = amb.get("id")
-                    best_route = [self.mock_coords[node] for node in path]
-
-        if not best_ambulance_id:
-            best_ambulance_id = ambulances[0].get("id")
-
+        pick = self._pick_ambulance(
+            incident_location,
+            [
+                {
+                    **a,
+                    "lat": a.get("lat") if a.get("lat") is not None else (a.get("location") or (0, 0))[0],
+                    "lng": a.get("lng") if a.get("lng") is not None else (a.get("location") or (0, 0))[1],
+                }
+                for a in ambulances
+            ],
+        )
+        unit = (pick or {}).get("ambulance") or ambulances[0]
         return {
-            "ambulance_id": best_ambulance_id,
-            "route": best_route,
-            "eta_seconds": best_time if best_time != float("inf") else 0,
+            "ambulance_id": unit.get("id"),
+            "route": (pick or {}).get("pickup_route") or [],
+            "eta_seconds": (pick or {}).get("pickup_seconds") or 0,
         }
 
     def _peak_traffic_factor(self) -> float:
@@ -174,26 +153,19 @@ class DispatchOptimizer:
         pool = available or [a for a in ambulances if a.get("status") != "busy"] or ambulances
         if not pool:
             return None
-        ranked = sorted(
+        nearest = min(
             pool,
             key=lambda a: self._haversine_km((a["lat"], a["lng"]), incident_location),
-        )[:5]
-        best_unit = None
-        best_time = float("inf")
-        best_route: List[Tuple[float, float]] = []
-        for amb in ranked:
-            duration, coords, _source = self._route((amb["lat"], amb["lng"]), incident_location)
-            if duration < best_time:
-                best_time = duration
-                best_unit = amb
-                best_route = coords
-        if best_unit is None:
-            best_unit = ranked[0]
-            best_time = 0
+        )
+        duration, coords, _source = self._route((nearest["lat"], nearest["lng"]), incident_location)
+        if duration == float("inf") or not coords:
+            coords = [(nearest["lat"], nearest["lng"]), incident_location]
+            km = self._haversine_km((nearest["lat"], nearest["lng"]), incident_location)
+            duration = max(60.0, km / 40.0 * 3600.0)
         return {
-            "ambulance": best_unit,
-            "pickup_seconds": best_time if best_time != float("inf") else 0,
-            "pickup_route": best_route,
+            "ambulance": nearest,
+            "pickup_seconds": duration if duration != float("inf") else 0,
+            "pickup_route": coords,
         }
 
     def optimize_hospital_dispatch(
@@ -264,10 +236,11 @@ class DispatchOptimizer:
         pickup_min = round(float(best.get("pickup_seconds") or 0) / 60, 1)
         transport_min = round(float(best.get("transport_seconds") or eta) / 60, 1)
         specs = ", ".join(hospital.get("specializations") or [])
+        amb_label = (assigned or {}).get("label") or (assigned or {}).get("id") or "nearest unit"
         reason = (
+            f"Nearest ambulance {amb_label} assigned. "
             f"{hospital.get('name')} is the fastest destination "
-            f"({pickup_min} min pickup + {transport_min} min to hospital) "
-            f"using live traffic routing. Auto-assigned — no staff hospital pick."
+            f"({pickup_min} min pickup + {transport_min} min to hospital)."
             + (f" Specialties: {specs}." if specs else "")
         )
         return {

@@ -9,7 +9,8 @@
     lng: 77.5693,
   };
 
-  let route = $state<[number, number][]>([]);
+  let pickupRoute = $state<[number, number][]>([]);
+  let dropRoute = $state<[number, number][]>([]);
   let markers = $state<any[]>([]);
   let dispatchStatus = $state('Waiting for SOS');
   let etaLabel = $state('');
@@ -28,8 +29,8 @@
 
   function applyPayload(payload: any) {
     if (!payload) return;
-    const routeCoords: [number, number][] = payload.route || payload.pickup_route || [];
-    route = routeCoords.length > 1 ? routeCoords : [];
+    pickupRoute = payload.pickup_route || [];
+    dropRoute = payload.drop_route || payload.route || [];
     selectedHospital = payload.hospital;
     assignedUnit = payload.ambulance_id || '';
     constraints = payload.constraints;
@@ -41,7 +42,11 @@
     const mins = payload.eta_minutes ?? Math.round((payload.eta_seconds || 0) / 60);
     if (mins) etaLabel = `${mins} min`;
     if (payload.hospital_name) {
-      dispatchStatus = `Auto → ${payload.hospital_name} · ${assignedUnit || 'unit'}`;
+      const phase = payload.phase || 'pickup';
+      dispatchStatus =
+        phase === 'complete'
+          ? `Trip complete · ${payload.hospital_name}`
+          : `Nearest 🚑 ${assignedUnit || 'unit'} → ${payload.hospital_name}`;
     }
     markers = buildMarkers();
   }
@@ -50,7 +55,7 @@
     const hospitalId = selectedHospital?.id;
     const fleetMarks = fleet.map((a: any) => ({
       position: [a.lat, a.lng] as [number, number],
-      popup: `🚑 ${a.id} · ${a.label}<br/><span style="font-weight:600;color:#6B6B6B">${a.status}</span>`,
+      popup: `🚑 ${a.id} · ${a.label}<br/><span style="font-weight:600;color:#6B6B6B">${a.status}${a.id === assignedUnit ? ' · assigned' : ''}</span>`,
       type: 'ambulance',
     }));
     const hospMarks = hosp.map((h: any) => ({
@@ -79,6 +84,16 @@
     } catch (err) {
       console.error(err);
     }
+  }
+
+  async function endTrip() {
+    await apiFetch('/accounts/mission/phase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phase: 'complete' }),
+    });
+    await loadMonitor();
+    await loadFleet();
   }
 
   async function loadMonitor() {
@@ -132,11 +147,11 @@
           <span class="text-[10px] text-red-500 font-bold">{dispatchStatus}</span>
         </div>
 
-        <p class="text-[10px] text-slate-400">Fastest unit and hospital are assigned automatically from patient SOS using traffic routing. Staff does not pick a hospital.</p>
+        <p class="text-[10px] text-slate-400">Nearest ambulance (map icon) is assigned automatically. Red line is pickup, blue line is hospital.</p>
 
         <div class="space-y-1.5 overflow-y-auto no-sb flex-1">
           {#each ambulances as a}
-            <div class="flex items-center justify-between bg-slate-900/40 border border-slate-800/60 px-3 py-1.5 rounded-lg">
+            <div class="flex items-center justify-between bg-slate-900/40 border px-3 py-1.5 rounded-lg {a.id === assignedUnit ? 'border-red-500/70' : 'border-slate-800/60'}">
               <div>
                 <p class="text-[11px] font-bold text-white">{a.id}</p>
                 <p class="text-[9px] text-slate-500 uppercase tracking-wide">{a.label}</p>
@@ -149,7 +164,7 @@
     </div>
 
     <div class="col-span-6 relative rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
-      <MapWidget id="dash-map" {route} {markers} {etaLabel} center={[BMSIT.lat, BMSIT.lng]} />
+      <MapWidget id="dash-map" {markers} {etaLabel} {pickupRoute} {dropRoute} showLegend center={[BMSIT.lat, BMSIT.lng]} />
       <div class="absolute inset-0 pointer-events-none z-10" style="padding: 1rem;">
         <div class="flex justify-between items-start pointer-events-auto">
           <div class="glass px-4 py-2 rounded-xl border border-slate-700/50 shadow">
@@ -163,6 +178,11 @@
               <a href="/notifications" class="glass px-3 py-1.5 rounded-xl border border-red-500/50 text-[10px] text-red-400 font-bold uppercase tracking-widest">
                 {monitor.unread_alerts} staff alert{monitor.unread_alerts === 1 ? '' : 's'}
               </a>
+            {/if}
+            {#if monitor?.mission && monitor.mission.phase !== 'complete'}
+              <button class="glass px-3 py-1.5 rounded-xl border border-red-500/60 text-[10px] text-red-300 font-bold uppercase tracking-widest" onclick={endTrip}>
+                End trip / Trip complete
+              </button>
             {/if}
             <div class="glass px-3 py-1.5 rounded-xl border border-yellow-500/30 text-[10px] text-yellow-400 font-bold uppercase tracking-widest max-w-[220px] text-right">
               📍 {BMSIT.name}
@@ -262,6 +282,15 @@
                   <span class="text-[9px] text-slate-500">Now</span>
                 </div>
                 <p class="text-xs text-slate-200">{etaLabel} · {selectedHospital.name}</p>
+              </div>
+            </div>
+          {/if}
+          {#if monitor?.mission?.report?.body}
+            <div class="relative">
+              <span class="absolute -left-[1.35rem] top-1 w-2 h-2 rounded-full bg-red-500 ring-4 ring-slate-950"></span>
+              <div class="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50">
+                <span class="text-[10px] font-bold text-red-500 uppercase">Trip report</span>
+                <pre class="text-[10px] text-slate-200 whitespace-pre-wrap font-sans mt-1">{monitor.mission.report.body}</pre>
               </div>
             </div>
           {/if}

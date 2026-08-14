@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     NVIDIA_MODEL: str = "nvidia/llama-3.1-nemotron-nano-8b-v1"
     NVIDIA_VISION_MODEL: str = "microsoft/phi-3-vision-128k-instruct"
     NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    GEMINI_API_KEY: str | None = None
+    GOOGLE_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    TAVUS_API_KEY: str | None = None
+    TAVUS_REPLICA_ID: str = "r90bbd427f71"
+    TAVUS_PERSONA_ID: str | None = None
+    TAVUS_PAL_ID: str | None = None
+    TAVUS_FACE_ID: str | None = None
+    TAVUS_CALLBACK_URL: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=(

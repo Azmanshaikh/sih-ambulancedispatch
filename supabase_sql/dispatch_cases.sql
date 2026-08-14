@@ -72,3 +72,46 @@ create policy "dispatch_alerts_staff_or_driver"
 create index if not exists dispatch_cases_created_at_idx on public.dispatch_cases (created_at desc);
 create index if not exists dispatch_alerts_role_idx on public.dispatch_alerts (role, created_at desc);
 create index if not exists medical_events_user_idx on public.medical_events (user_id, created_at desc);
+
+create table if not exists public.patient_health_profiles (
+  id uuid primary key references public.profiles (id) on delete cascade,
+  user_id uuid,
+  allergies text default '',
+  medicines text default '',
+  conditions text default '',
+  cardiac boolean default false,
+  diabetes boolean default false,
+  epilepsy boolean default false,
+  pregnant boolean default false,
+  visits jsonb default '[]'::jsonb,
+  doctors jsonb default '[]'::jsonb,
+  notes text default '',
+  updated_at timestamptz default now()
+);
+
+create table if not exists public.patient_chat_messages (
+  id uuid primary key,
+  user_id uuid,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  created_at timestamptz default now()
+);
+
+create table if not exists public.trip_reports (
+  id uuid primary key,
+  mission_id uuid,
+  patient_id uuid,
+  patient_name text,
+  patient_email text,
+  hospital_name text,
+  ambulance_id text,
+  body text not null,
+  created_at timestamptz default now()
+);
+
+alter table public.patient_health_profiles enable row level security;
+alter table public.patient_chat_messages enable row level security;
+alter table public.trip_reports enable row level security;
+
+create index if not exists patient_chat_user_idx on public.patient_chat_messages (user_id, created_at);
+create index if not exists trip_reports_patient_idx on public.trip_reports (patient_id, created_at desc);
