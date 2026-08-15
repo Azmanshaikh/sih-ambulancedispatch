@@ -65,6 +65,16 @@ app.include_router(ai.router)
 app.include_router(hospitals.router)
 app.include_router(accounts.router)
 
+@app.get("/")
+async def root():
+    return {
+        "status": "ok",
+        "service": "JEEVAN API",
+        "health": "/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}

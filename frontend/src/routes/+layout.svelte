@@ -7,6 +7,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { auth, homeFor, initAuth, needsOnboarding } from '$lib/auth.svelte';
+  import { supabaseConfigured } from '$lib/supabase';
+  import { browser } from '$app/environment';
 
   interface Props { children: Snippet; }
   let { children }: Props = $props();
@@ -53,7 +55,7 @@
   });
 
   $effect(() => {
-    if (!auth.ready) return;
+    if (!browser || !auth.ready) return;
     const path = page.url.pathname;
     if (!auth.session && !PUBLIC.includes(path)) goto('/login', { replaceState: true });
     else if (auth.session && path === '/login') goto(homeFor(auth.profile?.role), { replaceState: true });
@@ -63,6 +65,18 @@
   });
 </script>
 
+{#if !supabaseConfigured}
+  <div style="padding:24px;font-family:Inter,sans-serif;max-width:560px;margin:40px auto;">
+    <h1 style="font-size:20px;margin:0 0 8px;">JEEVAN is missing env vars</h1>
+    <p style="color:#6B6B6B;line-height:1.5;">
+      In Vercel → Settings → Environment Variables add
+      <code>VITE_SUPABASE_URL</code>,
+      <code>VITE_SUPABASE_ANON_KEY</code>, and
+      <code>VITE_BACKEND_URL</code>
+      for Production, then Redeploy.
+    </p>
+  </div>
+{:else}
 {#if !NO_NAV.includes(page.url.pathname)}
   <TopNav {gpsStatus} />
 {/if}
@@ -77,3 +91,4 @@
 </main>
 
 <InstallApp />
+{/if}
