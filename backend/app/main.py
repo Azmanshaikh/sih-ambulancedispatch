@@ -34,8 +34,9 @@ async def lifespan(app: FastAPI):
 
     tracker = asyncio.create_task(fleet_loop())
     try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        if engine is not None:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
     except Exception:
         # DB is optional for map/dispatch; keep the API up if Postgres is down.
         pass
@@ -45,15 +46,16 @@ async def lifespan(app: FastAPI):
         await tracker
     except asyncio.CancelledError:
         pass
-    await engine.dispose()
+    if engine is not None:
+        await engine.dispose()
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 
-# CORS
+_cors = [o.strip() for o in (settings.CORS_ORIGINS or "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors or ["*"],
+    allow_credentials=bool(_cors),
     allow_methods=["*"],
     allow_headers=["*"],
 )

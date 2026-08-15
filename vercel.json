@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm --prefix frontend install",
+  "buildCommand": "npm --prefix frontend run build && rm -rf .vercel/output && mkdir -p .vercel && cp -a frontend/.vercel/output .vercel/output"
+}

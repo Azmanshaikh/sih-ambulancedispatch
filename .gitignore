@@ -235,6 +235,8 @@ frontend/dist/
 frontend/.env
 frontend/.env.*
 frontend/.svelte-kit/
+frontend/.vercel/
+.vercel/
 
 # Backend
 backend/__pycache__/
