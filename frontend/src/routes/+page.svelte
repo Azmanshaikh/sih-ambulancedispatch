@@ -34,7 +34,6 @@
       activeMissions.find((m) => m.conflict?.reason)?.conflict?.reason ||
       ''
   );
-  let assignedIds = $derived(new Set([assignedUnit, ...activeMissions.map((m) => m.ambulance_id)].filter(Boolean)));
 
   function applyPayload(payload: any) {
     if (!payload) return;
