@@ -23,11 +23,12 @@
 		"vite": "^8.0.16"
 	},
 	"dependencies": {
+		"@daily-co/daily-js": "^0.92.0",
 		"@lucide/svelte": "^1.31.0",
+		"@supabase/supabase-js": "^2.104.1",
 		"@tailwindcss/forms": "^0.5.11",
 		"leaflet": "^1.9.4",
-		"lucide-svelte": "^1.0.1",
-		"@supabase/supabase-js": "^2.104.1"
+		"lucide-svelte": "^1.0.1"
 	},
 	"engines": {
 		"node": ">=20"

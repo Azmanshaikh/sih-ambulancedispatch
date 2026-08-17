@@ -18,18 +18,20 @@
 
 <svelte:head><title>JEEVAN — Sign in</title></svelte:head>
 
-<div class="h-full flex items-center justify-center p-6" style="background:#F5F5F5;">
-  <div style="width:100%;max-width:420px;background:#fff;border:2px solid #DC2626;padding:32px;">
-    <img src="/logo.png" alt="JEEVAN" style="height:88px;width:auto;max-width:100%;object-fit:contain;margin:0 auto 16px;display:block;" />
-    <h1 style="margin:0 0 8px;font-size:22px;">Sign in with Gmail</h1>
-    <p style="margin:0 0 20px;font-size:13px;color:#6B6B6B;line-height:1.5;">
+<div class="h-full flex items-center justify-center p-6">
+  <div class="nb-card-lg" style="width:100%;max-width:420px;background:#fff;border:4px solid #111;padding:32px;">
+    <div style="display:inline-flex;background:#FF2D2D;border:3px solid #111;box-shadow:4px 4px 0 #111;padding:10px 14px;margin-bottom:18px;">
+      <img src="/logo.png" alt="JEEVAN" style="height:64px;width:auto;max-width:100%;object-fit:contain;display:block;" />
+    </div>
+    <h1 style="margin:0 0 8px;font-size:26px;font-weight:900;text-transform:uppercase;letter-spacing:-0.01em;">Sign in with Gmail</h1>
+    <p style="margin:0 0 20px;font-size:13px;color:#4B4B4B;line-height:1.5;font-weight:500;">
       After Google sign-in you choose Patient, Driver, or Staff. Patients enter immediately. Drivers and new staff need an OTP from main staff.
     </p>
-    <button class="btn btn-primary" style="width:100%;padding:12px;" disabled={loading} onclick={handleGoogle}>
+    <button class="btn btn-primary" style="width:100%;padding:14px;" disabled={loading} onclick={handleGoogle}>
       {loading ? 'Redirecting…' : 'Continue with Google'}
     </button>
     {#if error}
-      <p style="color:#DC2626;font-size:12px;margin:12px 0 0;">{error}</p>
+      <p class="nb-card p-2" style="color:#111;font-size:12px;margin:14px 0 0;font-weight:700;">{error}</p>
     {/if}
   </div>
 </div>

@@ -185,9 +185,9 @@
 <div class="map-wrap {clazz}" style="width: 100%; height: 100%; position: relative;">
   <div bind:this={mapElement} {id} style="width: 100%; height: 100%; border-radius: inherit; z-index: 0;"></div>
   {#if showLegend && ((pickupRoute && pickupRoute.length > 1) || (dropRoute && dropRoute.length > 1) || (route && route.length > 1))}
-    <div class="absolute bottom-3 left-3 z-[500] rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-widest" style="background:rgba(15,23,42,0.86);color:#e2e8f0;">
-      <p><span style="color:#dc2626">━</span> Ambulance → patient</p>
-      <p><span style="color:#2563eb">━</span> Patient → hospital</p>
+    <div class="absolute bottom-3 left-3 z-[500] px-3 py-2 text-[10px] font-black uppercase tracking-widest" style="background:#fff;color:#111;border:3px solid #111;box-shadow:3px 3px 0 #111;">
+      <p><span style="color:#FF2D2D">━</span> Ambulance → patient</p>
+      <p><span style="color:#2E5BFF">━</span> Patient → hospital</p>
     </div>
   {/if}
 </div>

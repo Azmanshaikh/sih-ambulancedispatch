@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.security import get_current_user, require_roles
 from app.services.patient_care import (
     append_chat,
+    confirm_call_intake,
     end_tavus_conversation,
     ingest_tavus_transcript,
     list_chat,
@@ -20,6 +21,13 @@ router = APIRouter(prefix="/ai", tags=["AI"])
 class ChatBody(BaseModel):
     message: str
     history: list[dict[str, str]] = []
+
+
+class IntakeConfirmBody(BaseModel):
+    name: str = ""
+    date_of_birth: str = ""
+    issue: str = ""
+    recap: str = ""
 
 
 @router.get("/chat/history")
@@ -55,7 +63,19 @@ async def chat(body: ChatBody, user: dict[str, Any] = Depends(require_roles("pat
     try:
         content = await nemotron_chat(messages, max_tokens=400)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)[:300])
+        raw = str(e)
+        low = raw.lower()
+        if "unauthorized" in low or "authentication" in low or "401" in low or "invalid api key" in low:
+            raise HTTPException(
+                status_code=502,
+                detail="AI chat is unavailable: the NVIDIA API key is invalid or expired. Update NVIDIA_API_KEY.",
+            )
+        if "forbidden" in low or "403" in low or "not found for account" in low:
+            raise HTTPException(
+                status_code=502,
+                detail="AI chat is unavailable: your NVIDIA key can't access the configured models. Set NVIDIA_MODEL to a model you have access to (e.g. nvidia/nemotron-mini-4b-instruct).",
+            )
+        raise HTTPException(status_code=502, detail=raw[:300])
     if not content:
         raise HTTPException(status_code=502, detail="AI provider error")
     append_chat(user["id"], "user", body.message.strip())
@@ -79,6 +99,16 @@ async def tavus_start(user: dict[str, Any] = Depends(require_roles("patient"))):
 async def tavus_end(conversation_id: str, _user: dict[str, Any] = Depends(require_roles("patient"))):
     result = await end_tavus_conversation(conversation_id)
     return {"status": "success", **result}
+
+
+@router.post("/tavus/{conversation_id}/confirm")
+async def tavus_confirm(
+    conversation_id: str,
+    body: IntakeConfirmBody,
+    _user: dict[str, Any] = Depends(require_roles("patient")),
+):
+    intake = confirm_call_intake(conversation_id, body.model_dump())
+    return {"status": "success", "intake": intake}
 
 
 @router.post("/tavus/webhook")

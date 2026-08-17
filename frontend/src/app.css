@@ -9,17 +9,30 @@
   --font-mono: "Share Tech Mono", monospace;
 }
 
-/* ── Ambulance Dispatch: White & Red Theme ── */
+/* ══════════════════════════════════════════════════════════
+   JEEVAN — NEO-BRUTALIST DESIGN SYSTEM
+   Thick ink borders · hard offset shadows · loud color blocks
+   ══════════════════════════════════════════════════════════ */
 :root {
-  --clr-bg:        #F5F5F5;
+  --clr-bg:        #FFE8D6;
   --clr-surface:   #FFFFFF;
-  --clr-surface2:  #F0F0F0;
-  --clr-border:    #E0E0E0;
-  --clr-primary:   #DC2626;
-  --clr-primary-h: #B91C1C;
-  --clr-text:      #1A1A1A;
-  --clr-muted:     #6B6B6B;
-  --clr-subtle:    #9CA3AF;
+  --clr-surface2:  #FFF3E6;
+  --clr-border:    #111111;
+  --clr-ink:       #111111;
+  --clr-primary:   #FF2D2D;
+  --clr-primary-h: #E01212;
+  --clr-yellow:    #FFD23F;
+  --clr-blue:      #2E5BFF;
+  --clr-green:     #22C55E;
+  --clr-text:      #111111;
+  --clr-muted:     #4B4B4B;
+  --clr-subtle:    #6B6B6B;
+
+  /* hard offset shadows — the brutalist signature */
+  --nb-sh:    4px 4px 0 #111111;
+  --nb-sh-lg: 6px 6px 0 #111111;
+  --nb-sh-sm: 3px 3px 0 #111111;
+  --nb-bw:    3px;
 }
 
 html {
@@ -29,6 +42,10 @@ html {
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--clr-bg);
+  background-image:
+    linear-gradient(rgba(17, 17, 17, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 17, 17, 0.045) 1px, transparent 1px);
+  background-size: 26px 26px;
   color: var(--clr-text);
   margin: 0;
   overflow: hidden;
@@ -52,57 +69,111 @@ body {
   }
 }
 
-/* ── Sharp Rectangle Button System ── */
+/* ── Neo-brutalist card + surface helpers ── */
+.nb-card {
+  background: var(--clr-surface);
+  border: var(--nb-bw) solid var(--clr-ink);
+  box-shadow: var(--nb-sh);
+}
+.nb-card-lg {
+  box-shadow: var(--nb-sh-lg);
+}
+.nb-flat {
+  background: var(--clr-surface);
+  border: var(--nb-bw) solid var(--clr-ink);
+}
+.nb-yellow { background: var(--clr-yellow); }
+.nb-red    { background: var(--clr-primary); color: #fff; }
+.nb-blue   { background: var(--clr-blue); color: #fff; }
+.nb-green  { background: var(--clr-green); color: #fff; }
+.nb-shadow { box-shadow: var(--nb-sh); }
+.nb-shadow-lg { box-shadow: var(--nb-sh-lg); }
+
+/* ── Neo-brutalist chip / badge ── */
+.nb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 2px solid var(--clr-ink);
+  background: var(--clr-yellow);
+  padding: 3px 9px;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  box-shadow: var(--nb-sh-sm);
+}
+
+/* ── Brutalist button system ── */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   border-radius: 0;
   font-family: 'Rajdhani', sans-serif;
   font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 12px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  padding: 10px 20px;
+  padding: 11px 20px;
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  color: var(--clr-ink);
+  background: var(--clr-surface);
+  border: var(--nb-bw) solid var(--clr-ink);
+  box-shadow: var(--nb-sh);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.12s ease;
+}
+.btn:hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--nb-sh-lg);
+}
+.btn:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 #111;
 }
 .btn-primary {
   background: var(--clr-primary);
   color: #FFFFFF;
-  border-color: var(--clr-primary);
-}
-.btn-primary:hover:not(:disabled) {
-  background: var(--clr-primary-h);
-  border-color: var(--clr-primary-h);
-  box-shadow: 0 4px 16px rgba(220,38,38,0.4);
 }
 .btn-secondary {
-  background: #FFFFFF;
-  color: var(--clr-primary);
-  border-color: var(--clr-primary);
-}
-.btn-secondary:hover:not(:disabled) {
-  background: rgba(220,38,38,0.06);
+  background: var(--clr-yellow);
+  color: var(--clr-ink);
 }
 .btn-ghost {
-  background: transparent;
-  color: var(--clr-muted);
-  border-color: var(--clr-border);
+  background: var(--clr-surface);
+  color: var(--clr-ink);
 }
-.btn-ghost:hover:not(:disabled) {
-  color: var(--clr-text);
-  border-color: #9CA3AF;
-  background: var(--clr-surface2);
+.btn-blue {
+  background: var(--clr-blue);
+  color: #FFFFFF;
 }
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--nb-sh-sm);
 }
 
-/* ── Sharp rectangular nav tab labels ── */
+/* ── Brutalist form fields ── */
+.nb-input {
+  width: 100%;
+  border: var(--nb-bw) solid var(--clr-ink);
+  background: #fff;
+  padding: 11px 12px;
+  font-size: 14px;
+  color: var(--clr-ink);
+  box-shadow: var(--nb-sh-sm);
+  transition: box-shadow 0.1s, transform 0.1s;
+}
+.nb-input:focus {
+  outline: none;
+  box-shadow: var(--nb-sh);
+  transform: translate(-1px, -1px);
+}
+
+/* ── Nav tab labels ── */
 .nav-label {
   font-family: 'Rajdhani', sans-serif;
   font-weight: 700;
@@ -112,26 +183,23 @@ body {
   line-height: 1;
 }
 
-/* ── Orbitron: brand / screen headings ── */
 .font-display {
   font-family: 'Orbitron', sans-serif;
 }
-
-/* ── Share Tech Mono: monospaced telemetry ── */
 .font-mono-tech {
   font-family: 'Share Tech Mono', monospace;
 }
 
 .material-symbols-outlined {
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
   font-family: 'Material Symbols Outlined';
 }
 
+/* ── glass replaced by solid brutalist block ── */
 .glass {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(220,38,38,0.15);
+  background: #FFFFFF;
+  border: var(--nb-bw) solid var(--clr-ink);
+  box-shadow: var(--nb-sh);
 }
 
 .no-sb::-webkit-scrollbar {
@@ -142,13 +210,16 @@ body {
   -ms-overflow-style: none;
 }
 ::-webkit-scrollbar {
-  width: 3px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--clr-surface2);
+  border-left: 2px solid var(--clr-ink);
 }
 ::-webkit-scrollbar-thumb {
-  background: #DC2626;
+  background: var(--clr-primary);
+  border: 2px solid var(--clr-ink);
   border-radius: 0;
 }
 
@@ -159,10 +230,10 @@ body {
 
 @keyframes blink {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: .5; transform: scale(1.4); }
+  50% { opacity: .4; transform: scale(1.4); }
 }
 .blink {
-  animation: blink 1.5s infinite;
+  animation: blink 1.4s infinite;
 }
 
 @keyframes spin {
@@ -185,18 +256,61 @@ body {
 .bot-vbar:nth-child(4) { animation-delay: .3s; }
 .bot-vbar:nth-child(5) { animation-delay: .4s; }
 
-/* ── Leaflet overrides ── */
+/* ── Floating action buttons (AI chatbot + video call) ── */
+.fab-stack {
+  position: fixed;
+  right: 18px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-end;
+}
+.fab {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border: var(--nb-bw) solid var(--clr-ink);
+  box-shadow: var(--nb-sh);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--clr-ink);
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.fab:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--nb-sh-lg);
+}
+.fab:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 #111;
+}
+.fab .material-symbols-outlined { font-size: 22px; }
+
+/* ── Leaflet overrides — brutalist ── */
 .leaflet-container {
-  background: #f0f0f0 !important;
+  background: #FFF3E6 !important;
+}
+.leaflet-control-zoom {
+  border: 3px solid #111 !important;
+  box-shadow: 4px 4px 0 #111 !important;
 }
 .leaflet-control-zoom a {
   background: #FFFFFF !important;
-  color: #1A1A1A !important;
-  border-color: #E0E0E0 !important;
+  color: #111 !important;
+  border-color: #111 !important;
   border-radius: 0 !important;
+  font-weight: 800 !important;
 }
 .leaflet-control-zoom a:hover {
-  background: #DC2626 !important;
+  background: var(--clr-primary) !important;
   color: #FFFFFF !important;
 }
 .leaflet-control-attribution {
@@ -204,17 +318,19 @@ body {
 }
 .leaflet-popup-content-wrapper {
   background: #FFFFFF;
-  color: #1A1A1A;
+  color: #111;
   border-radius: 0;
-  border: 2px solid #DC2626;
-  box-shadow: 0 8px 32px rgba(220,38,38,.2);
+  border: 3px solid #111;
+  box-shadow: 6px 6px 0 #111;
 }
 .leaflet-popup-tip {
   background: #FFFFFF;
+  border: 3px solid #111;
 }
 .leaflet-popup-close-button {
-  color: #DC2626 !important;
+  color: #111 !important;
   font-size: 1.2rem !important;
+  font-weight: 900 !important;
 }
 .leaflet-popup-content {
   margin: 12px 16px;
@@ -225,7 +341,7 @@ body {
 /* ── Custom map icons ── */
 .amb-icon {
   font-size: 1.25rem;
-  filter: drop-shadow(0 2px 6px rgba(220,38,38,.75));
+  filter: drop-shadow(0 2px 0 rgba(17,17,17,.9));
   animation: bob 2.4s ease-in-out infinite;
 }
 @keyframes bob {
@@ -234,14 +350,13 @@ body {
 }
 .hosp-icon {
   font-size: 1.8rem;
-  filter: drop-shadow(0 2px 6px rgba(59,130,246,.7));
 }
 .hosp-building {
-  filter: drop-shadow(0 2px 5px rgba(29, 78, 216, 0.65));
+  filter: drop-shadow(2px 2px 0 rgba(17,17,17,0.8));
 }
 .hosp-selected .hosp-building {
-  transform: scale(1.15);
-  filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.9));
+  transform: scale(1.18);
+  filter: drop-shadow(2px 2px 0 rgba(255, 45, 45, 1));
 }
 .amb-marker {
   background: transparent !important;
@@ -252,21 +367,21 @@ body {
   border: none !important;
 }
 .eta-badge {
-  background: #dc2626;
-  color: #fff;
+  background: var(--clr-yellow);
+  color: #111;
   font-family: 'Rajdhani', sans-serif;
   font-weight: 800;
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 4px 10px;
   white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45);
-  border: 2px solid #fff;
+  border: 3px solid #111;
+  box-shadow: 3px 3px 0 #111;
 }
 .user-icon {
   font-size: 1.4rem;
-  filter: drop-shadow(0 2px 8px rgba(251,191,36,.9));
+  filter: drop-shadow(0 2px 0 rgba(17,17,17,.9));
   animation: pulse-icon 2s ease-in-out infinite;
 }
 @keyframes pulse-icon {
@@ -274,7 +389,7 @@ body {
   50% { transform: scale(1.15); }
 }
 .route-line {
-  stroke: #ef4444;
+  stroke: #FF2D2D;
   stroke-width: 5;
   stroke-dasharray: 15, 10;
   animation: dash 2s linear infinite;
@@ -284,14 +399,13 @@ body {
   to { stroke-dashoffset: -50; }
 }
 .custom-popup .leaflet-popup-content-wrapper {
-  background: rgba(255, 255, 255, 0.97);
-  backdrop-filter: blur(12px);
-  border: 2px solid #DC2626;
+  background: #FFFFFF;
+  border: 3px solid #111;
   border-radius: 0;
-  box-shadow: 0 10px 40px rgba(220,38,38,0.25);
+  box-shadow: 6px 6px 0 #111;
 }
 .custom-popup .leaflet-popup-tip {
-  background: rgba(255, 255, 255, 0.97);
+  background: #FFFFFF;
 }
 @keyframes siren-blink {
   0%, 100% { opacity: 1; transform: scale(1); filter: brightness(1.2); }

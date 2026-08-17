@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -16,6 +17,7 @@ _chats: dict[str, list[dict[str, Any]]] = {}
 _reports: list[dict[str, Any]] = []
 _tavus_owners: dict[str, str] = {}
 _tavus_ingested: set[str] = set()
+_call_intakes: dict[str, dict[str, Any]] = {}
 
 
 def _now() -> str:
@@ -117,30 +119,62 @@ def append_chat(user_id: str, role: str, content: str) -> dict[str, Any]:
     return turn
 
 
+def _nvidia_models() -> list[str]:
+    models = [settings.NVIDIA_MODEL]
+    for name in (settings.NVIDIA_MODEL_FALLBACKS or "").split(","):
+        name = name.strip()
+        if name and name not in models:
+            models.append(name)
+    return models
+
+
 async def nemotron_chat(messages: list[dict[str, str]], max_tokens: int = 500) -> str:
-    if not settings.NVIDIA_API_KEY:
-        raise RuntimeError("NVIDIA_API_KEY not configured")
-    payload = {
-        "model": settings.NVIDIA_MODEL,
-        "messages": messages,
-        "max_tokens": max_tokens,
-        "temperature": 0.3,
-    }
-    headers = {
-        "Authorization": f"Bearer {settings.NVIDIA_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{settings.NVIDIA_BASE_URL}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=60.0,
-        )
-    if response.status_code != 200:
-        raise RuntimeError(response.text[:400])
-    result = response.json()
-    return (result.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+    last_error = ""
+    if settings.NVIDIA_API_KEY:
+        headers = {
+            "Authorization": f"Bearer {settings.NVIDIA_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient() as client:
+            for model in _nvidia_models():
+                payload = {
+                    "model": model,
+                    "messages": messages,
+                    "max_tokens": max_tokens,
+                    "temperature": 0.3,
+                }
+                try:
+                    response = await client.post(
+                        f"{settings.NVIDIA_BASE_URL}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=20.0,
+                    )
+                except httpx.TimeoutException:
+                    last_error = f"timeout talking to {model}"
+                    continue
+                except httpx.HTTPError as e:
+                    last_error = str(e)[:400]
+                    continue
+                if response.status_code == 200:
+                    result = response.json()
+                    content = (result.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+                    if content:
+                        return content
+                    last_error = "empty response"
+                    continue
+                last_error = response.text[:400]
+                # A 401 means the key itself is bad; other models will not help.
+                if response.status_code == 401:
+                    break
+                # 403/404: this model is not enabled for the account — try the next.
+    if settings.GEMINI_API_KEY or settings.GOOGLE_API_KEY:
+        try:
+            return await _gemini_complete(messages, max_tokens=max_tokens)
+        except Exception as e:
+            gemini_err = str(e)[:400]
+            last_error = f"{last_error} | gemini: {gemini_err}" if last_error else gemini_err
+    raise RuntimeError(last_error or "NVIDIA_API_KEY not configured")
 
 
 VOICE_SYSTEM = (
@@ -150,6 +184,56 @@ VOICE_SYSTEM = (
     "You are not a doctor. If it sounds urgent or severe, tell them to tap Emergency SOS. "
     "Do not use markdown or lists with stars. Speak naturally."
 )
+
+
+async def _gemini_complete(messages: list[dict[str, str]], max_tokens: int = 500) -> str:
+    key = settings.GEMINI_API_KEY or settings.GOOGLE_API_KEY
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY not configured")
+    system_parts: list[str] = []
+    contents: list[dict[str, Any]] = []
+    for turn in messages:
+        role = turn.get("role") or "user"
+        text = turn.get("content") or ""
+        if role == "system":
+            system_parts.append(text)
+            continue
+        contents.append(
+            {
+                "role": "model" if role == "assistant" else "user",
+                "parts": [{"text": text}],
+            }
+        )
+    payload: dict[str, Any] = {
+        "contents": contents,
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": max_tokens},
+    }
+    if system_parts:
+        payload["system_instruction"] = {"parts": [{"text": "\n".join(system_parts)}]}
+    models = [settings.GEMINI_MODEL or "gemini-2.0-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    seen: set[str] = set()
+    last_error = ""
+    async with httpx.AsyncClient() as client:
+        for name in models:
+            if name in seen:
+                continue
+            seen.add(name)
+            response = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{name}:generateContent",
+                params={"key": key},
+                json=payload,
+                timeout=45.0,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                parts = (((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [])
+                text = "".join(p.get("text") or "" for p in parts).strip()
+                if text:
+                    return text
+            last_error = response.text[:400]
+            if response.status_code not in (404, 400):
+                break
+    raise RuntimeError(last_error or "Gemini chat failed")
 
 
 async def gemini_chat(user_id: str, message: str) -> str:
@@ -196,9 +280,19 @@ async def gemini_chat(user_id: str, message: str) -> str:
 
 TAVUS_CONTEXT = (
     "You are JEEVAN, a live video-call health helper. You can hear the patient. "
-    "Listen until they finish. Think for a moment, then answer out loud with simple "
-    "home remedies for small issues (headache, mild fever, acidity, dehydration, sleep, cough, diet). "
-    "Speak in short sentences. You are not a doctor. If it sounds urgent, tell them to tap Emergency SOS."
+    "This call is VOICE ONLY. The patient cannot type. Never ask them to type, "
+    "write, fill a form, use a text box, or pick a date on a calendar. "
+    "Never use canvas_show_input or canvas_show_calendar. "
+    "Collect every detail out loud: full name, date of birth (day, month, year), "
+    "then their small health issue. Wait for them to speak each answer. "
+    "After you have name, date of birth, and the issue, you MUST show a Magic Canvas "
+    "TEXT card with canvas_show_text. Title it 'Please verify'. Body must list "
+    "Name, Date of birth, and Issue in short lines. Also speak the recap. "
+    "Tell them the yellow verify card is on screen. Ask them to say 'yes that is correct' "
+    "or speak any correction. They can also tap Looks correct on the card. "
+    "Then give simple home remedies for small issues (headache, mild fever, acidity, "
+    "dehydration, sleep, cough, diet). Speak in short sentences. You are not a doctor. "
+    "If it sounds urgent, tell them to tap Emergency SOS."
 )
 
 
@@ -208,9 +302,10 @@ def _tavus_context_for_user(user_id: str, patient_name: str | None) -> str:
     chat_bits = "\n".join(
         f"{t.get('role')}: {t.get('content')}" for t in prior if t.get("content")
     )
+    known = f"App already has display name {patient_name}." if patient_name else "Name is not on file."
     return (
         f"{TAVUS_CONTEXT}\n"
-        f"Patient name: {patient_name or 'unknown'}.\n"
+        f"{known} Still ask them to SAY their full name and date of birth out loud.\n"
         f"Known allergies: {profile.get('allergies') or 'none noted'}.\n"
         f"Medicines: {profile.get('medicines') or 'none noted'}.\n"
         f"Conditions: {profile.get('conditions') or 'none noted'}.\n"
@@ -218,19 +313,72 @@ def _tavus_context_for_user(user_id: str, patient_name: str | None) -> str:
     )
 
 
+async def _ensure_voice_canvas(pal_id: str) -> None:
+    """Disable typed Canvas fields so the PAL collects name/DOB by voice; keep the text recap card."""
+    if not settings.TAVUS_API_KEY or not pal_id:
+        return
+    payload = {
+        "config": {
+            "usage_guidance": (
+                "Never show input, calendar, or question cards. The patient answers by speaking. "
+                "After you have spoken name, date of birth, and the health issue, show a text card "
+                "titled Please verify listing those three facts. Then clear it when they confirm."
+            ),
+            "components": {
+                "input": {"enabled": False},
+                "calendar": {"enabled": False},
+                "question": {"enabled": False},
+                "scheduling_embed": {"enabled": False},
+                "chart": {"enabled": False},
+                "image": {"enabled": False},
+            },
+        }
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.put(
+                f"https://tavusapi.com/v2/pals/{pal_id}/skills/magic_canvas",
+                headers={"x-api-key": settings.TAVUS_API_KEY, "Content-Type": "application/json"},
+                json=payload,
+                timeout=15.0,
+            )
+    except Exception:
+        return
+
+
 async def start_tavus_conversation(user_id: str, patient_name: str | None = None) -> dict[str, Any]:
     if not settings.TAVUS_API_KEY:
         raise RuntimeError("TAVUS_API_KEY not configured")
-    replica = (settings.TAVUS_REPLICA_ID or settings.TAVUS_FACE_ID or "r90bbd427f71").strip()
+
+    replica = (settings.TAVUS_REPLICA_ID or "").strip() or None
     pal = (settings.TAVUS_PAL_ID or "").strip() or None
     persona = (settings.TAVUS_PERSONA_ID or "").strip() or None
     face = (settings.TAVUS_FACE_ID or "").strip() or None
+
+    # Guard against the common mix-up: replica ids start with "r", persona ids with "p".
+    # If a persona-shaped id lands in the replica slot, treat it as a persona so Tavus
+    # doesn't reject it with "Invalid replica_uuid".
+    if replica and replica.lower().startswith("p"):
+        persona = persona or replica
+        replica = None
+    if face and face.lower().startswith("p"):
+        face = None
+
+    if not (replica or persona or pal):
+        raise RuntimeError(
+            "No Tavus replica/persona configured. Set TAVUS_PERSONA_ID (id starts with 'p') "
+            "or TAVUS_REPLICA_ID (id starts with 'r') in .env."
+        )
+
+    await _ensure_voice_canvas(pal or persona or "")
+
     payload: dict[str, Any] = {
         "conversation_name": f"JEEVAN health call · {patient_name or 'patient'}",
         "conversational_context": _tavus_context_for_user(user_id, patient_name),
         "custom_greeting": (
             f"Hello{(' ' + patient_name) if patient_name else ''}. I am Jeevan. "
-            "I can hear you. Tell me your small health issue, I will think, then suggest simple remedies. "
+            "I can hear you, so please speak your answers. First say your full name, "
+            "then your date of birth, then the small health issue. "
             "If it feels serious, use Emergency SOS in the app."
         ),
     }
@@ -238,12 +386,14 @@ async def start_tavus_conversation(user_id: str, patient_name: str | None = None
         payload["pal_id"] = pal
         if face or replica:
             payload["face_id"] = face or replica
-    elif persona:
-        payload["persona_id"] = persona
-        payload["replica_id"] = replica
     else:
-        payload["replica_id"] = replica
-        if face:
+        if persona:
+            payload["persona_id"] = persona
+        # Only send a replica_id when it's an actual replica; a persona can supply its
+        # own default replica, and sending an invalid replica id breaks the call.
+        if replica:
+            payload["replica_id"] = replica
+        elif face:
             payload["face_id"] = face
     callback = (settings.TAVUS_CALLBACK_URL or "").strip()
     if callback:
@@ -327,9 +477,121 @@ async def fetch_tavus_transcript(conversation_id: str) -> list[Any]:
     return _extract_transcript(data)
 
 
+def _turns_as_text(turns: list[Any]) -> str:
+    lines: list[str] = []
+    for turn in turns:
+        if not isinstance(turn, dict):
+            continue
+        role = (turn.get("role") or "user").lower()
+        if role in ("replica", "model", "pal", "persona"):
+            role = "assistant"
+        content = (turn.get("content") or turn.get("text") or "").strip()
+        if content:
+            lines.append(f"{role}: {content}")
+    return "\n".join(lines)
+
+
+def _parse_json_object(raw: str) -> dict[str, Any]:
+    text = (raw or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end <= start:
+        return {}
+    try:
+        data = json.loads(text[start : end + 1])
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def empty_intake(conversation_id: str = "") -> dict[str, Any]:
+    return {
+        "conversation_id": conversation_id,
+        "name": "",
+        "date_of_birth": "",
+        "issue": "",
+        "recap": "",
+        "confirmed": False,
+    }
+
+
+async def summarize_call_intake(conversation_id: str, turns: list[Any]) -> dict[str, Any]:
+    intake = empty_intake(conversation_id)
+    chat = _turns_as_text(turns)
+    if not chat.strip():
+        _call_intakes[conversation_id] = intake
+        return intake
+    try:
+        raw = await nemotron_chat(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Extract patient intake from a spoken video-call transcript. "
+                        "Return JSON only with keys name, date_of_birth, issue, recap. "
+                        "date_of_birth as spoken or YYYY-MM-DD if clear. recap is 2-4 short sentences. "
+                        "Use empty strings when unknown. No markdown."
+                    ),
+                },
+                {"role": "user", "content": chat[-6000:]},
+            ],
+            max_tokens=280,
+        )
+        parsed = _parse_json_object(raw)
+        for key in ("name", "date_of_birth", "issue", "recap"):
+            val = parsed.get(key)
+            if isinstance(val, str):
+                intake[key] = val.strip()
+        if not intake["recap"]:
+            intake["recap"] = chat[-800:]
+    except Exception:
+        intake["recap"] = chat[-800:]
+    _call_intakes[conversation_id] = intake
+    return intake
+
+
+def get_call_intake(conversation_id: str) -> dict[str, Any]:
+    return dict(_call_intakes.get(conversation_id) or empty_intake(conversation_id))
+
+
+def confirm_call_intake(conversation_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    uid = _tavus_owners.get(conversation_id)
+    current = get_call_intake(conversation_id)
+    body = payload or {}
+    for key in ("name", "date_of_birth", "issue", "recap"):
+        val = body.get(key)
+        if isinstance(val, str) and val.strip():
+            current[key] = val.strip()
+    current["confirmed"] = True
+    current["conversation_id"] = conversation_id
+    _call_intakes[conversation_id] = current
+    if uid:
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        block = (
+            f"Call intake {stamp}: Name: {current.get('name') or 'n/a'}; "
+            f"DOB: {current.get('date_of_birth') or 'n/a'}; "
+            f"Issue: {current.get('issue') or 'n/a'}."
+        )
+        profile = get_health_profile(uid)
+        notes = (profile.get("notes") or "").strip()
+        if "Call intake " in notes:
+            kept = [ln for ln in notes.splitlines() if not ln.startswith("Call intake ")]
+            notes = "\n".join(kept).strip()
+        profile["notes"] = f"{block}\n{notes}".strip()
+        save_health_profile(uid, profile)
+        recap = current.get("recap") or block
+        append_chat(uid, "assistant", f"Verified video-call intake: {recap}")
+    return current
+
+
 async def end_tavus_conversation(conversation_id: str) -> dict[str, Any]:
     if not settings.TAVUS_API_KEY or not conversation_id:
-        return {"saved": 0}
+        return {"saved": 0, "intake": empty_intake(conversation_id)}
     async with httpx.AsyncClient() as client:
         await client.post(
             f"https://tavusapi.com/v2/conversations/{conversation_id}/end",
@@ -337,13 +599,15 @@ async def end_tavus_conversation(conversation_id: str) -> dict[str, Any]:
             timeout=15.0,
         )
     saved = 0
+    turns: list[Any] = []
     for delay in (2.0, 3.0, 5.0):
         await asyncio.sleep(delay)
         turns = await fetch_tavus_transcript(conversation_id)
         saved = ingest_tavus_transcript(conversation_id, turns)
-        if saved:
+        if saved or turns:
             break
-    return {"saved": saved, "conversation_id": conversation_id}
+    intake = await summarize_call_intake(conversation_id, turns)
+    return {"saved": saved, "conversation_id": conversation_id, "intake": intake}
 
 
 def _profile_text(profile: dict[str, Any]) -> str:

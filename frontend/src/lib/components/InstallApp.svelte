@@ -87,13 +87,13 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 12px;
+    padding: 12px 14px;
     background: #ffffff;
-    border: 2px solid #dc2626;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border: 3px solid #111;
+    box-shadow: 6px 6px 0 #111;
   }
   .install-banner img {
-    border-radius: 8px;
+    border: 2px solid #111;
     flex-shrink: 0;
   }
   .install-copy {

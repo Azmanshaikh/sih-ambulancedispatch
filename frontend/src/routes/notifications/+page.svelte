@@ -76,35 +76,35 @@
 
 <svelte:head><title>JEEVAN — Notifications</title></svelte:head>
 
-<div class="flex-col h-full overflow-y-auto">
+<div class="flex-col h-full overflow-y-auto no-sb">
   <div class="p-5 grid grid-cols-12 gap-5 content-start">
 
     <div class="col-span-12 lg:col-span-4 flex flex-col gap-4">
-      <div class="relative rounded-xl overflow-hidden border border-slate-800 map-wrap" style="height: 220px;">
+      <div class="relative overflow-hidden nb-card-lg map-wrap" style="height: 220px;border:4px solid #111;">
         <MapWidget id="notif-map" clazz="absolute inset-0" {markers} {pickupRoute} {dropRoute} showLegend />
-        <div class="absolute top-3 left-3 glass px-3 py-1.5 rounded-lg border border-slate-700/50 z-10">
+        <div class="absolute top-3 left-3 glass px-3 py-1.5 z-10">
           <div class="flex items-center gap-2">
-            <div class="w-2 h-2 bg-red-500 rounded-full blink"></div>
-            <span class="text-[10px] font-bold tracking-widest uppercase text-slate-200">{unread.length ? 'ALERT' : 'STANDBY'}</span>
+            <div class="w-2.5 h-2.5 bg-[#FF2D2D] blink" style="border:2px solid #111;"></div>
+            <span class="text-[10px] font-black tracking-widest uppercase text-black">{unread.length ? 'ALERT' : 'STANDBY'}</span>
           </div>
         </div>
       </div>
 
-      <div class="bg-slate-900/60 rounded-xl p-5 border border-slate-800/50">
+      <div class="nb-card p-5">
         <div class="flex justify-between items-end mb-4">
-          <h3 class="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Staff alerts</h3>
-          <span class="text-2xl font-black text-slate-200">{String(unread.length).padStart(2, '0')}</span>
+          <h3 class="text-xs font-black uppercase tracking-[0.2em] text-[#4B4B4B]">Staff alerts</h3>
+          <span class="text-2xl font-black text-black">{String(unread.length).padStart(2, '0')}</span>
         </div>
-        <div class="space-y-3 max-h-64 overflow-y-auto">
+        <div class="space-y-3 max-h-64 overflow-y-auto no-sb">
           {#if alerts.length === 0}
-            <p class="text-xs text-slate-600 italic">No incoming emergency units.</p>
+            <p class="text-xs text-[#4B4B4B] font-semibold">No incoming emergency units.</p>
           {:else}
             {#each alerts as a}
-              <div class="border border-slate-700 p-3 {a.read ? 'opacity-60' : ''}">
-                <p class="text-[10px] font-black uppercase tracking-widest text-red-400">{a.title}</p>
-                <p class="text-xs text-slate-200 mt-1">{a.body}</p>
+              <div class="p-3 bg-[#FFF3E6] {a.read ? 'opacity-60' : ''}" style="border:3px solid #111;">
+                <p class="nb-chip nb-red" style="color:#fff;">{a.title}</p>
+                <p class="text-xs text-black mt-2 font-semibold">{a.body}</p>
                 {#if !a.read}
-                  <button class="btn btn-primary mt-2 text-[10px]" onclick={() => ack(a.id)}>Acknowledge</button>
+                  <button class="btn btn-primary mt-2 text-[10px]" style="padding:6px 12px;" onclick={() => ack(a.id)}>Acknowledge</button>
                 {/if}
               </div>
             {/each}
@@ -114,81 +114,81 @@
     </div>
 
     <div class="col-span-12 lg:col-span-5 flex flex-col gap-4">
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800/50">
+      <div class="nb-card nb-red p-6" style="color:#fff;">
         {#if latest}
           <div class="flex items-center gap-3 mb-1">
-            <span class="material-symbols-outlined text-red-500">emergency</span>
-            <h2 class="text-xl font-black text-white tracking-tight uppercase">Patient en route</h2>
+            <span class="material-symbols-outlined">emergency</span>
+            <h2 class="text-xl font-black tracking-tight uppercase">Patient en route</h2>
           </div>
-          <p class="text-slate-300 text-sm mt-2">
+          <p class="text-white/90 text-sm mt-2 font-semibold">
             {latest.patient_name || monitor?.patient?.name || 'Patient'}
             is going to
             <strong>{latest.hospital_name || monitor?.mission?.hospital_name || 'hospital'}</strong>
           </p>
           {#if monitor?.mission && monitor.mission.phase !== 'complete'}
-            <button class="btn btn-primary mt-4 w-full" onclick={endTrip}>End trip / Trip complete</button>
-            <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">Auto-completes at hospital if you skip this</p>
+            <button class="btn btn-secondary mt-4 w-full" onclick={endTrip}>End trip / Trip complete</button>
+            <p class="text-[10px] text-white/80 mt-2 uppercase tracking-widest font-bold">Auto-completes at hospital if you skip this</p>
           {/if}
         {:else}
-          <h2 class="text-2xl font-black text-white tracking-tight uppercase">Awaiting dispatch</h2>
-          <p class="text-slate-500 font-medium tracking-wide uppercase text-xs mt-1">Alerts appear when a patient requests an ambulance</p>
+          <h2 class="text-2xl font-black tracking-tight uppercase">Awaiting dispatch</h2>
+          <p class="text-white/80 font-bold tracking-wide uppercase text-xs mt-1">Alerts appear when a patient requests an ambulance</p>
         {/if}
       </div>
 
-      <div class="bg-slate-900/40 border border-slate-800/40 rounded-2xl p-5">
-        <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Patient details</h3>
+      <div class="nb-card p-5">
+        <h3 class="nb-chip nb-blue mb-3" style="color:#fff;">Patient details</h3>
         {#if monitor?.patient?.name || monitor?.patient?.email}
-          <p class="text-lg font-bold text-white">{monitor.patient.name || '—'}</p>
-          <p class="text-xs text-slate-400">{monitor.patient.email || 'no email'}</p>
-          <p class="text-xs text-slate-300 mt-3">HR {monitor.patient.vitals?.heart_rate ?? '—'} bpm · SpO2 {monitor.patient.vitals?.spo2 ?? '—'}%</p>
-          <p class="text-xs text-slate-400 mt-1">Current: {flagList(monitor.patient.record)}</p>
+          <p class="text-lg font-black text-black">{monitor.patient.name || '—'}</p>
+          <p class="text-xs text-[#4B4B4B] font-semibold">{monitor.patient.email || 'no email'}</p>
+          <p class="text-xs text-black mt-3 font-semibold">HR {monitor.patient.vitals?.heart_rate ?? '—'} bpm · SpO2 {monitor.patient.vitals?.spo2 ?? '—'}%</p>
+          <p class="text-xs text-[#4B4B4B] mt-1 font-semibold">Current: {flagList(monitor.patient.record)}</p>
           {#if monitor.health_profile}
-            <p class="text-xs text-slate-300 mt-3">Allergies: {monitor.health_profile.allergies || 'none noted'}</p>
-            <p class="text-xs text-slate-300">Medicines: {monitor.health_profile.medicines || 'none noted'}</p>
+            <p class="text-xs text-black mt-3 font-semibold">Allergies: {monitor.health_profile.allergies || 'none noted'}</p>
+            <p class="text-xs text-black font-semibold">Medicines: {monitor.health_profile.medicines || 'none noted'}</p>
           {/if}
         {:else}
-          <p class="text-sm text-slate-600">No active patient.</p>
+          <p class="text-sm text-[#4B4B4B] font-semibold">No active patient.</p>
         {/if}
       </div>
     </div>
 
     <div class="col-span-12 lg:col-span-3 flex flex-col gap-4">
-      <div class="bg-slate-900/40 rounded-xl p-5 border border-slate-800/30">
-        <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Trip reports</h3>
+      <div class="nb-card p-5">
+        <h3 class="nb-chip nb-red mb-3" style="color:#fff;">Trip reports</h3>
         {#if reports.length === 0}
-          <p class="text-xs text-slate-600 mb-4">Reports appear when a driver ends a trip.</p>
+          <p class="text-xs text-[#4B4B4B] mb-4 font-semibold">Reports appear when a driver ends a trip.</p>
         {:else}
-          <div class="space-y-3 max-h-64 overflow-y-auto mb-4">
+          <div class="space-y-3 max-h-64 overflow-y-auto no-sb mb-4">
             {#each reports as r}
-              <div class="text-[11px] text-slate-200 border border-slate-800 p-2">
-                <p class="font-bold">{r.patient_name || 'Patient'} → {r.hospital_name}</p>
-                <pre class="whitespace-pre-wrap font-sans mt-1 text-slate-300">{r.body}</pre>
+              <div class="text-[11px] text-black p-2 bg-[#FFF3E6]" style="border:3px solid #111;">
+                <p class="font-black">{r.patient_name || 'Patient'} → {r.hospital_name}</p>
+                <pre class="whitespace-pre-wrap font-sans mt-1 text-[#4B4B4B]">{r.body}</pre>
               </div>
             {/each}
           </div>
         {/if}
-        <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Stored cases</h3>
+        <h3 class="nb-chip nb-yellow mb-3">Stored cases</h3>
         {#if cases.length === 0}
-          <p class="text-xs text-slate-600 mb-4">No saved dispatches yet.</p>
+          <p class="text-xs text-[#4B4B4B] mb-4 font-semibold">No saved dispatches yet.</p>
         {:else}
-          <div class="space-y-2 max-h-40 overflow-y-auto mb-4">
+          <div class="space-y-2 max-h-40 overflow-y-auto no-sb mb-4">
             {#each cases as c}
-              <div class="text-[11px] text-slate-300 border border-slate-800 p-2">
-                <p class="font-bold">{c.patient_name || c.patient_email || 'Patient'}</p>
-                <p class="text-slate-500">{c.patient_email}</p>
+              <div class="text-[11px] text-black p-2 bg-[#FFF3E6]" style="border:3px solid #111;">
+                <p class="font-black">{c.patient_name || c.patient_email || 'Patient'}</p>
+                <p class="text-[#4B4B4B]">{c.patient_email}</p>
                 <p>→ {c.hospital_name} · {c.ambulance_id}</p>
               </div>
             {/each}
           </div>
         {/if}
-        <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Past records</h3>
+        <h3 class="nb-chip mb-3">Past records</h3>
         {#if history.length === 0}
-          <p class="text-xs text-slate-600">No prior records.</p>
+          <p class="text-xs text-[#4B4B4B] font-semibold">No prior records.</p>
         {:else}
-          <div class="space-y-2 max-h-80 overflow-y-auto">
+          <div class="space-y-2 max-h-80 overflow-y-auto no-sb">
             {#each history.slice().reverse() as h}
-              <div class="text-[11px] text-slate-300 border border-slate-800 p-2">
-                <p class="text-[9px] text-slate-500">{h.at?.slice(0, 19)?.replace('T', ' ')}</p>
+              <div class="text-[11px] text-black p-2 bg-[#FFF3E6]" style="border:3px solid #111;">
+                <p class="text-[9px] text-[#4B4B4B]">{h.at?.slice(0, 19)?.replace('T', ' ')}</p>
                 <p>{flagList(h)}</p>
               </div>
             {/each}

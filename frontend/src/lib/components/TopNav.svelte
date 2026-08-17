@@ -35,74 +35,69 @@
   style="
     position: fixed; top: 0; left: 0; right: 0; z-index: 50;
     background: #FFFFFF;
-    border-bottom: 3px solid #DC2626;
-    box-shadow: 0 2px 12px rgba(220,38,38,0.12);
+    border-bottom: 4px solid #111111;
     padding-top: env(safe-area-inset-top);
   "
 >
-  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 16px; height: 48px;">
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 14px; height: 50px;">
     <div style="display: flex; align-items: center; gap: 10px;">
-      <img
-        src="/logo.png"
-        alt="JEEVAN logo"
-        style="height: 36px; width: auto; max-width: 88px; object-fit: contain; display: block;"
-      />
-      <div style="display: flex; flex-direction: column; line-height: 1.1;">
-        <span style="font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 900; color: #DC2626; letter-spacing: 0.22em; text-transform: uppercase;">JEEVAN</span>
-        <span style="font-family: 'Share Tech Mono', monospace; font-size: 7px; font-weight: 400; color: #6B6B6B; letter-spacing: 0.12em; text-transform: uppercase;">Precision EMS · AI Dispatch</span>
+      <div style="border: 3px solid #111; box-shadow: 3px 3px 0 #111; background:#FF2D2D; padding: 3px 6px; display:flex; align-items:center;">
+        <img
+          src="/logo.png"
+          alt="JEEVAN logo"
+          style="height: 30px; width: auto; max-width: 78px; object-fit: contain; display: block;"
+        />
+      </div>
+      <div style="display: flex; flex-direction: column; line-height: 1.05;">
+        <span style="font-family: 'Orbitron', sans-serif; font-size: 17px; font-weight: 900; color: #111; letter-spacing: 0.22em; text-transform: uppercase;">JEEVAN</span>
+        <span style="font-family: 'Share Tech Mono', monospace; font-size: 7px; font-weight: 400; color: #4B4B4B; letter-spacing: 0.12em; text-transform: uppercase;">Precision EMS · AI Dispatch</span>
       </div>
     </div>
 
     <div style="display: flex; align-items: center; gap: 8px;">
       <div style="
-        display: flex; align-items: center; gap: 4px;
-        padding: 3px 10px;
-        border: 2px solid #DC2626;
-        border-radius: 0;
-        background: rgba(220,38,38,0.05);
+        display: flex; align-items: center; gap: 5px;
+        padding: 3px 9px;
+        border: 3px solid #111;
+        box-shadow: 3px 3px 0 #111;
+        background: #FFD23F;
       ">
-        <span class="material-symbols-outlined spin" style="font-size: 12px; color: #DC2626;">my_location</span>
-        <span style="font-size: 9px; font-weight: 700; color: #DC2626; letter-spacing: 0.05em; font-family: 'Share Tech Mono', monospace;">{gpsStatus}</span>
+        <span class="material-symbols-outlined spin" style="font-size: 12px; color: #111;">my_location</span>
+        <span style="font-size: 9px; font-weight: 700; color: #111; letter-spacing: 0.05em; font-family: 'Share Tech Mono', monospace;">{gpsStatus}</span>
       </div>
 
       {#if auth.profile}
-        <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #1A1A1A;">
+        <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #111;" class="hidden sm:inline">
           {auth.profile.full_name || auth.profile.email} · {auth.profile.role}
         </span>
-        <button class="btn btn-ghost" style="padding: 5px 10px; font-size: 10px;" onclick={handleLogout}>Logout</button>
+        <button class="btn btn-ghost" style="padding: 6px 10px; font-size: 10px; box-shadow: 3px 3px 0 #111;" onclick={handleLogout}>Logout</button>
       {/if}
     </div>
   </div>
 
-  <nav style="display: flex; overflow-x: auto; scrollbar-width: none; background: #FAFAFA; border-top: 1px solid #E0E0E0; padding: 0 8px;">
+  <nav style="display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; background: #FFE8D6; border-top: 3px solid #111; padding: 7px 8px;">
     {#each navItems as item}
       {@const isActive = page.url.pathname === item.to}
       <a
         href={item.to}
         style="
-          display: flex; flex-direction: column; align-items: center; gap: 3px;
-          padding: 5px 12px; white-space: nowrap; flex-shrink: 0; text-decoration: none;
-          color: {isActive ? '#DC2626' : '#6B6B6B'};
-          border-bottom: {isActive ? '3px solid #DC2626' : '3px solid transparent'};
-          border-top: {isActive ? '3px solid #DC2626' : '3px solid transparent'};
-          transition: color 0.15s, border-color 0.15s, background 0.15s;
-          background: {isActive ? 'rgba(220,38,38,0.06)' : 'transparent'};
+          display: flex; align-items: center; gap: 6px;
+          padding: 6px 12px; white-space: nowrap; flex-shrink: 0; text-decoration: none;
+          border: 3px solid #111;
+          box-shadow: {isActive ? '3px 3px 0 #111' : '2px 2px 0 #111'};
+          color: {isActive ? '#FFFFFF' : '#111'};
+          background: {isActive ? '#FF2D2D' : '#FFFFFF'};
+          transition: transform 0.08s, box-shadow 0.08s;
         "
       >
         <span class="material-symbols-outlined" style="font-size: 17px;">{item.icon}</span>
         <span style="
           font-family: 'Rajdhani', sans-serif;
           font-weight: 700;
-          font-size: 8px;
-          letter-spacing: 0.2em;
+          font-size: 10px;
+          letter-spacing: 0.14em;
           text-transform: uppercase;
-          background: {isActive ? 'rgba(220,38,38,0.12)' : 'rgba(107,107,107,0.08)'};
-          color: {isActive ? '#DC2626' : '#6B6B6B'};
-          padding: 2px 5px;
-          border-radius: 0;
-          border: 1px solid {isActive ? 'rgba(220,38,38,0.4)' : 'rgba(107,107,107,0.15)'};
-          line-height: 1.4;
-          display: block;
+          line-height: 1.2;
         ">{item.label}</span>
       </a>
     {/each}

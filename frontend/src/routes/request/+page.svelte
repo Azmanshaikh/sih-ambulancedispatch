@@ -35,19 +35,18 @@
 
 <svelte:head><title>JEEVAN — New Request</title></svelte:head>
 
-<div style="flex: 1; overflow-y: auto; background: #F5F5F5;">
+<div style="flex: 1; overflow-y: auto;">
   <div style="padding: 32px; max-width: 1100px; margin: 0 auto; width: 100%; box-sizing: border-box;">
 
     <!-- Page Header -->
-    <div style="margin-bottom: 32px; padding-bottom: 20px; border-bottom: 3px solid #DC2626;">
+    <div style="margin-bottom: 32px; padding-bottom: 20px; border-bottom: 4px solid #111;">
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
-        <div style="width: 6px; height: 40px; background: #DC2626;"></div>
-        <h1 style="margin: 0; font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 900; color: #1A1A1A; text-transform: uppercase; letter-spacing: 0.05em;">New Dispatch Request</h1>
+        <div style="width: 10px; height: 40px; background: #FF2D2D; border: 3px solid #111;"></div>
+        <h1 style="margin: 0; font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 900; color: #111; text-transform: uppercase; letter-spacing: 0.05em;">New Dispatch Request</h1>
       </div>
-      <p style="margin: 0 0 12px 18px; font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.3em;">AI-Powered Triage &amp; Fleet Assignment</p>
-      <div style="display: inline-flex; align-items: center; gap: 8px; border: 2px solid #DC2626; padding: 6px 14px; background: rgba(220,38,38,0.06); border-radius: 0; margin-left: 18px;">
-        <span style="font-size: 13px;">🛰️</span>
-        <span style="font-size: 10px; font-weight: 700; color: #DC2626; text-transform: uppercase; letter-spacing: 0.1em;">📍 BMSIT College, Avalahalli, Yelahanka</span>
+      <p style="margin: 0 0 12px 22px; font-size: 10px; font-weight: 700; color: #4B4B4B; text-transform: uppercase; letter-spacing: 0.3em;">AI-Powered Triage &amp; Fleet Assignment</p>
+      <div class="nb-chip nb-yellow" style="margin-left: 22px;">
+        🛰️ 📍 BMSIT College, Avalahalli, Yelahanka
       </div>
     </div>
 
@@ -67,7 +66,7 @@
             width: 100%; box-sizing: border-box;
             height: 128px;
             background: #FFFFFF;
-            border: 2px solid #E0E0E0;
+            border: 3px solid #111;
             border-radius: 0;
             padding: 14px;
             font-size: 13px;
@@ -80,7 +79,7 @@
           placeholder="Describe the emergency in detail (e.g., 'Severe bleeding from left foot after fall')"
           bind:value={description}
           onfocus={(e) => (e.target as HTMLTextAreaElement).style.borderColor = '#DC2626'}
-          onblur={(e) => (e.target as HTMLTextAreaElement).style.borderColor = '#E0E0E0'}
+          onblur={(e) => (e.target as HTMLTextAreaElement).style.borderColor = '#111'}
         ></textarea>
 
         <!-- AI Analysis Section -->
@@ -90,7 +89,7 @@
             <h3 style="margin: 0; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.25em; color: #DC2626;">Quick Triage &amp; AI Analysis</h3>
           </div>
 
-          <div style="background: #FFFFFF; border: 2px solid #E0E0E0; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="background: #FFFFFF; border: 3px solid #111; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
             <label style="font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.2em; display: block;">Upload Medical Report (Image)</label>
             <input
               type="file"
@@ -109,7 +108,7 @@
           </div>
 
           {#if analysisResult}
-            <div style="background: #FFFFFF; border: 2px solid #DC2626; border-left-width: 5px; padding: 16px; margin-top: 12px; max-height: 200px; overflow-y: auto;">
+            <div style="background: #FFFFFF; border: 3px solid #111; border-left-width: 8px; box-shadow: 4px 4px 0 #111; padding: 16px; margin-top: 12px; max-height: 200px; overflow-y: auto;">
               <h4 style="margin: 0 0 8px; font-size: 10px; font-weight: 700; color: #DC2626; text-transform: uppercase; letter-spacing: 0.2em;">AI Assessment Result</h4>
               <p style="margin: 0; font-size: 13px; color: #1A1A1A; white-space: pre-wrap; line-height: 1.6;">{analysisResult}</p>
             </div>
@@ -124,14 +123,14 @@
           <h3 style="margin: 0; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.25em; color: #DC2626;">Incident Context</h3>
         </div>
 
-        <div style="background: #FFFFFF; border: 2px solid #E0E0E0; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="background: #FFFFFF; border: 3px solid #111; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
           <div>
             <label style="display: block; font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 8px;">Scene Narrative</label>
             <textarea
               style="
                 width: 100%; box-sizing: border-box;
                 background: #F5F5F5;
-                border: 2px solid #E0E0E0;
+                border: 3px solid #111;
                 border-radius: 0;
                 padding: 12px;
                 color: #1A1A1A;
@@ -145,13 +144,13 @@
               placeholder="Describe the situation…"
               bind:value={narrative}
               onfocus={(e) => (e.target as HTMLTextAreaElement).style.borderColor = '#DC2626'}
-              onblur={(e) => (e.target as HTMLTextAreaElement).style.borderColor = '#E0E0E0'}
+              onblur={(e) => (e.target as HTMLTextAreaElement).style.borderColor = '#111'}
             ></textarea>
           </div>
 
           <div>
             <label for="age-select" style="display: block; font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px;">Age Group</label>
-            <select id="age-select" bind:value={age} style="width: 100%; background: #F5F5F5; border: 2px solid #E0E0E0; border-radius: 0; padding: 8px 10px; font-size: 13px; color: #1A1A1A; outline: none; font-family: 'Inter', sans-serif;">
+            <select id="age-select" bind:value={age} style="width: 100%; background: #F5F5F5; border: 3px solid #111; border-radius: 0; padding: 8px 10px; font-size: 13px; color: #1A1A1A; outline: none; font-family: 'Inter', sans-serif;">
               <option value="infant">Infant (0-1)</option>
               <option value="child">Child (2-12)</option>
               <option value="teen">Teen (13-17)</option>

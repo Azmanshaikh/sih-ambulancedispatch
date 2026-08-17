@@ -2,6 +2,7 @@
   import '../app.css';
   import TopNav from '$lib/components/TopNav.svelte';
   import InstallApp from '$lib/components/InstallApp.svelte';
+  import FloatingActions from '$lib/components/FloatingActions.svelte';
   import type { Snippet } from 'svelte';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -83,12 +84,16 @@
 
 <main
   class="app-shell"
-  style="padding-top: {NO_NAV.includes(page.url.pathname) ? 'env(safe-area-inset-top)' : 'calc(88px + env(safe-area-inset-top))'};"
+  style="padding-top: {NO_NAV.includes(page.url.pathname) ? 'env(safe-area-inset-top)' : 'calc(104px + env(safe-area-inset-top))'};"
 >
   <div class="flex-1 overflow-hidden relative h-full">
     {@render children()}
   </div>
 </main>
+
+{#if !NO_NAV.includes(page.url.pathname)}
+  <FloatingActions role={auth.profile?.role} />
+{/if}
 
 <InstallApp />
 {/if}

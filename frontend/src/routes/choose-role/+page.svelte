@@ -57,47 +57,50 @@
 
 <svelte:head><title>JEEVAN — Choose role</title></svelte:head>
 
-<div class="h-full flex items-center justify-center p-6" style="background:#F5F5F5;">
-  <div style="width:100%;max-width:460px;background:#fff;border:2px solid #DC2626;padding:32px;">
-    <img src="/logo.png" alt="JEEVAN" style="height:72px;width:auto;max-width:100%;object-fit:contain;margin:0 0 16px;display:block;" />
-    <h1 style="margin:0 0 8px;font-size:22px;">Who are you?</h1>
-    <p style="margin:0 0 20px;font-size:13px;color:#6B6B6B;line-height:1.5;">
+<div class="h-full flex items-center justify-center p-6">
+  <div class="nb-card-lg" style="width:100%;max-width:460px;background:#fff;border:4px solid #111;padding:32px;">
+    <div style="display:inline-flex;background:#FFD23F;border:3px solid #111;box-shadow:4px 4px 0 #111;padding:8px 12px;margin-bottom:16px;">
+      <img src="/logo.png" alt="JEEVAN" style="height:56px;width:auto;max-width:100%;object-fit:contain;display:block;" />
+    </div>
+    <h1 style="margin:0 0 8px;font-size:26px;font-weight:900;text-transform:uppercase;">Who are you?</h1>
+    <p style="margin:0 0 20px;font-size:13px;color:#4B4B4B;line-height:1.5;font-weight:500;">
       Signed in as <strong>{auth.profile?.email}</strong>. Patients enter immediately. Drivers and new staff must get an OTP from main staff.
     </p>
 
     {#if !otpSent}
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <button class="btn btn-primary" style="width:100%;padding:14px;" disabled={picking} onclick={() => choose('patient')}>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <button class="btn btn-primary" style="width:100%;padding:16px;" disabled={picking} onclick={() => choose('patient')}>
           Patient — no approval
         </button>
-        <button class="btn btn-ghost" style="width:100%;padding:14px;border:2px solid #DC2626;" disabled={picking} onclick={() => choose('driver')}>
+        <button class="btn btn-secondary" style="width:100%;padding:16px;" disabled={picking} onclick={() => choose('driver')}>
           Driver — OTP from staff
         </button>
-        <button class="btn btn-ghost" style="width:100%;padding:14px;border:2px solid #DC2626;" disabled={picking} onclick={() => choose('staff')}>
+        <button class="btn btn-blue" style="width:100%;padding:16px;" disabled={picking} onclick={() => choose('staff')}>
           Staff — OTP from main staff
         </button>
       </div>
     {:else}
-      <p style="font-size:13px;color:#1A1A1A;margin:0 0 12px;">
+      <p style="font-size:13px;color:#111;margin:0 0 12px;font-weight:600;">
         OTP for <strong>{wanted}</strong> was sent to staff. Ask them for the 6-digit code.
       </p>
       <input
+        class="nb-input"
         bind:value={code}
         maxlength="6"
         inputmode="numeric"
         placeholder="6-digit OTP"
-        style="width:100%;border:2px solid #E0E0E0;padding:12px;font-size:20px;letter-spacing:0.4em;text-align:center;margin-bottom:12px;"
+        style="font-size:22px;letter-spacing:0.4em;text-align:center;margin-bottom:12px;"
       />
-      <button class="btn btn-primary" style="width:100%;padding:12px;" disabled={verifying || code.length < 6} onclick={verify}>
+      <button class="btn btn-primary" style="width:100%;padding:14px;" disabled={verifying || code.length < 6} onclick={verify}>
         {verifying ? 'Checking…' : 'Verify OTP'}
       </button>
-      <button class="btn btn-ghost" style="width:100%;margin-top:8px;" disabled={picking} onclick={() => { otpSent = false; code = ''; }}>
+      <button class="btn btn-ghost" style="width:100%;margin-top:10px;" disabled={picking} onclick={() => { otpSent = false; code = ''; }}>
         Choose a different role
       </button>
     {/if}
 
     {#if error}
-      <p style="color:#DC2626;font-size:12px;margin:12px 0 0;">{error}</p>
+      <p class="nb-card p-2" style="color:#111;font-size:12px;margin:14px 0 0;font-weight:700;">{error}</p>
     {/if}
   </div>
 </div>

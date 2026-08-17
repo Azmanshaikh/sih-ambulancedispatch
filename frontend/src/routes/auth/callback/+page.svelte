@@ -27,6 +27,6 @@
 
 <svelte:head><title>JEEVAN — Auth</title></svelte:head>
 
-<div class="h-full flex items-center justify-center">
-  <p class="text-sm font-bold uppercase tracking-widest text-slate-500">{message}</p>
+<div class="h-full flex items-center justify-center p-6">
+  <p class="nb-card nb-yellow px-6 py-4 text-sm font-black uppercase tracking-widest text-black">{message}</p>
 </div>

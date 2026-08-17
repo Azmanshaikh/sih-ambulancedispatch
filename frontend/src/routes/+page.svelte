@@ -121,70 +121,70 @@
 <svelte:head><title>JEEVAN — Dispatch</title></svelte:head>
 
 <div class="h-full flex flex-col" style="overflow: hidden;">
-  <div class="p-5 grid grid-cols-12 gap-5 h-full overflow-hidden">
+  <div class="p-4 grid grid-cols-12 gap-4 h-full overflow-hidden">
 
     <div class="col-span-3 flex flex-col gap-4 overflow-y-auto no-sb pb-3">
-      <section class="bg-slate-900/60 p-5 rounded-xl border border-slate-800/60 flex-shrink-0">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500">System Performance</h3>
-          <span class="w-2 h-2 rounded-full bg-green-500 blink"></span>
+      <section class="nb-card nb-yellow p-4 flex-shrink-0">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-[11px] font-black uppercase tracking-widest text-black">System Performance</h3>
+          <span class="w-2.5 h-2.5 bg-[#22C55E] blink" style="border:2px solid #111;"></span>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <div class="text-2xl font-black text-white">{etaLabel ? etaLabel.split(' ')[0] : '—'}<span class="text-xs text-slate-500 ml-1">min</span></div>
-            <div class="text-[9px] uppercase tracking-wide text-slate-400 mt-0.5">Hospital ETA</div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white p-3" style="border:3px solid #111;">
+            <div class="text-3xl font-black text-black leading-none">{etaLabel ? etaLabel.split(' ')[0] : '—'}<span class="text-xs text-[#4B4B4B] ml-1">min</span></div>
+            <div class="text-[9px] uppercase tracking-widest text-[#4B4B4B] mt-1 font-bold">Hospital ETA</div>
           </div>
-          <div>
-            <div class="text-2xl font-black text-white">{availableCount}<span class="text-xs text-slate-500 ml-1">units</span></div>
-            <div class="text-[9px] uppercase tracking-wide text-slate-400 mt-0.5">Available</div>
+          <div class="bg-white p-3" style="border:3px solid #111;">
+            <div class="text-3xl font-black text-black leading-none">{availableCount}<span class="text-xs text-[#4B4B4B] ml-1">u</span></div>
+            <div class="text-[9px] uppercase tracking-widest text-[#4B4B4B] mt-1 font-bold">Available</div>
           </div>
         </div>
       </section>
 
       <section class="flex flex-col gap-3 flex-1 min-h-0">
-        <div class="flex justify-between items-center">
-          <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500">Yelahanka Fleet</h3>
-          <span class="text-[10px] text-red-500 font-bold">{dispatchStatus}</span>
+        <div class="flex justify-between items-center flex-wrap gap-1">
+          <h3 class="text-[11px] font-black uppercase tracking-widest text-black">Yelahanka Fleet</h3>
+          <span class="nb-chip nb-red" style="color:#fff;">{dispatchStatus}</span>
         </div>
 
-        <p class="text-[10px] text-slate-400">Nearest ambulance (map icon) is assigned automatically. Red line is pickup, blue line is hospital.</p>
+        <p class="text-[10px] text-[#4B4B4B] font-semibold">Nearest ambulance is assigned automatically. Red line is pickup, blue line is hospital.</p>
 
-        <div class="space-y-1.5 overflow-y-auto no-sb flex-1">
+        <div class="space-y-2 overflow-y-auto no-sb flex-1 pr-1">
           {#each ambulances as a}
-            <div class="flex items-center justify-between bg-slate-900/40 border px-3 py-1.5 rounded-lg {a.id === assignedUnit ? 'border-red-500/70' : 'border-slate-800/60'}">
+            <div class="flex items-center justify-between bg-white px-3 py-2 {a.id === assignedUnit ? 'nb-red' : ''}" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
               <div>
-                <p class="text-[11px] font-bold text-white">{a.id}</p>
-                <p class="text-[9px] text-slate-500 uppercase tracking-wide">{a.label}</p>
+                <p class="text-[12px] font-black {a.id === assignedUnit ? 'text-white' : 'text-black'}">{a.id}</p>
+                <p class="text-[9px] {a.id === assignedUnit ? 'text-white/80' : 'text-[#4B4B4B]'} uppercase tracking-wide font-bold">{a.label}</p>
               </div>
-              <span class="text-[9px] font-bold uppercase tracking-wider {a.status === 'available' ? 'text-green-400' : a.status === 'dispatched' ? 'text-red-400' : 'text-yellow-400'}">{a.status}</span>
+              <span class="nb-chip {a.status === 'available' ? 'nb-green' : a.status === 'dispatched' ? 'nb-red' : ''}" style="color:{a.status === 'idle' ? '#111' : '#fff'};">{a.status}</span>
             </div>
           {/each}
         </div>
       </section>
     </div>
 
-    <div class="col-span-6 relative rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
+    <div class="col-span-6 relative overflow-hidden nb-card-lg" style="border:4px solid #111;">
       <MapWidget id="dash-map" {markers} {etaLabel} {pickupRoute} {dropRoute} showLegend center={[BMSIT.lat, BMSIT.lng]} />
-      <div class="absolute inset-0 pointer-events-none z-10" style="padding: 1rem;">
-        <div class="flex justify-between items-start pointer-events-auto">
-          <div class="glass px-4 py-2 rounded-xl border border-slate-700/50 shadow">
+      <div class="absolute inset-0 pointer-events-none z-10" style="padding: 0.9rem;">
+        <div class="flex justify-between items-start pointer-events-auto gap-2">
+          <div class="glass px-3 py-2">
             <div class="flex items-center gap-2">
-              <span class="flex h-2 w-2 rounded-full bg-red-600 blink"></span>
-              <span class="text-xs font-bold tracking-widest uppercase text-white">Yelahanka Live Feed</span>
+              <span class="flex h-2.5 w-2.5 bg-[#FF2D2D] blink" style="border:2px solid #111;"></span>
+              <span class="text-[11px] font-black tracking-widest uppercase text-black">Yelahanka Live Feed</span>
             </div>
           </div>
           <div class="flex flex-col items-end gap-2">
             {#if monitor?.unread_alerts}
-              <a href="/notifications" class="glass px-3 py-1.5 rounded-xl border border-red-500/50 text-[10px] text-red-400 font-bold uppercase tracking-widest">
+              <a href="/notifications" class="glass px-3 py-1.5 text-[10px] text-black font-black uppercase tracking-widest nb-red" style="color:#fff;">
                 {monitor.unread_alerts} staff alert{monitor.unread_alerts === 1 ? '' : 's'}
               </a>
             {/if}
             {#if monitor?.mission && monitor.mission.phase !== 'complete'}
-              <button class="glass px-3 py-1.5 rounded-xl border border-red-500/60 text-[10px] text-red-300 font-bold uppercase tracking-widest" onclick={endTrip}>
-                End trip / Trip complete
+              <button class="btn btn-primary" style="padding:6px 12px;font-size:10px;" onclick={endTrip}>
+                End trip
               </button>
             {/if}
-            <div class="glass px-3 py-1.5 rounded-xl border border-yellow-500/30 text-[10px] text-yellow-400 font-bold uppercase tracking-widest max-w-[220px] text-right">
+            <div class="glass px-3 py-1.5 text-[10px] text-black font-bold uppercase tracking-widest max-w-[220px] text-right nb-yellow">
               📍 {BMSIT.name}
             </div>
           </div>
@@ -193,35 +193,35 @@
     </div>
 
     <div class="col-span-3 flex flex-col gap-4 overflow-y-auto no-sb pb-3">
-      <section class="bg-gradient-to-br from-slate-900 to-blue-900/20 p-5 rounded-2xl border border-blue-500/20 shadow-xl flex-shrink-0">
-        <div class="flex items-center gap-2 mb-4">
-          <span class="material-symbols-outlined text-blue-400">psychology</span>
-          <h3 class="text-[10px] font-black uppercase tracking-widest text-blue-400">AI Recommendation</h3>
+      <section class="nb-card nb-blue p-4 flex-shrink-0" style="color:#fff;">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="material-symbols-outlined">psychology</span>
+          <h3 class="text-[11px] font-black uppercase tracking-widest">AI Recommendation</h3>
         </div>
         {#if selectedHospital}
           <div class="flex gap-3 mb-3">
-            <div class="h-9 w-9 shrink-0 bg-blue-600/20 rounded-lg flex items-center justify-center border border-blue-500/30 text-blue-400 font-bold text-xs">{confidence ?? '—'}%</div>
+            <div class="h-11 w-11 shrink-0 bg-white text-black flex items-center justify-center font-black text-xs" style="border:3px solid #111;">{confidence ?? '—'}%</div>
             <div>
-              <p class="text-xs font-bold text-white">{selectedHospital.name}</p>
-              <p class="text-[10px] text-slate-400 mt-1">{reason}</p>
+              <p class="text-sm font-black">{selectedHospital.name}</p>
+              <p class="text-[10px] text-white/85 mt-1">{reason}</p>
             </div>
           </div>
           {#if pickupMinutes != null}
-            <p class="text-[10px] text-slate-300">Pickup {pickupMinutes} min · Transport {transportMinutes} min</p>
+            <p class="text-[10px] font-semibold">Pickup {pickupMinutes} min · Transport {transportMinutes} min</p>
           {/if}
           {#if constraints}
-            <p class="text-[10px] text-blue-300 mt-2 uppercase tracking-wide">
+            <p class="text-[10px] mt-2 uppercase tracking-wide font-bold">
               {constraints.routing} · {constraints.traffic} traffic
             </p>
           {/if}
           {#if assignedUnit}
-            <p class="text-[10px] text-red-400 mt-1 font-bold">Assigned {assignedUnit}</p>
+            <p class="nb-chip mt-2" style="background:#FFD23F;color:#111;">Assigned {assignedUnit}</p>
           {/if}
           {#if candidates.length}
-            <div class="mt-3 space-y-1.5">
-              <p class="text-[9px] font-black uppercase tracking-widest text-slate-500">Ranked hospitals</p>
+            <div class="mt-3 space-y-1 bg-white text-black p-2" style="border:3px solid #111;">
+              <p class="text-[9px] font-black uppercase tracking-widest text-[#4B4B4B]">Ranked hospitals</p>
               {#each candidates as c, i}
-                <div class="flex justify-between gap-2 text-[10px] {i === 0 ? 'text-white font-bold' : 'text-slate-400'}">
+                <div class="flex justify-between gap-2 text-[10px] {i === 0 ? 'font-black' : 'text-[#4B4B4B]'}">
                   <span>{i + 1}. {c.name}</span>
                   <span class="shrink-0">{c.eta_minutes} min</span>
                 </div>
@@ -230,68 +230,55 @@
           {/if}
         {:else}
           <div class="flex gap-3">
-            <div class="h-9 w-9 shrink-0 bg-blue-600/20 rounded-lg flex items-center justify-center border border-blue-500/30 text-blue-400 font-bold text-xs">—</div>
+            <div class="h-11 w-11 shrink-0 bg-white text-black flex items-center justify-center font-black text-xs" style="border:3px solid #111;">—</div>
             <div>
-              <p class="text-xs font-bold text-white">Waiting for patient SOS</p>
-              <p class="text-[10px] text-slate-400 mt-1">The fastest ambulance and hospital are assigned automatically from traffic.</p>
+              <p class="text-sm font-black">Waiting for patient SOS</p>
+              <p class="text-[10px] text-white/85 mt-1">The fastest ambulance and hospital are assigned automatically from traffic.</p>
             </div>
           </div>
         {/if}
       </section>
 
       <section class="flex-1 flex flex-col gap-3 min-h-0">
-        <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-500">Telemetry Stream</h3>
-        <div class="relative space-y-3 overflow-y-auto no-sb flex-1" style="padding-left: 1.75rem;">
-          <div class="absolute left-2 top-0 bottom-0 w-px bg-slate-800"></div>
-          <div class="relative">
-            <span class="absolute -left-[1.35rem] top-1 w-2 h-2 rounded-full bg-blue-500 ring-4 ring-slate-950"></span>
-            <div class="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-[10px] font-bold text-blue-500 uppercase">Fleet</span>
-                <span class="text-[9px] text-slate-500">Live</span>
-              </div>
-              <p class="text-xs text-slate-200">{ambulances.length} ambulances tracked across Yelahanka.</p>
+        <h3 class="text-[11px] font-black uppercase tracking-widest text-black">Telemetry Stream</h3>
+        <div class="space-y-3 overflow-y-auto no-sb flex-1 pr-1">
+          <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+            <div class="flex justify-between items-center mb-1">
+              <span class="nb-chip nb-blue" style="color:#fff;">Fleet</span>
+              <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">Live</span>
             </div>
+            <p class="text-xs text-black font-semibold mt-1">{ambulances.length} ambulances tracked across Yelahanka.</p>
           </div>
           {#if monitor?.patient}
-            <div class="relative">
-              <span class="absolute -left-[1.35rem] top-1 w-2 h-2 rounded-full bg-green-500 ring-4 ring-slate-950"></span>
-              <div class="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50">
-                <div class="flex justify-between items-center mb-1">
-                  <span class="text-[10px] font-bold text-green-500 uppercase">Patient</span>
-                  <span class="text-[9px] text-slate-500">{monitor.patient.vitals?.heart_rate ?? '—'} bpm</span>
-                </div>
-                <p class="text-xs text-slate-200">{monitor.patient.name || 'Unassigned'} · {monitor.patient.address}</p>
-                <p class="text-[10px] text-slate-400 mt-1">
-                  SpO2 {monitor.patient.vitals?.spo2 ?? '—'}%
-                  · Cardiac {monitor.patient.record?.cardiac ? 'yes' : 'no'}
-                  · Diabetes {monitor.patient.record?.diabetes ? 'yes' : 'no'}
-                </p>
-                {#if monitor.driver}
-                  <p class="text-[10px] text-red-300 mt-1">Driver {monitor.driver.id} at {monitor.driver.lat}, {monitor.driver.lng}</p>
-                {/if}
+            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+              <div class="flex justify-between items-center mb-1">
+                <span class="nb-chip nb-green" style="color:#fff;">Patient</span>
+                <span class="text-[9px] text-[#4B4B4B] font-bold">{monitor.patient.vitals?.heart_rate ?? '—'} bpm</span>
               </div>
+              <p class="text-xs text-black font-semibold mt-1">{monitor.patient.name || 'Unassigned'} · {monitor.patient.address}</p>
+              <p class="text-[10px] text-[#4B4B4B] mt-1 font-semibold">
+                SpO2 {monitor.patient.vitals?.spo2 ?? '—'}%
+                · Cardiac {monitor.patient.record?.cardiac ? 'yes' : 'no'}
+                · Diabetes {monitor.patient.record?.diabetes ? 'yes' : 'no'}
+              </p>
+              {#if monitor.driver}
+                <p class="text-[10px] text-[#FF2D2D] mt-1 font-black">Driver {monitor.driver.id} at {monitor.driver.lat}, {monitor.driver.lng}</p>
+              {/if}
             </div>
           {/if}
           {#if selectedHospital}
-            <div class="relative">
-              <span class="absolute -left-[1.35rem] top-1 w-2 h-2 rounded-full bg-red-500 ring-4 ring-slate-950"></span>
-              <div class="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50">
-                <div class="flex justify-between items-center mb-1">
-                  <span class="text-[10px] font-bold text-red-500 uppercase">Route</span>
-                  <span class="text-[9px] text-slate-500">Now</span>
-                </div>
-                <p class="text-xs text-slate-200">{etaLabel} · {selectedHospital.name}</p>
+            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+              <div class="flex justify-between items-center mb-1">
+                <span class="nb-chip nb-red" style="color:#fff;">Route</span>
+                <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">Now</span>
               </div>
+              <p class="text-xs text-black font-semibold mt-1">{etaLabel} · {selectedHospital.name}</p>
             </div>
           {/if}
           {#if monitor?.mission?.report?.body}
-            <div class="relative">
-              <span class="absolute -left-[1.35rem] top-1 w-2 h-2 rounded-full bg-red-500 ring-4 ring-slate-950"></span>
-              <div class="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50">
-                <span class="text-[10px] font-bold text-red-500 uppercase">Trip report</span>
-                <pre class="text-[10px] text-slate-200 whitespace-pre-wrap font-sans mt-1">{monitor.mission.report.body}</pre>
-              </div>
+            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+              <span class="nb-chip nb-red" style="color:#fff;">Trip report</span>
+              <pre class="text-[10px] text-black whitespace-pre-wrap font-sans mt-2">{monitor.mission.report.body}</pre>
             </div>
           {/if}
         </div>
