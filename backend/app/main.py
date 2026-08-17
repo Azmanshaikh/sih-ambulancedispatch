@@ -5,6 +5,7 @@ from app.core.db import engine, Base
 from app.api import accounts, ai, hospitals, tracking
 from app.services.fleet import init_fleet, tick_fleet
 from app.services.runtime_state import apply_fleet_events, save_mission
+from app.services.corridor import tick_corridor_alerts
 import asyncio
 import contextlib
 
@@ -25,9 +26,11 @@ async def lifespan(app: FastAPI):
         try:
             while True:
                 events = tick_fleet()
-                changed = apply_fleet_events(events)
-                if changed and changed.get("phase") == "complete" and not changed.get("report"):
-                    asyncio.create_task(finish_if_needed(changed))
+                changed_list = apply_fleet_events(events)
+                for changed in changed_list:
+                    if changed.get("phase") == "complete" and not changed.get("report"):
+                        asyncio.create_task(finish_if_needed(changed))
+                tick_corridor_alerts()
                 await asyncio.sleep(2)
         except asyncio.CancelledError:
             return

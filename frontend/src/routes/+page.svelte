@@ -25,7 +25,16 @@
   let pickupMinutes = $state<number | null>(null);
   let transportMinutes = $state<number | null>(null);
   let monitor = $state<any>(null);
-  let availableCount = $derived(ambulances.filter((a) => a.status === 'available').length);
+  let extraRoutes = $state<any[]>([]);
+  let corridor = $state<any>(null);
+  let activeMissions = $state<any[]>([]);
+  let assignedIds = $derived(new Set([assignedUnit, ...activeMissions.map((m) => m.ambulance_id)].filter(Boolean)));
+  let conflictReason = $derived(
+    monitor?.mission?.conflict?.reason ||
+      activeMissions.find((m) => m.conflict?.reason)?.conflict?.reason ||
+      ''
+  );
+  let assignedIds = $derived(new Set([assignedUnit, ...activeMissions.map((m) => m.ambulance_id)].filter(Boolean)));
 
   function applyPayload(payload: any) {
     if (!payload) return;
@@ -51,11 +60,21 @@
     markers = buildMarkers();
   }
 
+  function postMarkers(posts: any[] = []) {
+    return posts.map((p) => ({
+      position: [p.lat, p.lng] as [number, number],
+      popup: `${p.kind === 'rescue' ? 'Rescue' : 'Traffic'} · ${p.name}${p.alerted ? '<br/>ALERT SENT' : ''}`,
+      type: p.kind === 'rescue' ? (p.alerted ? 'rescue_alert' : 'rescue') : p.alerted ? 'police_alert' : 'police',
+    }));
+  }
+
   function buildMarkers(fleet = ambulances, hosp = hospitals, extra: any[] = []) {
     const hospitalId = selectedHospital?.id;
+    const assigned = new Set(activeMissions.map((m) => m.ambulance_id).filter(Boolean));
+    if (assignedUnit) assigned.add(assignedUnit);
     const fleetMarks = fleet.map((a: any) => ({
       position: [a.lat, a.lng] as [number, number],
-      popup: `🚑 ${a.id} · ${a.label}<br/><span style="font-weight:600;color:#6B6B6B">${a.status}${a.id === assignedUnit ? ' · assigned' : ''}</span>`,
+      popup: `🚑 ${a.id} · ${a.label}<br/><span style="font-weight:600;color:#6B6B6B">${a.status}${assigned.has(a.id) ? ' · assigned' : ''}</span>`,
       type: 'ambulance',
     }));
     const hospMarks = hosp.map((h: any) => ({
@@ -70,6 +89,7 @@
       ...(monitor?.patient?.lat
         ? [{ position: [monitor.patient.lat, monitor.patient.lng] as [number, number], popup: `Patient · ${monitor.patient.name || 'unknown'}`, type: 'incident' }]
         : []),
+      ...postMarkers(corridor?.posts || []),
       ...extra,
     ];
   }
@@ -96,12 +116,31 @@
     await loadFleet();
   }
 
+  async function loadCorridor() {
+    try {
+      const res = await apiFetch('/tracking/corridor');
+      if (!res.ok) return;
+      corridor = await res.json();
+      activeMissions = corridor.missions || [];
+      const latestId = monitor?.mission?.id;
+      extraRoutes = (corridor.extra_routes || []).filter((r: any) => {
+        if (r.kind === 'overlap') return true;
+        if (latestId && String(r.id || '').startsWith(String(latestId))) return false;
+        return true;
+      });
+      markers = buildMarkers();
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function loadMonitor() {
     try {
       const res = await apiFetch('/accounts/monitor');
       if (!res.ok) return;
       monitor = await res.json();
       if (monitor?.mission) applyPayload(monitor.mission);
+      if (monitor?.active_missions?.length) activeMissions = monitor.active_missions;
     } catch {
       /* ignore */
     }
@@ -110,9 +149,11 @@
   onMount(() => {
     loadFleet();
     loadMonitor();
+    loadCorridor();
     const timer = setInterval(() => {
       loadFleet();
       loadMonitor();
+      loadCorridor();
     }, 2500);
     return () => clearInterval(timer);
   });
@@ -147,14 +188,14 @@
           <span class="nb-chip nb-red" style="color:#fff;">{dispatchStatus}</span>
         </div>
 
-        <p class="text-[10px] text-[#4B4B4B] font-semibold">Nearest ambulance is assigned automatically. Red line is pickup, blue line is hospital.</p>
+        <p class="text-[10px] text-[#4B4B4B] font-semibold">Emergency shortest path. Nearby traffic police get an SMS to clear the corridor. Multiple units stay live.</p>
 
         <div class="space-y-2 overflow-y-auto no-sb flex-1 pr-1">
           {#each ambulances as a}
-            <div class="flex items-center justify-between bg-white px-3 py-2 {a.id === assignedUnit ? 'nb-red' : ''}" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+            <div class="flex items-center justify-between bg-white px-3 py-2 {assignedIds.has(a.id) ? 'nb-red' : ''}" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
               <div>
-                <p class="text-[12px] font-black {a.id === assignedUnit ? 'text-white' : 'text-black'}">{a.id}</p>
-                <p class="text-[9px] {a.id === assignedUnit ? 'text-white/80' : 'text-[#4B4B4B]'} uppercase tracking-wide font-bold">{a.label}</p>
+                <p class="text-[12px] font-black {assignedIds.has(a.id) ? 'text-white' : 'text-black'}">{a.id}</p>
+                <p class="text-[9px] {assignedIds.has(a.id) ? 'text-white/80' : 'text-[#4B4B4B]'} uppercase tracking-wide font-bold">{a.label}</p>
               </div>
               <span class="nb-chip {a.status === 'available' ? 'nb-green' : a.status === 'dispatched' ? 'nb-red' : ''}" style="color:{a.status === 'idle' ? '#111' : '#fff'};">{a.status}</span>
             </div>
@@ -164,7 +205,7 @@
     </div>
 
     <div class="col-span-6 relative overflow-hidden nb-card-lg" style="border:4px solid #111;">
-      <MapWidget id="dash-map" {markers} {etaLabel} {pickupRoute} {dropRoute} showLegend center={[BMSIT.lat, BMSIT.lng]} />
+      <MapWidget id="dash-map" {markers} {etaLabel} {pickupRoute} {dropRoute} {extraRoutes} showLegend center={[BMSIT.lat, BMSIT.lng]} />
       <div class="absolute inset-0 pointer-events-none z-10" style="padding: 0.9rem;">
         <div class="flex justify-between items-start pointer-events-auto gap-2">
           <div class="glass px-3 py-2">
@@ -211,8 +252,17 @@
           {/if}
           {#if constraints}
             <p class="text-[10px] mt-2 uppercase tracking-wide font-bold">
-              {constraints.routing} · {constraints.traffic} traffic
+              {constraints.routing === 'emergency-shortest' ? 'Emergency corridor — traffic rules waived for ETA' : `${constraints.routing} · ${constraints.traffic} traffic`}
             </p>
+            <p class="text-[10px] mt-1 uppercase tracking-wide font-bold">
+              Engine: {constraints.engine === 'networkx' ? `NetworkX Dijkstra${constraints.graph_nodes ? ` · ${constraints.graph_nodes} nodes` : ''}` : 'Direct TomTom/OSRM'}
+            </p>
+            {#if constraints.shortest_km != null && constraints.fastest_min != null}
+              <p class="text-[10px] mt-1 font-bold">Shortest {constraints.shortest_km} km · Fastest {constraints.fastest_min} min</p>
+            {/if}
+          {/if}
+          {#if conflictReason}
+            <p class="text-[10px] mt-2 font-black" style="background:#FFD23F;color:#111;padding:6px;border:2px solid #111;">{conflictReason}</p>
           {/if}
           {#if assignedUnit}
             <p class="nb-chip mt-2" style="background:#FFD23F;color:#111;">Assigned {assignedUnit}</p>
@@ -264,6 +314,29 @@
               {#if monitor.driver}
                 <p class="text-[10px] text-[#FF2D2D] mt-1 font-black">Driver {monitor.driver.id} at {monitor.driver.lat}, {monitor.driver.lng}</p>
               {/if}
+            </div>
+          {/if}
+          {#if activeMissions.length}
+            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+              <div class="flex justify-between items-center mb-1">
+                <span class="nb-chip nb-red" style="color:#fff;">Live corridors</span>
+                <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">{activeMissions.length} unit{activeMissions.length === 1 ? '' : 's'}</span>
+              </div>
+              {#each activeMissions as m}
+                <p class="text-[10px] text-black font-semibold mt-1">
+                  {m.ambulance_id} · {m.priority_label || 'standard'} · {m.phase} → {m.hospital_name}
+                  {#if m.conflict?.status && m.conflict.status !== 'none'}
+                    <span class="text-[#b45309]"> · {m.conflict.status}</span>
+                  {/if}
+                </p>
+              {/each}
+            </div>
+          {/if}
+          {#if corridor?.sms?.length}
+            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+              <span class="nb-chip nb-yellow">Corridor SMS</span>
+              <p class="text-[10px] text-black font-semibold mt-2">{corridor.sms[0].post_name}: {corridor.sms[0].status}</p>
+              <p class="text-[10px] text-[#4B4B4B] mt-1">{corridor.sms[0].body}</p>
             </div>
           {/if}
           {#if selectedHospital}

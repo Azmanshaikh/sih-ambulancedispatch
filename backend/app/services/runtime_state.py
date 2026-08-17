@@ -156,6 +156,8 @@ def save_mission(mission: dict[str, Any]) -> dict[str, Any]:
     mission.setdefault("phase", "pickup")
     mission.setdefault("id", str(uuid.uuid4()))
     mission.setdefault("phase_started_at", _now())
+    mission.setdefault("created_at", mission.get("phase_started_at") or _now())
+    _missions[f"id:{mission['id']}"] = mission
     if amb_id:
         _missions[f"amb:{amb_id}"] = mission
     if patient_id:
@@ -175,6 +177,26 @@ def get_mission_for_ambulance(ambulance_id: str | None) -> dict[str, Any] | None
 
 def get_mission_for_patient(patient_id: str) -> dict[str, Any] | None:
     return _missions.get(f"patient:{patient_id}") or None
+
+
+def list_active_missions() -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    active: list[dict[str, Any]] = []
+    for key, mission in _missions.items():
+        if not isinstance(mission, dict):
+            continue
+        if key == "latest" or key.startswith("patient:"):
+            continue
+        phase = mission.get("phase") or "pickup"
+        if phase not in ("pickup", "drop"):
+            continue
+        mid = str(mission.get("id") or key)
+        if mid in seen:
+            continue
+        seen.add(mid)
+        active.append(mission)
+    active.sort(key=lambda m: int(m.get("priority") or 1), reverse=True)
+    return active
 
 
 def get_latest_mission() -> dict[str, Any] | None:
@@ -246,31 +268,36 @@ def _phase_age_seconds(mission: dict[str, Any]) -> float:
         return 0.0
 
 
-def apply_fleet_events(events: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Auto-advance pickup → drop → complete when the mock unit reaches each stop."""
-    mission = get_latest_mission()
-    if not mission or mission.get("phase") == "complete":
-        return None
-    changed = None
+def apply_fleet_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Auto-advance pickup → drop → complete for every active mission."""
+    changed: list[dict[str, Any]] = []
+    by_unit: dict[str, list[dict[str, Any]]] = {}
     for event in events or []:
-        if event.get("ambulance_id") and event.get("ambulance_id") != mission.get("ambulance_id"):
-            continue
-        arrived = event.get("arrived")
-        phase = mission.get("phase") or "pickup"
-        if arrived == "pickup" and phase == "pickup":
-            changed = set_mission_phase("drop", mission.get("ambulance_id"))
-            mission = changed or mission
-        elif arrived == "drop" and phase in ("pickup", "drop"):
-            changed = set_mission_phase("complete", mission.get("ambulance_id"))
-            mission = changed or mission
-    # Demo fallback: finish each leg even if the route feed is empty.
-    if mission and mission.get("phase") != "complete":
-        age = _phase_age_seconds(mission)
-        phase = mission.get("phase") or "pickup"
-        if phase == "pickup" and age >= 22:
-            changed = set_mission_phase("drop", mission.get("ambulance_id"))
-        elif phase == "drop" and age >= 22:
-            changed = set_mission_phase("complete", mission.get("ambulance_id"))
+        amb_id = event.get("ambulance_id")
+        if amb_id:
+            by_unit.setdefault(str(amb_id), []).append(event)
+
+    for mission in list(list_active_missions()):
+        amb_id = mission.get("ambulance_id")
+        updated = None
+        for event in by_unit.get(str(amb_id or ""), []):
+            arrived = event.get("arrived")
+            phase = mission.get("phase") or "pickup"
+            if arrived == "pickup" and phase == "pickup":
+                updated = set_mission_phase("drop", amb_id)
+                mission = updated or mission
+            elif arrived == "drop" and phase in ("pickup", "drop"):
+                updated = set_mission_phase("complete", amb_id)
+                mission = updated or mission
+        if mission and mission.get("phase") != "complete":
+            age = _phase_age_seconds(mission)
+            phase = mission.get("phase") or "pickup"
+            if phase == "pickup" and age >= 22:
+                updated = set_mission_phase("drop", amb_id)
+            elif phase == "drop" and age >= 22:
+                updated = set_mission_phase("complete", amb_id)
+        if updated:
+            changed.append(updated)
     return changed
 
 
@@ -370,21 +397,30 @@ def unread_count(role: str, ambulance_id: str | None = None) -> int:
 
 def list_dispatch_cases(limit: int = 40) -> list[dict[str, Any]]:
     rows = rest_select("dispatch_cases", {"select": "*", "order": "created_at.desc", "limit": str(limit)})
-    latest = get_latest_mission()
-    if latest and not any(str(r.get("id")) == str(latest.get("id")) for r in rows):
-        rows = [
+    extras = []
+    seen = {str(r.get("id")) for r in rows}
+    for mission in list_active_missions() + ([get_latest_mission()] if get_latest_mission() else []):
+        if not mission:
+            continue
+        mid = str(mission.get("id"))
+        if mid in seen:
+            continue
+        seen.add(mid)
+        extras.append(
             {
-                "id": latest.get("id"),
-                "patient_id": latest.get("patient_id"),
-                "patient_name": latest.get("patient_name"),
-                "patient_email": latest.get("patient_email"),
-                "ambulance_id": latest.get("ambulance_id"),
-                "hospital_name": latest.get("hospital_name"),
-                "hospital": latest.get("hospital"),
-                "pickup": latest.get("pickup"),
-                "phase": latest.get("phase"),
-                "medical": get_medical_record(latest.get("patient_id") or "") if latest.get("patient_id") else {},
-                "created_at": latest.get("created_at") or _now(),
+                "id": mission.get("id"),
+                "patient_id": mission.get("patient_id"),
+                "patient_name": mission.get("patient_name"),
+                "patient_email": mission.get("patient_email"),
+                "ambulance_id": mission.get("ambulance_id"),
+                "hospital_name": mission.get("hospital_name"),
+                "hospital": mission.get("hospital"),
+                "pickup": mission.get("pickup"),
+                "phase": mission.get("phase"),
+                "medical": get_medical_record(mission.get("patient_id") or "") if mission.get("patient_id") else {},
+                "created_at": mission.get("created_at") or _now(),
+                "priority": mission.get("priority"),
+                "conflict": mission.get("conflict"),
             }
-        ] + rows
-    return rows
+        )
+    return extras + rows

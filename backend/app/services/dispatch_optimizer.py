@@ -1,53 +1,54 @@
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
+from urllib.parse import quote
 
 import requests
+
+# Ambulance privilege vs civilian driving time (skip signals / use shoulder).
+EMERGENCY_ETA_FACTOR = 0.70
+RAIN_ETA_FACTOR = 1.08
 
 
 class DispatchOptimizer:
     def __init__(self):
         self._tomtom_available: bool | None = None
-        self.mock_graph = {
-            "node_a": {"node_b": 5.0, "node_c": 10.0},
-            "node_b": {"node_a": 5.0, "node_d": 8.0, "node_c": 2.0},
-            "node_c": {"node_a": 10.0, "node_b": 2.0, "node_d": 4.0},
-            "node_d": {"node_b": 8.0, "node_c": 4.0},
-        }
-        self.mock_coords = {
-            "node_a": (0.0, 0.0),
-            "node_b": (3.0, 4.0),
-            "node_c": (6.0, 0.0),
-            "node_d": (6.0, 8.0),
-        }
-
-    def _find_nearest_node(self, location: tuple) -> str:
-        import math
-
-        nearest_node = None
-        min_dist = float("inf")
-        for node, coord in self.mock_coords.items():
-            dist = math.sqrt((location[0] - coord[0]) ** 2 + (location[1] - coord[1]) ** 2)
-            if dist < min_dist:
-                min_dist = dist
-                nearest_node = node
-        return nearest_node or "node_a"
 
     def get_tomtom_route(
-        self, origin: tuple, destination: tuple, api_key: str
+        self,
+        origin: tuple,
+        destination: tuple,
+        api_key: str,
+        emergency: bool = False,
+        avoid_areas: list[tuple[float, float, float, float]] | None = None,
     ) -> Tuple[float, List[Tuple[float, float]]]:
+        route_type = "shortest" if emergency else "fastest"
+        traffic = "false" if emergency else "true"
         url = (
             f"https://api.tomtom.com/routing/1/calculateRoute/"
             f"{origin[0]},{origin[1]}:{destination[0]},{destination[1]}/json"
-            f"?key={api_key}&traffic=true&travelMode=car&routeType=fastest"
+            f"?key={api_key}&traffic={traffic}&travelMode=car&routeType={route_type}"
         )
+        if emergency:
+            url += "&maxAlternatives=2"
+        if avoid_areas:
+            parts = []
+            for south, west, north, east in avoid_areas[:3]:
+                parts.append(f"rectangle:{south},{west}:{north},{east}")
+            url += "&avoidAreas=" + quote(";".join(parts), safe=":;,")
         try:
             response = requests.get(url, timeout=8)
             data = response.json()
-            if "routes" in data and len(data["routes"]) > 0:
-                route = data["routes"][0]
-                duration = route["summary"]["travelTimeInSeconds"]
-                points = route["legs"][0]["points"]
+            routes = data.get("routes") or []
+            if routes:
+                chosen = routes[0]
+                if emergency and len(routes) > 1:
+                    chosen = min(
+                        routes,
+                        key=lambda r: float((r.get("summary") or {}).get("lengthInMeters") or 10**12),
+                    )
+                duration = float(chosen["summary"]["travelTimeInSeconds"])
+                points = chosen["legs"][0]["points"]
                 route_coords = [(pt["latitude"], pt["longitude"]) for pt in points]
                 return duration, route_coords
             print("TomTom API Error:", data.get("error", data.get("detailedError", "unknown")))
@@ -56,24 +57,57 @@ class DispatchOptimizer:
         return float("inf"), []
 
     def get_osrm_route(
-        self, origin: tuple, destination: tuple
+        self,
+        origin: tuple,
+        destination: tuple,
+        emergency: bool = False,
     ) -> Tuple[float, List[Tuple[float, float]]]:
+        alt = "true" if emergency else "false"
         url = (
             "https://router.project-osrm.org/route/v1/driving/"
             f"{origin[1]},{origin[0]};{destination[1]},{destination[0]}"
-            "?overview=full&geometries=geojson"
+            f"?overview=full&geometries=geojson&alternatives={alt}"
         )
         try:
             response = requests.get(url, timeout=8, headers={"User-Agent": "JEEVAN-dispatch/1.0"})
             data = response.json()
-            if data.get("code") == "Ok" and data.get("routes"):
-                route = data["routes"][0]
+            routes = data.get("routes") or []
+            if data.get("code") == "Ok" and routes:
+                if emergency:
+                    route = min(routes, key=lambda r: float(r.get("distance") or 10**12))
+                else:
+                    route = min(routes, key=lambda r: float(r.get("duration") or 10**12))
                 duration = float(route["duration"])
                 coords = [(lat, lng) for lng, lat in route["geometry"]["coordinates"]]
                 return duration, coords
         except Exception as e:
             print("Failed to contact OSRM:", e)
         return float("inf"), []
+
+    def get_osrm_alternatives(
+        self, origin: tuple, destination: tuple
+    ) -> list[dict[str, Any]]:
+        url = (
+            "https://router.project-osrm.org/route/v1/driving/"
+            f"{origin[1]},{origin[0]};{destination[1]},{destination[0]}"
+            "?overview=full&geometries=geojson&alternatives=true"
+        )
+        out: list[dict[str, Any]] = []
+        try:
+            response = requests.get(url, timeout=8, headers={"User-Agent": "JEEVAN-dispatch/1.0"})
+            data = response.json()
+            for route in data.get("routes") or []:
+                coords = [(lat, lng) for lng, lat in route["geometry"]["coordinates"]]
+                out.append(
+                    {
+                        "duration": float(route.get("duration") or 0),
+                        "distance": float(route.get("distance") or 0),
+                        "coords": coords,
+                    }
+                )
+        except Exception as e:
+            print("Failed to contact OSRM alternatives:", e)
+        return out
 
     def _tomtom_key(self) -> str | None:
         from app.core.config import settings
@@ -93,19 +127,149 @@ class DispatchOptimizer:
         self._tomtom_available = bool(coords) and duration != float("inf")
         return self._tomtom_available
 
-    def _route(self, origin: tuple, destination: tuple, api_key: str | None = None):
-        """Automatically uses TomTom live traffic when available, otherwise OSRM roads."""
-        key = (api_key or "").strip() or self._tomtom_key()
+    def _apply_emergency_eta(self, duration: float, is_raining: bool) -> float:
+        if duration == float("inf"):
+            return duration
+        out = duration * EMERGENCY_ETA_FACTOR
+        if is_raining:
+            out *= RAIN_ETA_FACTOR
+        return out
+
+    def _route_direct(
+        self,
+        origin: tuple,
+        destination: tuple,
+        key: str | None,
+        emergency: bool,
+        is_raining: bool,
+        avoid_areas: list[tuple[float, float, float, float]] | None,
+    ):
+        """Direct TomTom/OSRM routing used when the NetworkX graph is unavailable."""
         if key and self._detect_tomtom():
-            duration, coords = self.get_tomtom_route(origin, destination, key)
+            duration, coords = self.get_tomtom_route(
+                origin, destination, key, emergency=emergency, avoid_areas=avoid_areas
+            )
             if duration != float("inf") and coords:
+                if emergency:
+                    return self._apply_emergency_eta(duration, is_raining), coords, "tomtom-direct"
                 return duration, coords, "tomtom-live-traffic"
             self._tomtom_available = False
 
-        duration, coords = self.get_osrm_route(origin, destination)
+        duration, coords = self.get_osrm_route(origin, destination, emergency=emergency)
         if duration != float("inf") and coords:
-            return duration, coords, "osrm-road-network"
+            return (self._apply_emergency_eta(duration, is_raining) if emergency else duration), coords, "osrm-direct"
         return float("inf"), [], "none"
+
+    def route_full(
+        self,
+        origin: tuple,
+        destination: tuple,
+        *,
+        api_key: str | None = None,
+        emergency: bool = True,
+        is_raining: bool = False,
+        avoid_areas: list[tuple[float, float, float, float]] | None = None,
+        avoid_paths: list[list[tuple[float, float]]] | None = None,
+        prefer: str = "fastest",
+        enrich: bool = False,
+    ) -> dict[str, Any]:
+        """Primary router: NetworkX graph (Dijkstra) over live TomTom/OSRM roads.
+
+        Returns distance + both shortest/fastest metrics and honours corridors
+        already occupied by other ambulances via ``avoid_paths``.
+        """
+        from app.services import graph_router
+
+        key = (api_key or "").strip() or self._tomtom_key()
+        graph_key = key if (key and self._detect_tomtom()) else None
+
+        if graph_router.available():
+            try:
+                g = graph_router.route(
+                    origin,
+                    destination,
+                    api_key=graph_key,
+                    avoid_paths=avoid_paths,
+                    prefer=prefer,
+                    enrich=enrich,
+                )
+            except Exception as exc:  # pragma: no cover - defensive
+                print("graph_router failed, using direct routing:", exc)
+                g = None
+            if g and g.get("coords"):
+                dur = g["duration"]
+                if emergency:
+                    dur = self._apply_emergency_eta(dur, is_raining)
+                return {
+                    "duration": dur,
+                    "coords": g["coords"],
+                    "source": g["source"],
+                    "engine": "networkx",
+                    "distance": g.get("distance"),
+                    "shortest_km": g.get("shortest_km"),
+                    "fastest_min": g.get("fastest_min"),
+                    "occupied_hits": g.get("occupied_hits", 0),
+                    "graph_nodes": g.get("graph_nodes"),
+                }
+
+        dur, coords, source = self._route_direct(origin, destination, key, emergency, is_raining, avoid_areas)
+        return {
+            "duration": dur,
+            "coords": coords,
+            "source": source,
+            "engine": "direct",
+            "distance": None,
+            "shortest_km": None,
+            "fastest_min": None,
+            "occupied_hits": 0,
+            "graph_nodes": None,
+        }
+
+    def _route(
+        self,
+        origin: tuple,
+        destination: tuple,
+        api_key: str | None = None,
+        emergency: bool = True,
+        is_raining: bool = False,
+        avoid_areas: list[tuple[float, float, float, float]] | None = None,
+        avoid_paths: list[list[tuple[float, float]]] | None = None,
+        prefer: str = "fastest",
+    ):
+        res = self.route_full(
+            origin,
+            destination,
+            api_key=api_key,
+            emergency=emergency,
+            is_raining=is_raining,
+            avoid_areas=avoid_areas,
+            avoid_paths=avoid_paths,
+            prefer=prefer,
+        )
+        return res["duration"], res["coords"], res["source"]
+
+    def compute_route(
+        self,
+        origin: tuple,
+        destination: tuple,
+        *,
+        emergency: bool = True,
+        is_raining: bool = False,
+        avoid_areas: list[tuple[float, float, float, float]] | None = None,
+        avoid_paths: list[list[tuple[float, float]]] | None = None,
+        prefer: str = "fastest",
+        enrich: bool = True,
+    ) -> dict[str, Any]:
+        return self.route_full(
+            origin,
+            destination,
+            emergency=emergency,
+            is_raining=is_raining,
+            avoid_areas=avoid_areas,
+            avoid_paths=avoid_paths,
+            prefer=prefer,
+            enrich=enrich,
+        )
 
     def optimize_dispatch(self, incident_location: tuple, ambulances: List[Dict]) -> dict:
         if not ambulances:
@@ -148,25 +312,41 @@ class DispatchOptimizer:
         h = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
         return 2 * r * math.asin(math.sqrt(h))
 
-    def _pick_ambulance(self, incident_location: tuple, ambulances: List[Dict[str, Any]]) -> dict[str, Any] | None:
+    def _pick_ambulance(
+        self,
+        incident_location: tuple,
+        ambulances: List[Dict[str, Any]],
+        is_raining: bool = False,
+    ) -> dict[str, Any] | None:
         available = [a for a in ambulances if a.get("status") in (None, "available")]
         pool = available or [a for a in ambulances if a.get("status") != "busy"] or ambulances
         if not pool:
             return None
-        nearest = min(
+        shortlist = sorted(
             pool,
             key=lambda a: self._haversine_km((a["lat"], a["lng"]), incident_location),
-        )
-        duration, coords, _source = self._route((nearest["lat"], nearest["lng"]), incident_location)
-        if duration == float("inf") or not coords:
-            coords = [(nearest["lat"], nearest["lng"]), incident_location]
-            km = self._haversine_km((nearest["lat"], nearest["lng"]), incident_location)
-            duration = max(60.0, km / 40.0 * 3600.0)
-        return {
-            "ambulance": nearest,
-            "pickup_seconds": duration if duration != float("inf") else 0,
-            "pickup_route": coords,
-        }
+        )[:3]
+
+        best: dict[str, Any] | None = None
+        for unit in shortlist:
+            duration, coords, _source = self._route(
+                (unit["lat"], unit["lng"]),
+                incident_location,
+                emergency=True,
+                is_raining=is_raining,
+            )
+            if duration == float("inf") or not coords:
+                coords = [(unit["lat"], unit["lng"]), incident_location]
+                km = self._haversine_km((unit["lat"], unit["lng"]), incident_location)
+                duration = max(60.0, km / 55.0 * 3600.0 * EMERGENCY_ETA_FACTOR)
+            row = {
+                "ambulance": unit,
+                "pickup_seconds": duration if duration != float("inf") else 0,
+                "pickup_route": coords,
+            }
+            if best is None or row["pickup_seconds"] < best["pickup_seconds"]:
+                best = row
+        return best
 
     def optimize_hospital_dispatch(
         self,
@@ -177,27 +357,31 @@ class DispatchOptimizer:
     ) -> dict:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        peak = self._peak_traffic_factor()
         self._detect_tomtom()
-        pickup = self._pick_ambulance(incident_location, ambulances)
+        pickup = self._pick_ambulance(incident_location, ambulances, is_raining=is_raining)
 
         def score_hospital(hosp: Dict[str, Any]) -> dict[str, Any] | None:
             dest = (float(hosp["lat"]), float(hosp["lng"]))
-            duration, coords, source = self._route(incident_location, dest)
+            res = self.route_full(
+                incident_location, dest, emergency=True, is_raining=is_raining, prefer="fastest"
+            )
+            duration, coords = res["duration"], res["coords"]
             if duration == float("inf") or not coords:
                 return None
-            extra_traffic = 1.0 if source == "tomtom-live-traffic" else peak
-            transport = duration * extra_traffic
             pickup_s = float(pickup["pickup_seconds"]) if pickup else 0.0
-            effective = pickup_s + transport
+            effective = pickup_s + duration
             return {
                 "hospital": hosp,
                 "route": coords,
                 "raw_seconds": duration,
-                "transport_seconds": transport,
+                "transport_seconds": duration,
                 "pickup_seconds": pickup_s,
                 "eta_seconds": effective,
-                "source": source,
+                "source": res["source"],
+                "engine": res.get("engine"),
+                "shortest_km": res.get("shortest_km"),
+                "fastest_min": res.get("fastest_min"),
+                "graph_nodes": res.get("graph_nodes"),
             }
 
         scored: list[dict[str, Any]] = []
@@ -218,10 +402,10 @@ class DispatchOptimizer:
             best = {
                 "hospital": nearest,
                 "route": [incident_location, (nearest["lat"], nearest["lng"])],
-                "raw_seconds": 720,
-                "transport_seconds": 720,
+                "raw_seconds": 720 * EMERGENCY_ETA_FACTOR,
+                "transport_seconds": 720 * EMERGENCY_ETA_FACTOR,
                 "pickup_seconds": float(pickup["pickup_seconds"]) if pickup else 0.0,
-                "eta_seconds": 720,
+                "eta_seconds": 720 * EMERGENCY_ETA_FACTOR,
                 "source": "straight-line-fallback",
             }
 
@@ -237,10 +421,22 @@ class DispatchOptimizer:
         transport_min = round(float(best.get("transport_seconds") or eta) / 60, 1)
         specs = ", ".join(hospital.get("specializations") or [])
         amb_label = (assigned or {}).get("label") or (assigned or {}).get("id") or "nearest unit"
+        engine = best.get("engine") or "direct"
+        shortest_km = best.get("shortest_km")
+        fastest_min = best.get("fastest_min")
+        engine_note = (
+            f"NetworkX Dijkstra over live TomTom traffic"
+            if engine == "networkx"
+            else "Direct TomTom/OSRM routing"
+        )
+        metric_note = ""
+        if shortest_km is not None and fastest_min is not None:
+            metric_note = f" Graph compared shortest {shortest_km} km vs fastest {fastest_min} min."
         reason = (
+            f"{engine_note}: emergency corridor (traffic delays waived). "
             f"Nearest ambulance {amb_label} assigned. "
             f"{hospital.get('name')} is the fastest destination "
-            f"({pickup_min} min pickup + {transport_min} min to hospital)."
+            f"({pickup_min} min pickup + {transport_min} min to hospital).{metric_note}"
             + (f" Specialties: {specs}." if specs else "")
         )
         return {
@@ -258,8 +454,13 @@ class DispatchOptimizer:
             "confidence": confidence,
             "reason": reason,
             "constraints": {
-                "routing": best["source"],
-                "traffic": "live" if best["source"] == "tomtom-live-traffic" else "estimated-peak",
+                "routing": "emergency-shortest",
+                "traffic": "waived",
+                "provider": best["source"],
+                "engine": engine,
+                "shortest_km": shortest_km,
+                "fastest_min": fastest_min,
+                "graph_nodes": best.get("graph_nodes"),
             },
             "candidates": [
                 {

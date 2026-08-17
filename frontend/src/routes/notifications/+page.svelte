@@ -9,7 +9,9 @@
   let cases = $state<any[]>([]);
   let pickupRoute = $state<[number, number][]>([]);
   let dropRoute = $state<[number, number][]>([]);
+  let extraRoutes = $state<any[]>([]);
   let reports = $state<any[]>([]);
+  let corridor = $state<any>(null);
 
   function flagList(rec: any) {
     if (!rec) return 'None noted';
@@ -23,10 +25,17 @@
   }
 
   async function load() {
-    const [aRes, mRes] = await Promise.all([apiFetch('/accounts/alerts'), apiFetch('/accounts/monitor')]);
+    const [aRes, mRes, cRes] = await Promise.all([
+      apiFetch('/accounts/alerts'),
+      apiFetch('/accounts/monitor'),
+      apiFetch('/tracking/corridor'),
+    ]);
     if (aRes.ok) {
       const data = await aRes.json();
       alerts = data.alerts || [];
+    }
+    if (cRes.ok) {
+      corridor = await cRes.json();
     }
     if (mRes.ok) {
       monitor = await mRes.json();
@@ -34,14 +43,26 @@
       const p = monitor.patient || {};
       const d = monitor.driver || {};
       const h = monitor.mission?.hospital || {};
+      pickupRoute = monitor.mission?.pickup_route || [];
+      dropRoute = monitor.mission?.drop_route || monitor.mission?.route || [];
+      reports = monitor.reports || [];
+      const posts = (corridor?.posts || []).map((post: any) => ({
+        position: [post.lat, post.lng],
+        popup: `${post.kind === 'rescue' ? 'Rescue' : 'Traffic'} · ${post.name}${post.alerted ? ' · ALERT SENT' : ''}`,
+        type: post.kind === 'rescue' ? (post.alerted ? 'rescue_alert' : 'rescue') : post.alerted ? 'police_alert' : 'police',
+      }));
       markers = [
         p.lat ? { position: [p.lat, p.lng], popup: `Patient · ${p.name || ''}`, type: 'incident' } : null,
         d.lat ? { position: [d.lat, d.lng], popup: `Driver · ${d.id}`, type: 'ambulance' } : null,
         h.lat ? { position: [h.lat, h.lng], popup: `Hospital · ${h.name}`, type: 'hospital_selected' } : null,
+        ...posts,
       ].filter(Boolean);
-      pickupRoute = monitor.mission?.pickup_route || [];
-      dropRoute = monitor.mission?.drop_route || monitor.mission?.route || [];
-      reports = monitor.reports || [];
+      const latestId = monitor.mission?.id;
+      extraRoutes = (corridor?.extra_routes || []).filter((r: any) => {
+        if (r.kind === 'overlap') return true;
+        if (latestId && String(r.id || '').startsWith(String(latestId))) return false;
+        return true;
+      });
     }
   }
 
@@ -81,7 +102,7 @@
 
     <div class="col-span-12 lg:col-span-4 flex flex-col gap-4">
       <div class="relative overflow-hidden nb-card-lg map-wrap" style="height: 220px;border:4px solid #111;">
-        <MapWidget id="notif-map" clazz="absolute inset-0" {markers} {pickupRoute} {dropRoute} showLegend />
+        <MapWidget id="notif-map" clazz="absolute inset-0" {markers} {pickupRoute} {dropRoute} {extraRoutes} showLegend />
         <div class="absolute top-3 left-3 glass px-3 py-1.5 z-10">
           <div class="flex items-center gap-2">
             <div class="w-2.5 h-2.5 bg-[#FF2D2D] blink" style="border:2px solid #111;"></div>
@@ -111,6 +132,27 @@
           {/if}
         </div>
       </div>
+
+      <div class="nb-card p-5">
+        <div class="flex justify-between items-end mb-4">
+          <h3 class="text-xs font-black uppercase tracking-[0.2em] text-[#4B4B4B]">Corridor SMS</h3>
+          <span class="text-2xl font-black text-black">{String((corridor?.sms || []).length).padStart(2, '0')}</span>
+        </div>
+        <div class="space-y-3 max-h-64 overflow-y-auto no-sb">
+          {#if !(corridor?.sms || []).length}
+            <p class="text-xs text-[#4B4B4B] font-semibold">Police and rescue posts along the route are texted ~3 minutes before the unit arrives.</p>
+          {:else}
+            {#each corridor.sms as s}
+              <div class="p-3 bg-[#FFF3E6]" style="border:3px solid #111;">
+                <p class="nb-chip {s.status === 'demo' ? 'nb-yellow' : 'nb-green'}">{s.status} · {s.provider}</p>
+                <p class="text-xs text-black mt-2 font-black">{s.post_name}</p>
+                <p class="text-[10px] text-[#4B4B4B] font-semibold">{s.phone}</p>
+                <p class="text-xs text-black mt-2 font-semibold">{s.body}</p>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      </div>
     </div>
 
     <div class="col-span-12 lg:col-span-5 flex flex-col gap-4">
@@ -125,6 +167,9 @@
             is going to
             <strong>{latest.hospital_name || monitor?.mission?.hospital_name || 'hospital'}</strong>
           </p>
+          {#if monitor?.mission?.conflict?.reason}
+            <p class="text-[11px] text-white mt-3 font-black" style="background:#111;padding:8px;">{monitor.mission.conflict.reason}</p>
+          {/if}
           {#if monitor?.mission && monitor.mission.phase !== 'complete'}
             <button class="btn btn-secondary mt-4 w-full" onclick={endTrip}>End trip / Trip complete</button>
             <p class="text-[10px] text-white/80 mt-2 uppercase tracking-widest font-bold">Auto-completes at hospital if you skip this</p>

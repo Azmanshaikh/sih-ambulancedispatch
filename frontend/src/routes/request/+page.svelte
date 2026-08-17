@@ -9,6 +9,10 @@
   let analysisResult = $state('');
   let isAnalyzing = $state(false);
   let dispatching = $state(false);
+  let cardiac = $state(false);
+  let diabetes = $state(false);
+  let epilepsy = $state(false);
+  let pregnant = $state(false);
 
   async function handleAnalyzeReport() {
     if (!description && !reportFile) {
@@ -162,10 +166,10 @@
           <div style="padding-top: 12px; border-top: 2px solid #E0E0E0;">
             <p style="font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.2em; margin: 0 0 10px;">Medical History</p>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #1A1A1A; cursor: pointer; font-weight: 600;"><input type="checkbox" style="accent-color: #DC2626;" /> Cardiac History</label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #1A1A1A; cursor: pointer; font-weight: 600;"><input type="checkbox" style="accent-color: #DC2626;" /> Diabetes</label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #1A1A1A; cursor: pointer; font-weight: 600;"><input type="checkbox" style="accent-color: #DC2626;" /> Epilepsy</label>
-              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #1A1A1A; cursor: pointer; font-weight: 600;"><input type="checkbox" style="accent-color: #DC2626;" /> Pregnant</label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #1A1A1A; cursor: pointer; font-weight: 600;"><input type="checkbox" bind:checked={cardiac} style="accent-color: #DC2626;" /> Cardiac History</label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #1A1A1A; cursor: pointer; font-weight: 600;"><input type="checkbox" bind:checked={diabetes} style="accent-color: #DC2626;" /> Diabetes</label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #1A1A1A; cursor: pointer; font-weight: 600;"><input type="checkbox" bind:checked={epilepsy} style="accent-color: #DC2626;" /> Epilepsy</label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #1A1A1A; cursor: pointer; font-weight: 600;"><input type="checkbox" bind:checked={pregnant} style="accent-color: #DC2626;" /> Pregnant</label>
             </div>
           </div>
         </div>
@@ -188,6 +192,10 @@
                     incident_lng: 77.5693,
                     address: 'BMSIT College, Avalahalli, Yelahanka',
                     notes: [description, narrative].filter(Boolean).join('\n'),
+                    cardiac,
+                    diabetes,
+                    epilepsy,
+                    pregnant,
                   }),
                 });
               } finally {

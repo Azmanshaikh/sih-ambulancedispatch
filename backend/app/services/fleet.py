@@ -208,6 +208,38 @@ def release_ambulance(ambulance_id: str | None) -> None:
         break
 
 
+def update_ambulance_paths(
+    ambulance_id: str | None,
+    pickup_path: list[tuple[float, float]] | None = None,
+    drop_path: list[tuple[float, float]] | None = None,
+) -> None:
+    if not ambulance_id:
+        return
+    for unit in _fleet:
+        if unit["id"] != ambulance_id:
+            continue
+        here = (float(unit["lat"]), float(unit["lng"]))
+        if pickup_path is not None:
+            unit["pickup_path"] = list(pickup_path)
+        if drop_path is not None:
+            unit["drop_path"] = list(drop_path)
+        if unit.get("leg") == "drop" and drop_path is not None:
+            path = list(drop_path)
+            if path and (abs(path[0][0] - here[0]) > 1e-6 or abs(path[0][1] - here[1]) > 1e-6):
+                path = [here] + path
+            unit["path"] = path
+            unit["path_i"] = 0
+        elif unit.get("leg") == "pickup" and pickup_path is not None:
+            path = list(pickup_path)
+            if path and (abs(path[0][0] - here[0]) > 1e-6 or abs(path[0][1] - here[1]) > 1e-6):
+                path = [here] + path
+            unit["path"] = path
+            unit["path_i"] = 0
+        elif unit.get("leg") == "pickup" and drop_path is not None:
+            unit["drop_path"] = list(drop_path)
+        break
+
+
 def follow_drop_leg(ambulance_id: str | None) -> None:
     if not ambulance_id:
         return

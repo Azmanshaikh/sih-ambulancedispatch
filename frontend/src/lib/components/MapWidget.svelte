@@ -8,6 +8,14 @@
     type?: string;
   }
 
+  interface ExtraRoute {
+    points: [number, number][];
+    color?: string;
+    halo?: string;
+    kind?: string;
+    label?: string;
+  }
+
   interface Props {
     id?: string;
     clazz?: string;
@@ -15,6 +23,7 @@
     route?: [number, number][] | null;
     pickupRoute?: [number, number][] | null;
     dropRoute?: [number, number][] | null;
+    extraRoutes?: ExtraRoute[];
     etaLabel?: string;
     center?: [number, number];
     zoom?: number;
@@ -31,6 +40,7 @@
     route = null,
     pickupRoute = null,
     dropRoute = null,
+    extraRoutes = [],
     etaLabel = '',
     center = BMSIT,
     zoom = 13,
@@ -109,13 +119,31 @@
       ),
       hospital: makeIcon(HOSPITAL_SVG, 28, 'hosp-marker'),
       hospital_selected: makeIcon(HOSPITAL_SVG, 34, 'hosp-marker hosp-selected'),
+      police: makeIcon(
+        `<span style="font-size:18px;line-height:1;filter:grayscale(0.2)">👮</span>`,
+        18
+      ),
+      police_alert: makeIcon(
+        `<span style="font-size:20px;line-height:1">👮</span>`,
+        20,
+        'amb-marker'
+      ),
+      rescue: makeIcon(
+        `<span style="font-size:18px;line-height:1">🛟</span>`,
+        18
+      ),
+      rescue_alert: makeIcon(
+        `<span style="font-size:20px;line-height:1">🛟</span>`,
+        20,
+        'amb-marker'
+      ),
       default: makeIcon(`<span style="font-size:22px">📍</span>`, 22),
     };
 
     markers.forEach((marker) => {
       const m = L.marker(marker.position, {
         icon: ICONS[marker.type || 'default'] || ICONS.default,
-        zIndexOffset: marker.type === 'hospital_selected' ? 600 : marker.type === 'incident' ? 500 : marker.type === 'ambulance' ? 700 : 0,
+        zIndexOffset: marker.type === 'hospital_selected' ? 600 : marker.type === 'incident' ? 500 : marker.type === 'ambulance' ? 700 : marker.type?.includes('alert') ? 800 : 0,
       }).addTo(map);
       if (marker.popup) {
         m.bindPopup(`<span style="font-weight:700;font-size:13px">${marker.popup}</span>`, {
@@ -129,6 +157,12 @@
     const blue = dropRoute && dropRoute.length > 1 ? dropRoute : null;
     if (red && red.length > 1) drawLine(red, '#dc2626', '#7f1d1d');
     if (blue && blue.length > 1) drawLine(blue, '#2563eb', '#1e3a8a');
+    extraRoutes.forEach((r) => {
+      if (r.points && r.points.length > 1) {
+        const color = r.color || '#38bdf8';
+        drawLine(r.points, color, r.halo || color);
+      }
+    });
 
     const etaOn = (blue && blue.length > 1 ? blue : red) || [];
     if (etaLabel && etaOn.length > 1) {
@@ -145,12 +179,16 @@
       }).addTo(map);
     }
 
-    const key = `${routeKey(red)}|${routeKey(blue)}`;
-    if (fitRoute && key !== '|' && key !== lastRouteKey) {
+    const key = `${routeKey(red)}|${routeKey(blue)}|${extraRoutes.length}`;
+    if (fitRoute && key !== '||0' && key !== lastRouteKey) {
       lastRouteKey = key;
       try {
-        const boundsPts = [...(red || []), ...(blue || [])];
-        map.fitBounds(boundsPts, { padding: [56, 56], maxZoom: 14 });
+        const boundsPts = [
+          ...(red || []),
+          ...(blue || []),
+          ...extraRoutes.flatMap((r) => r.points || []),
+        ];
+        if (boundsPts.length) map.fitBounds(boundsPts, { padding: [56, 56], maxZoom: 14 });
       } catch {
         /* ignore */
       }
@@ -177,6 +215,7 @@
     const _r = route;
     const _p = pickupRoute;
     const _d = dropRoute;
+    const _x = extraRoutes;
     const _e = etaLabel;
     if (map && L) updateMap();
   });
@@ -184,10 +223,13 @@
 
 <div class="map-wrap {clazz}" style="width: 100%; height: 100%; position: relative;">
   <div bind:this={mapElement} {id} style="width: 100%; height: 100%; border-radius: inherit; z-index: 0;"></div>
-  {#if showLegend && ((pickupRoute && pickupRoute.length > 1) || (dropRoute && dropRoute.length > 1) || (route && route.length > 1))}
+  {#if showLegend && ((pickupRoute && pickupRoute.length > 1) || (dropRoute && dropRoute.length > 1) || (route && route.length > 1) || extraRoutes.length)}
     <div class="absolute bottom-3 left-3 z-[500] px-3 py-2 text-[10px] font-black uppercase tracking-widest" style="background:#fff;color:#111;border:3px solid #111;box-shadow:3px 3px 0 #111;">
       <p><span style="color:#FF2D2D">━</span> Ambulance → patient</p>
       <p><span style="color:#2E5BFF">━</span> Patient → hospital</p>
+      <p><span style="color:#38bdf8">━</span> Other active corridor</p>
+      <p><span style="color:#f59e0b">━</span> Shared / conflict</p>
+      <p><span style="color:#a855f7">━</span> Rerouted unit</p>
     </div>
   {/if}
 </div>

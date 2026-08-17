@@ -29,6 +29,7 @@ from app.services.runtime_state import (
     get_medical_record,
     get_mission_for_ambulance,
     get_mission_for_patient,
+    list_active_missions,
     list_alerts,
     list_dispatch_cases,
     save_mission,
@@ -230,6 +231,9 @@ async def live_mission(user: dict[str, Any] = Depends(get_current_user)):
             "ambulance_id": mission.get("ambulance_id"),
             "driver_location": mission.get("driver_location"),
             "pickup": mission.get("pickup"),
+            "conflict": mission.get("conflict"),
+            "priority": mission.get("priority"),
+            "priority_label": mission.get("priority_label"),
             "report": mission.get("report"),
         },
     }
@@ -328,6 +332,7 @@ async def staff_cases(_user: dict[str, Any] = Depends(require_roles("staff"))):
 @router.get("/monitor")
 async def staff_monitor(user: dict[str, Any] = Depends(require_roles("staff"))):
     mission = enrich_mission(get_latest_mission())
+    active = [enrich_mission(m) for m in list_active_missions()]
     patient_id = (mission or {}).get("patient_id")
     vitals = tick_vitals(patient_id) if patient_id else {"heart_rate": None, "spo2": None, "source": "none"}
     record = get_medical_record(patient_id) if patient_id else {}
@@ -348,6 +353,7 @@ async def staff_monitor(user: dict[str, Any] = Depends(require_roles("staff"))):
         },
         "driver": (mission or {}).get("driver_location"),
         "mission": mission,
+        "active_missions": active,
         "health_profile": get_health_profile(patient_id) if patient_id else {},
         "reports": list_reports_for(user),
         "fleet": get_ambulances(),

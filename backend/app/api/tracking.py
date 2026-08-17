@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from typing import Any, List
 from pydantic import BaseModel
 
-from app.core.security import get_current_user, require_roles
+from app.core.security import require_roles
+from app.services.corridor import arm_corridor, corridor_snapshot, mission_priority, resolve_conflict
 from app.services.dispatch_optimizer import get_optimal_ambulance, get_optimal_hospital_dispatch
 from app.services.fleet import (
     BMSIT,
@@ -11,7 +12,7 @@ from app.services.fleet import (
     get_ambulances,
     get_hospitals,
 )
-from app.services.runtime_state import get_latest_mission, push_alert, save_mission, set_medical_record, set_mission_phase
+from app.services.runtime_state import push_alert, save_mission, set_medical_record
 
 router = APIRouter(prefix="/tracking", tags=["Tracking"])
 
@@ -28,6 +29,7 @@ class DispatchRequest(BaseModel):
     epilepsy: bool = False
     pregnant: bool = False
     notes: str = ""
+    priority: int | None = None
 
 
 @router.get("/fleet")
@@ -40,13 +42,23 @@ async def live_fleet(_user: dict[str, Any] = Depends(require_roles("staff"))):
     }
 
 
+@router.get("/corridor")
+async def corridor_status(_user: dict[str, Any] = Depends(require_roles("staff"))):
+    snap = corridor_snapshot()
+    return {"status": "success", **snap}
+
+
 @router.post("/dispatch")
 async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends(require_roles("staff", "patient"))):
     ambulances = get_ambulances()
     hospitals = get_hospitals()
-    previous = get_latest_mission()
-    if previous and previous.get("phase") != "complete":
-        set_mission_phase("complete", previous.get("ambulance_id"))
+    flags = {
+        "cardiac": req.cardiac,
+        "diabetes": req.diabetes,
+        "epilepsy": req.epilepsy,
+        "pregnant": req.pregnant,
+    }
+    priority = mission_priority(flags, req.priority)
     result = await asyncio.to_thread(
         get_optimal_hospital_dispatch,
         req.incident_lat,
@@ -54,6 +66,12 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
         hospitals,
         ambulances,
         req.is_raining,
+    )
+    result = resolve_conflict(
+        result,
+        priority=priority,
+        is_raining=req.is_raining,
+        exclude_ambulance=result.get("ambulance_id"),
     )
     if result.get("ambulance_id"):
         pickup = result.get("pickup_route") or []
@@ -102,6 +120,13 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
             "pickup_minutes": result.get("pickup_minutes"),
             "transport_minutes": result.get("transport_minutes"),
             "phase": "pickup",
+            "priority": priority,
+            "priority_label": {5: "cardiac", 4: "pregnant", 3: "epilepsy", 2: "diabetes", 1: "standard"}.get(priority, "standard"),
+            "cardiac": req.cardiac,
+            "diabetes": req.diabetes,
+            "epilepsy": req.epilepsy,
+            "pregnant": req.pregnant,
+            "conflict": result.get("conflict") or {"status": "none"},
         }
     )
     hospital_name = result.get("hospital_name") or "hospital"
@@ -109,7 +134,7 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
     push_alert(
         "driver",
         "JOB ASSIGNED",
-        f"Pick up {patient_name} at {req.address}, then drop at {hospital_name}.",
+        f"Pick up {patient_name} at {req.address}, then drop at {hospital_name}. Emergency corridor — shortest path.",
         ambulance_id=result.get("ambulance_id"),
         mission_id=mission.get("id"),
         extra={"pickup": req.address, "drop": hospital_name, "patient_name": patient_name},
@@ -127,6 +152,17 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
             "ambulance_id": unit,
         },
     )
+    conflict = result.get("conflict") or {}
+    if conflict.get("reason"):
+        push_alert(
+            "staff",
+            "CORRIDOR CONFLICT",
+            conflict["reason"],
+            ambulance_id=result.get("ambulance_id"),
+            mission_id=mission.get("id"),
+            extra=conflict,
+        )
+    arm_corridor(mission)
     return {"status": "success", "data": result}
 
 
