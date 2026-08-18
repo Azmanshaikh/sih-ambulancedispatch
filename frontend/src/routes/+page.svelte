@@ -3,6 +3,7 @@
   import MapWidget from '$lib/components/MapWidget.svelte';
   import { apiFetch } from '$lib/auth.svelte';
   import { postToMarker } from '$lib/officers';
+  import { t } from '$lib/i18n.svelte';
 
   const BMSIT = {
     name: 'BMSIT College, Avalahalli, Yelahanka',
@@ -13,7 +14,7 @@
   let pickupRoute = $state<[number, number][]>([]);
   let dropRoute = $state<[number, number][]>([]);
   let markers = $state<any[]>([]);
-  let dispatchStatus = $state('Waiting for SOS');
+  let dispatchStatus = $state('');
   let etaLabel = $state('');
   let ambulances = $state<any[]>([]);
   let hospitals = $state<any[]>([]);
@@ -150,7 +151,7 @@
     candidates = [];
     pickupMinutes = null;
     transportMinutes = null;
-    dispatchStatus = 'Waiting for SOS';
+    dispatchStatus = '';
     selectedAmbulanceId = '';
     extraRoutes = extraRoutesFor(activeMissions, '');
     markers = buildMarkers();
@@ -223,7 +224,7 @@
   });
 </script>
 
-<svelte:head><title>JEEVAN — Dispatch</title></svelte:head>
+<svelte:head><title>{t('dash.pageTitle')}</title></svelte:head>
 
 <div class="h-full flex flex-col" style="overflow: hidden;">
   <div class="p-4 grid grid-cols-12 gap-4 h-full overflow-hidden">
@@ -248,11 +249,11 @@
 
       <section class="flex flex-col gap-3 flex-1 min-h-0">
         <div class="flex justify-between items-center flex-wrap gap-1">
-          <h3 class="text-[11px] font-black uppercase tracking-widest text-black">Yelahanka Fleet</h3>
-          <span class="nb-chip nb-red" style="color:#fff;">{dispatchStatus}</span>
+          <h3 class="text-[11px] font-black uppercase tracking-widest text-black">{t('dash.fleet')}</h3>
+          <span class="nb-chip nb-red" style="color:#fff;">{dispatchStatus || t('dash.waitingSos')}</span>
         </div>
 
-        <p class="text-[10px] text-[#4B4B4B] font-semibold">Tap an assigned ambulance on the map to drive that dispatch. Tap a police/rescue icon to call the duty officer.</p>
+        <p class="text-[10px] text-[#4B4B4B] font-semibold">{t('dash.tapHint')}</p>
 
         <div class="space-y-2 overflow-y-auto no-sb flex-1 pr-1">
           {#each ambulances as a}
@@ -280,18 +281,20 @@
           <div class="glass px-3 py-2">
             <div class="flex items-center gap-2">
               <span class="flex h-2.5 w-2.5 bg-[#FF2D2D] blink" style="border:2px solid #111;"></span>
-              <span class="text-[11px] font-black tracking-widest uppercase text-black">Yelahanka Live Feed</span>
+              <span class="text-[11px] font-black tracking-widest uppercase text-black">{t('dash.liveFeed')}</span>
             </div>
           </div>
           <div class="flex flex-col items-end gap-2">
             {#if monitor?.unread_alerts}
               <a href="/notifications" class="glass px-3 py-1.5 text-[10px] text-black font-black uppercase tracking-widest nb-red" style="color:#fff;">
-                {monitor.unread_alerts} staff alert{monitor.unread_alerts === 1 ? '' : 's'}
+                {monitor.unread_alerts === 1
+                  ? t('dash.staffAlerts', { count: monitor.unread_alerts })
+                  : t('dash.staffAlertsPlural', { count: monitor.unread_alerts })}
               </a>
             {/if}
             {#if monitor?.mission && monitor.mission.phase !== 'complete'}
               <button class="btn btn-primary" style="padding:6px 12px;font-size:10px;" onclick={endTrip}>
-                End trip
+                {t('dash.endTrip')}
               </button>
             {/if}
             <div class="glass px-3 py-1.5 text-[10px] text-black font-bold uppercase tracking-widest max-w-[220px] text-right nb-yellow">
@@ -306,7 +309,7 @@
       <section class="nb-card nb-blue p-4 flex-shrink-0" style="color:#fff;">
         <div class="flex items-center gap-2 mb-3">
           <span class="material-symbols-outlined">psychology</span>
-          <h3 class="text-[11px] font-black uppercase tracking-widest">AI Recommendation</h3>
+          <h3 class="text-[11px] font-black uppercase tracking-widest">{t('dash.aiRec')}</h3>
         </div>
         {#if selectedHospital}
           <div class="flex gap-3 mb-3">
@@ -317,11 +320,11 @@
             </div>
           </div>
           {#if pickupMinutes != null}
-            <p class="text-[10px] font-semibold">Pickup {pickupMinutes} min · Transport {transportMinutes} min</p>
+            <p class="text-[10px] font-semibold">{t('dash.pickupTransport', { pickup: pickupMinutes ?? '—', transport: transportMinutes ?? '—' })}</p>
           {/if}
           {#if constraints}
             <p class="text-[10px] mt-2 uppercase tracking-wide font-bold">
-              {constraints.routing === 'emergency-shortest' ? 'Emergency corridor — traffic rules waived for ETA' : `${constraints.routing} · ${constraints.traffic} traffic`}
+              {constraints.routing === 'emergency-shortest' ? t('dash.corridor') : `${constraints.routing} · ${constraints.traffic} traffic`}
             </p>
             <p class="text-[10px] mt-1 uppercase tracking-wide font-bold">
               Engine: {constraints.engine === 'networkx' ? `NetworkX Dijkstra${constraints.graph_nodes ? ` · ${constraints.graph_nodes} nodes` : ''}` : 'Direct TomTom/OSRM'}
@@ -334,11 +337,11 @@
             <p class="text-[10px] mt-2 font-black" style="background:#FFD23F;color:#111;padding:6px;border:2px solid #111;">{conflictReason}</p>
           {/if}
           {#if assignedUnit}
-            <p class="nb-chip mt-2" style="background:#FFD23F;color:#111;">Assigned {assignedUnit}</p>
+            <p class="nb-chip mt-2" style="background:#FFD23F;color:#111;">{t('dash.assigned', { unit: assignedUnit })}</p>
           {/if}
           {#if candidates.length}
             <div class="mt-3 space-y-1 bg-white text-black p-2" style="border:3px solid #111;">
-              <p class="text-[9px] font-black uppercase tracking-widest text-[#4B4B4B]">Ranked hospitals</p>
+              <p class="text-[9px] font-black uppercase tracking-widest text-[#4B4B4B]">{t('dash.ranked')}</p>
               {#each candidates as c, i}
                 <div class="flex justify-between gap-2 text-[10px] {i === 0 ? 'font-black' : 'text-[#4B4B4B]'}">
                   <span>{i + 1}. {c.name}</span>
@@ -351,34 +354,34 @@
           <div class="flex gap-3">
             <div class="h-11 w-11 shrink-0 bg-white text-black flex items-center justify-center font-black text-xs" style="border:3px solid #111;">—</div>
             <div>
-              <p class="text-sm font-black">Waiting for patient SOS</p>
-              <p class="text-[10px] text-white/85 mt-1">The fastest ambulance and hospital are assigned automatically from traffic.</p>
+              <p class="text-sm font-black">{t('dash.waitingPatient')}</p>
+              <p class="text-[10px] text-white/85 mt-1">{t('dash.waitingPatientHint')}</p>
             </div>
           </div>
         {/if}
       </section>
 
       <section class="flex-1 flex flex-col gap-3 min-h-0">
-        <h3 class="text-[11px] font-black uppercase tracking-widest text-black">Telemetry Stream</h3>
+        <h3 class="text-[11px] font-black uppercase tracking-widest text-black">{t('dash.telemetry')}</h3>
         <div class="space-y-3 overflow-y-auto no-sb flex-1 pr-1">
           <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
             <div class="flex justify-between items-center mb-1">
-              <span class="nb-chip nb-blue" style="color:#fff;">Fleet</span>
-              <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">Live</span>
+              <span class="nb-chip nb-blue" style="color:#fff;">{t('dash.fleet')}</span>
+              <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">{t('dash.live')}</span>
             </div>
-            <p class="text-xs text-black font-semibold mt-1">{ambulances.length} ambulances tracked across Yelahanka.</p>
+            <p class="text-xs text-black font-semibold mt-1">{t('dash.fleetTracked', { count: ambulances.length })}</p>
           </div>
           {#if monitor?.patient}
             <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
               <div class="flex justify-between items-center mb-1">
-                <span class="nb-chip nb-green" style="color:#fff;">Patient</span>
+                <span class="nb-chip nb-green" style="color:#fff;">{t('dash.patient')}</span>
                 <span class="text-[9px] text-[#4B4B4B] font-bold">{monitor.patient.vitals?.heart_rate ?? '—'} bpm</span>
               </div>
-              <p class="text-xs text-black font-semibold mt-1">{monitor.patient.name || 'Unassigned'} · {monitor.patient.address}</p>
+              <p class="text-xs text-black font-semibold mt-1">{monitor.patient.name || t('dash.unassigned')} · {monitor.patient.address}</p>
               <p class="text-[10px] text-[#4B4B4B] mt-1 font-semibold">
                 SpO2 {monitor.patient.vitals?.spo2 ?? '—'}%
-                · Cardiac {monitor.patient.record?.cardiac ? 'yes' : 'no'}
-                · Diabetes {monitor.patient.record?.diabetes ? 'yes' : 'no'}
+                · {t('patient.cardiac')} {monitor.patient.record?.cardiac ? t('dash.yes') : t('dash.no')}
+                · {t('patient.diabetes')} {monitor.patient.record?.diabetes ? t('dash.yes') : t('dash.no')}
               </p>
               {#if monitor.driver}
                 <p class="text-[10px] text-[#FF2D2D] mt-1 font-black">Driver {monitor.driver.id} at {monitor.driver.lat}, {monitor.driver.lng}</p>
@@ -388,8 +391,8 @@
           {#if activeMissions.length}
             <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
               <div class="flex justify-between items-center mb-1">
-                <span class="nb-chip nb-red" style="color:#fff;">Live corridors</span>
-                <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">{activeMissions.length} unit{activeMissions.length === 1 ? '' : 's'}</span>
+                <span class="nb-chip nb-red" style="color:#fff;">{t('dash.liveCorridors')}</span>
+                <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">{activeMissions.length === 1 ? t('dash.unit', { count: activeMissions.length }) : t('dash.units', { count: activeMissions.length })}</span>
               </div>
               {#each activeMissions as m}
                 <button type="button" class="block w-full text-left" onclick={() => selectAmbulance(m.ambulance_id)}>

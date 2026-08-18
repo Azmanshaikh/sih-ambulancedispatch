@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.security import get_current_user, require_roles
-from app.services.fleet import BMSIT, get_ambulances
+from app.services.fleet import BMSIT, get_ambulances, get_hospital
 from app.services.mail import head_staff_emails
 from app.services.otp import issue_otp, list_active_otps, verify_otp
 from app.services.profiles import (
@@ -41,7 +41,11 @@ from app.services.runtime_state import (
     unread_count,
 )
 
-router = APIRouter(prefix="/accounts", tags=["Accounts"])
+def _with_hospital(profile: dict[str, Any]) -> dict[str, Any]:
+    row = dict(profile or {})
+    hospital = get_hospital(row.get("hospital_id"))
+    row["hospital_name"] = (hospital or {}).get("name")
+    return row
 
 
 class RoleRequestBody(BaseModel):
@@ -50,6 +54,7 @@ class RoleRequestBody(BaseModel):
 
 class ChooseRoleBody(BaseModel):
     role: Literal["patient", "driver", "staff"]
+    hospital_id: int | None = None
 
 
 class VerifyOtpBody(BaseModel):
@@ -111,7 +116,7 @@ async def me(user: dict[str, Any] = Depends(get_current_user)):
         "user": {
             "id": user["id"],
             "email": user["email"],
-            **profile,
+            **_with_hospital(profile),
             "needs_onboarding": needs_onboarding,
         },
     }
@@ -126,14 +131,30 @@ async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_c
     if body.role == "patient":
         row = activate_patient(user["id"])
         row["onboarded"] = True
-        return {"status": "success", "user": row, "otp_sent": False}
+        return {"status": "success", "user": _with_hospital(row), "otp_sent": False}
 
-    pending = mark_otp_pending(user["id"], body.role)
-    issued = issue_otp(user["id"], user["email"], pending.get("full_name"), body.role)
+    hospital = None
+    if body.role == "staff":
+        if not body.hospital_id:
+            raise HTTPException(status_code=400, detail="Select the hospital you work at")
+        hospital = get_hospital(body.hospital_id)
+        if not hospital:
+            raise HTTPException(status_code=400, detail="Unknown hospital")
+
+    pending = mark_otp_pending(user["id"], body.role, hospital_id=body.hospital_id if body.role == "staff" else None)
+    issued = issue_otp(
+        user["id"],
+        user["email"],
+        pending.get("full_name"),
+        body.role,
+        hospital_id=(hospital or {}).get("id"),
+        hospital_name=(hospital or {}).get("name"),
+    )
     pending["onboarded"] = False
     emailed_to = issued.get("emailed_to") or head_staff_emails()
     emailed = bool(issued.get("email_sent"))
     dest = ", ".join(emailed_to) if emailed_to else "head staff"
+    hospital_bit = f" at {hospital['name']}" if hospital else ""
     message = (
         f"OTP emailed to {dest}."
         if emailed
@@ -141,11 +162,12 @@ async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_c
     )
     return {
         "status": "success",
-        "user": pending,
+        "user": _with_hospital(pending),
         "otp_sent": True,
         "otp_email_sent": emailed,
         "otp_emailed_to": emailed_to,
-        "message": message,
+        "hospital_name": (hospital or {}).get("name"),
+        "message": message + (f" You selected{hospital_bit}." if hospital_bit else ""),
     }
 
 
@@ -156,12 +178,17 @@ async def confirm_otp(body: VerifyOtpBody, user: dict[str, Any] = Depends(get_cu
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     ambulance_id = None
+    hospital_id = None
     if row["requested_role"] == "driver":
         units = [a for a in get_ambulances() if a.get("status") == "available"]
         ambulance_id = (units[0]["id"] if units else None) or (get_ambulances()[0]["id"] if get_ambulances() else None)
-    profile = activate_verified_role(user["id"], row["requested_role"], ambulance_id)
+    if row["requested_role"] == "staff":
+        hospital_id = row.get("hospital_id") or (user.get("profile") or {}).get("hospital_id")
+        if not get_hospital(hospital_id):
+            raise HTTPException(status_code=400, detail="Select a hospital before verifying OTP")
+    profile = activate_verified_role(user["id"], row["requested_role"], ambulance_id, hospital_id=hospital_id)
     profile["onboarded"] = True
-    return {"status": "success", "user": profile}
+    return {"status": "success", "user": _with_hospital(profile)}
 
 
 @router.get("/otps")
@@ -180,7 +207,7 @@ async def ask_role(body: RoleRequestBody, user: dict[str, Any] = Depends(get_cur
 
 @router.get("/requests")
 async def staff_requests(user: dict[str, Any] = Depends(require_roles("staff"))):
-    return {"status": "success", "requests": list_requests("pending"), "profiles": list_profiles()}
+    return {"status": "success", "requests": list_requests("pending"), "profiles": [_with_hospital(p) for p in list_profiles()]}
 
 
 @router.post("/requests/{request_id}/decide")

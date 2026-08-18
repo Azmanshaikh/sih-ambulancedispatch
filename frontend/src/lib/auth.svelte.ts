@@ -11,6 +11,8 @@ export type Profile = {
   status: string;
   requested_role?: string | null;
   ambulance_id?: string | null;
+  hospital_id?: number | null;
+  hospital_name?: string | null;
   onboarded?: boolean;
   needs_onboarding?: boolean;
 };

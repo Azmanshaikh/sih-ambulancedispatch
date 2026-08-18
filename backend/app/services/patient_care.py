@@ -15,6 +15,7 @@ from app.services.runtime_state import get_vitals, push_alert
 _profiles: dict[str, dict[str, Any]] = {}
 _chats: dict[str, list[dict[str, Any]]] = {}
 _reports: list[dict[str, Any]] = []
+_medical_analyses: dict[str, list[dict[str, Any]]] = {}
 _tavus_owners: dict[str, str] = {}
 _tavus_ingested: set[str] = set()
 _call_intakes: dict[str, dict[str, Any]] = {}
@@ -77,6 +78,77 @@ def save_health_profile(user_id: str, payload: dict[str, Any]) -> dict[str, Any]
     _profiles[user_id] = row
     rest_upsert("patient_health_profiles", row)
     return dict(row)
+
+
+def _uuid_or_none(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        uuid.UUID(str(value))
+        return str(value)
+    except Exception:
+        return None
+
+
+def save_medical_analysis(
+    user_id: str,
+    email: str | None,
+    input_text: str,
+    analysis: str,
+    image_name: str | None = None,
+) -> dict[str, Any]:
+    """Persist an AI report analysis against the signed-in account."""
+    row = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "email": email or "",
+        "input_text": (input_text or "")[:8000],
+        "analysis": analysis or "",
+        "image_name": image_name or "",
+        "created_at": _now(),
+    }
+    bucket = _medical_analyses.setdefault(user_id, [])
+    bucket.append(row)
+    _medical_analyses[user_id] = bucket[-40:]
+    rest_insert(
+        "medical_reports",
+        {
+            "id": row["id"],
+            "user_id": _uuid_or_none(user_id),
+            "email": row["email"] or None,
+            "input_text": row["input_text"],
+            "analysis": row["analysis"],
+            "image_name": row["image_name"] or None,
+            "created_at": row["created_at"],
+        },
+    )
+    try:
+        profile = get_health_profile(user_id)
+        stamp = f"[{row['created_at'][:16]}] AI report analysis"
+        if image_name:
+            stamp += f" ({image_name})"
+        snippet = (analysis or "").strip()[:1200]
+        notes = (profile.get("notes") or "").strip()
+        profile["notes"] = f"{notes}\n\n{stamp}\n{snippet}".strip() if notes else f"{stamp}\n{snippet}"
+        visits = list(profile.get("visits") or [])
+        visits.append({"hospital": "Uploaded report", "when": row["created_at"][:10], "reason": snippet[:240]})
+        profile["visits"] = visits[-20:]
+        save_health_profile(user_id, profile)
+    except Exception as exc:
+        print("health profile stamp skipped:", exc)
+    return row
+
+
+def list_medical_analyses(user_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    rows = rest_select(
+        "medical_reports",
+        {"user_id": f"eq.{user_id}", "select": "*", "order": "created_at.desc", "limit": str(limit)},
+    )
+    if rows:
+        return rows[:limit]
+    mem = list(_medical_analyses.get(user_id) or [])
+    mem.reverse()
+    return mem[:limit]
 
 
 def list_chat(user_id: str, limit: int = 80) -> list[dict[str, Any]]:

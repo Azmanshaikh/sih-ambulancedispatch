@@ -140,6 +140,47 @@ def get_hospitals() -> list[dict[str, Any]]:
     return copy.deepcopy(_hospitals)
 
 
+def hospital_directory() -> list[dict[str, Any]]:
+    return [{"id": h["id"], "name": h["name"]} for h in get_hospitals()]
+
+
+def get_hospital(hospital_id: int | str | None) -> dict[str, Any] | None:
+    if hospital_id is None or hospital_id == "":
+        return None
+    try:
+        hid = int(hospital_id)
+    except (TypeError, ValueError):
+        return None
+    for h in get_hospitals():
+        if int(h["id"]) == hid:
+            return h
+    return None
+
+
+def update_hospital_beds(
+    hospital_id: int,
+    available_beds: int,
+    total_beds: int | None = None,
+) -> dict[str, Any]:
+    if not _hospitals:
+        init_fleet()
+    for h in _hospitals:
+        if int(h["id"]) != int(hospital_id):
+            continue
+        available = int(available_beds)
+        total = int(total_beds) if total_beds is not None else int(h["total_beds"])
+        if available < 0:
+            raise ValueError("Available beds cannot be negative")
+        if total < 1:
+            raise ValueError("Total beds must be at least 1")
+        if available > total:
+            raise ValueError("Available beds cannot exceed total beds")
+        h["available_beds"] = available
+        h["total_beds"] = total
+        return copy.deepcopy(h)
+    raise ValueError("Hospital not found")
+
+
 def get_ambulances() -> list[dict[str, Any]]:
     if not _fleet:
         init_fleet()

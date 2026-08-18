@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, tick } from 'svelte';
   import { apiFetch } from '$lib/auth.svelte';
+  import { t } from '$lib/i18n.svelte';
 
   type Intake = {
     name: string;
@@ -364,14 +365,14 @@
   });
 </script>
 
-<svelte:head><title>JEEVAN — AI video call</title></svelte:head>
+<svelte:head><title>{t('call.pageTitle')}</title></svelte:head>
 
 <div class="h-full flex flex-col">
   {#if conversationUrl}
     <div class="flex items-center justify-between px-4 py-2" style="background:#2E5BFF;border-bottom:4px solid #111;">
-      <p class="nb-chip nb-yellow">Speak your answers · no typing</p>
+      <p class="nb-chip nb-yellow">{t('call.body')}</p>
       <button class="btn btn-primary px-4 py-2" disabled={saving} onclick={endCall}>
-        {saving ? 'Saving transcript…' : 'End call'}
+        {saving ? t('call.saving') : t('map.exit')}
       </button>
     </div>
     <div class="relative flex-1 min-h-0">
@@ -387,16 +388,16 @@
       {/if}
       {#if verifyOpen && verifyLive}
         <aside class="verify-card">
-          <p class="nb-chip nb-yellow mb-2">Please verify</p>
-          <h2 class="text-lg font-black uppercase mb-2">Check this recap</h2>
-          <p class="text-sm font-semibold mb-3">Say yes if this is right, or speak any correction.</p>
+          <p class="nb-chip nb-yellow mb-2">{t('call.verify')}</p>
+          <h2 class="text-lg font-black uppercase mb-2">{t('call.recap')}</h2>
+          <p class="text-sm font-semibold mb-3">{t('call.verifyHint')}</p>
           <dl class="text-sm font-bold space-y-2 mb-4">
-            <div><dt class="text-[10px] uppercase tracking-widest text-[#4B4B4B]">Name</dt><dd>{intake.name || '—'}</dd></div>
-            <div><dt class="text-[10px] uppercase tracking-widest text-[#4B4B4B]">Date of birth</dt><dd>{intake.date_of_birth || '—'}</dd></div>
-            <div><dt class="text-[10px] uppercase tracking-widest text-[#4B4B4B]">Issue</dt><dd>{intake.issue || intake.recap || '—'}</dd></div>
+            <div><dt class="text-[10px] uppercase tracking-widest text-[#4B4B4B]">{t('call.name')}</dt><dd>{intake.name || '—'}</dd></div>
+            <div><dt class="text-[10px] uppercase tracking-widest text-[#4B4B4B]">{t('call.dob')}</dt><dd>{intake.date_of_birth || '—'}</dd></div>
+            <div><dt class="text-[10px] uppercase tracking-widest text-[#4B4B4B]">{t('call.issue')}</dt><dd>{intake.issue || intake.recap || '—'}</dd></div>
           </dl>
           <button class="btn btn-primary w-full" disabled={confirming} onclick={confirmIntake}>
-            {confirming ? 'Saving…' : 'Looks correct'}
+            {confirming ? t('call.saving') : t('call.confirm')}
           </button>
         </aside>
       {/if}
@@ -407,34 +408,33 @@
         <div class="inline-flex items-center justify-center mb-4 bg-white text-black" style="width:64px;height:64px;border:3px solid #111;box-shadow:4px 4px 0 #111;">
           <span class="material-symbols-outlined" style="font-size:36px;">videocam</span>
         </div>
-        <p class="nb-chip nb-yellow mb-3">AI Video Call</p>
-        <h1 class="text-3xl font-black mb-3 uppercase tracking-tight">Talk to JEEVAN</h1>
+        <p class="nb-chip nb-yellow mb-3">{t('call.chip')}</p>
+        <h1 class="text-3xl font-black mb-3 uppercase tracking-tight">{t('call.title')}</h1>
         <p class="text-sm text-white/90 max-w-md mb-6 font-semibold">
-          Allow camera and mic. Speak your name, date of birth, and issue — nothing to type.
-          A verify card appears with the recap when JEEVAN is done collecting details.
+          {t('call.body')}
         </p>
         {#if error}<p class="nb-card p-2 text-xs text-black mb-4 max-w-lg font-bold">{error}</p>{/if}
         {#if savedNote}<p class="nb-card nb-green p-2 text-xs mb-4 font-bold" style="color:#fff;">{savedNote}</p>{/if}
         <button class="btn btn-primary px-10 py-3 w-full" disabled={loading || saving} onclick={startCall}>
-          {loading ? 'Connecting…' : 'Start video call'}
+          {loading ? t('call.connecting') : t('call.start')}
         </button>
       </div>
       {#if verifyOpen && !verifyLive}
         <div class="nb-card nb-yellow p-6 max-w-md w-full mt-6 text-left">
-          <p class="nb-chip mb-3">Please verify</p>
-          <h2 class="text-xl font-black uppercase mb-2">Call recap</h2>
-          <p class="text-xs font-semibold mb-4">Check what was spoken. Confirm to save it for your hospital trip report.</p>
-          <label class="block text-[10px] font-black uppercase tracking-widest mb-1">Name</label>
-          <input class="nb-input mb-3" bind:value={intake.name} placeholder="Spoken name" />
-          <label class="block text-[10px] font-black uppercase tracking-widest mb-1">Date of birth</label>
-          <input class="nb-input mb-3" bind:value={intake.date_of_birth} placeholder="Spoken date of birth" />
-          <label class="block text-[10px] font-black uppercase tracking-widest mb-1">Issue</label>
-          <input class="nb-input mb-3" bind:value={intake.issue} placeholder="Spoken health issue" />
+          <p class="nb-chip mb-3">{t('call.verify')}</p>
+          <h2 class="text-xl font-black uppercase mb-2">{t('call.recap')}</h2>
+          <p class="text-xs font-semibold mb-4">{t('call.verifyHint')}</p>
+          <label class="block text-[10px] font-black uppercase tracking-widest mb-1">{t('call.name')}</label>
+          <input class="nb-input mb-3" bind:value={intake.name} placeholder={t('call.spokenName')} />
+          <label class="block text-[10px] font-black uppercase tracking-widest mb-1">{t('call.dob')}</label>
+          <input class="nb-input mb-3" bind:value={intake.date_of_birth} placeholder={t('call.spokenDob')} />
+          <label class="block text-[10px] font-black uppercase tracking-widest mb-1">{t('call.issue')}</label>
+          <input class="nb-input mb-3" bind:value={intake.issue} placeholder={t('call.spokenIssue')} />
           {#if intake.recap}
             <p class="text-sm font-semibold mb-4 whitespace-pre-wrap">{intake.recap}</p>
           {/if}
           <button class="btn btn-primary w-full" disabled={confirming} onclick={confirmIntake}>
-            {confirming ? 'Saving…' : 'Confirm details'}
+            {confirming ? t('call.saving') : t('call.confirm')}
           </button>
         </div>
       {/if}

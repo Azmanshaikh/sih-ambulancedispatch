@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { apiFetch } from '$lib/auth.svelte';
+  import { t } from '$lib/i18n.svelte';
 
   let messages = $state<{ role: string; content: string }[]>([]);
   let draft = $state('');
@@ -40,20 +41,20 @@
   onMount(loadHistory);
 </script>
 
-<svelte:head><title>JEEVAN — AI Chat</title></svelte:head>
+<svelte:head><title>{t('chat.pageTitle')}</title></svelte:head>
 
 <div class="h-full flex flex-col p-4">
   <div class="max-w-3xl mx-auto w-full flex flex-col h-full">
     <div class="nb-card nb-yellow p-4 mb-3 flex items-center gap-3">
       <span class="material-symbols-outlined" style="font-size:32px;">forum</span>
       <div>
-        <h1 class="text-xl font-black uppercase tracking-tight leading-none">AI Chatbot</h1>
-        <p class="text-[11px] text-black font-semibold mt-1">Ask about everyday issues. Not a doctor. Chats are saved for your trip report. Use SOS if in danger.</p>
+        <h1 class="text-xl font-black uppercase tracking-tight leading-none">{t('chat.title')}</h1>
+        <p class="text-[11px] text-black font-semibold mt-1">{t('chat.subtitle')}</p>
       </div>
     </div>
     <div class="flex-1 overflow-y-auto no-sb nb-card p-4 space-y-3">
       {#if messages.length === 0}
-        <p class="text-sm text-[#4B4B4B] font-semibold">Try: “I have a mild headache after work” or “What should I eat when I have a fever?”</p>
+        <p class="text-sm text-[#4B4B4B] font-semibold">{t('chat.empty')}</p>
       {/if}
       {#each messages as m}
         <div class="text-sm {m.role === 'user' ? 'text-right' : ''}">
@@ -66,10 +67,10 @@
       <input
         class="nb-input flex-1"
         bind:value={draft}
-        placeholder="Describe an everyday issue…"
+        placeholder={t('chat.placeholder')}
         disabled={sending}
       />
-      <button class="btn btn-primary px-5" disabled={sending}>{sending ? '…' : 'Send'}</button>
+      <button class="btn btn-primary px-5" disabled={sending}>{sending ? '…' : t('chat.send')}</button>
     </form>
   </div>
 </div>

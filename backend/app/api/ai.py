@@ -11,7 +11,9 @@ from app.services.patient_care import (
     end_tavus_conversation,
     ingest_tavus_transcript,
     list_chat,
+    list_medical_analyses,
     nemotron_chat,
+    save_medical_analysis,
     start_tavus_conversation,
 )
 
@@ -123,11 +125,17 @@ async def tavus_webhook(payload: dict[str, Any]):
     return {"status": "ignored"}
 
 
+@router.get("/reports")
+async def my_report_analyses(user: dict[str, Any] = Depends(get_current_user)):
+    rows = list_medical_analyses(user["id"])
+    return {"status": "success", "reports": rows}
+
+
 @router.post("/analyze-report")
 async def analyze_report(
     text: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
-    _user: dict[str, Any] = Depends(get_current_user),
+    user: dict[str, Any] = Depends(get_current_user),
 ):
     if not settings.NVIDIA_API_KEY:
         raise HTTPException(status_code=500, detail="NVIDIA_API_KEY not configured in .env")
@@ -142,8 +150,10 @@ async def analyze_report(
 
     try:
         async with httpx.AsyncClient() as client:
+            image_name = ""
             if image:
                 contents = await image.read()
+                image_name = image.filename or "report.jpg"
                 base64_img = base64.b64encode(contents).decode("utf-8")
                 mime_type = image.content_type or "image/jpeg"
                 data_url = f"data:{mime_type};base64,{base64_img}"
@@ -190,10 +200,24 @@ async def analyze_report(
 
             if "choices" in result and len(result["choices"]) > 0:
                 content = result["choices"][0]["message"]["content"]
-                return {"status": "success", "analysis": content}
+                saved = save_medical_analysis(
+                    user["id"],
+                    user.get("email") or (user.get("profile") or {}).get("email"),
+                    (text or "").strip(),
+                    content,
+                    image_name,
+                )
+                return {
+                    "status": "success",
+                    "analysis": content,
+                    "saved": True,
+                    "report_id": saved.get("id"),
+                }
             else:
                 return {"status": "error", "message": "Unexpected response from AI provider"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("Analyze report exception:", e)
         raise HTTPException(status_code=500, detail=str(e))

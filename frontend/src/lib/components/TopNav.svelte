@@ -2,6 +2,8 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { auth, signOut } from '$lib/auth.svelte';
+  import { roleLabel, t } from '$lib/i18n.svelte';
+  import LanguageSettings from '$lib/components/LanguageSettings.svelte';
 
   interface Props {
     gpsStatus?: string;
@@ -10,16 +12,16 @@
   let { gpsStatus = 'Acquiring GPS…' }: Props = $props();
 
   const ALL_ITEMS = [
-    { to: '/',                  icon: 'emergency_recording', label: 'Dispatch',      roles: ['staff'] },
-    { to: '/request',           icon: 'add_call',            label: 'New Request',   roles: ['staff'] },
-    { to: '/navigation',        icon: 'map',                 label: 'Navigation',    roles: ['staff'] },
-    { to: '/notifications',     icon: 'notifications',       label: 'Notifications', roles: ['staff'] },
-    { to: '/staff/approvals',   icon: 'verified_user',       label: 'OTP codes',     roles: ['staff'] },
-    { to: '/patient',           icon: 'sos',                 label: 'SOS',           roles: ['patient'] },
-    { to: '/ai-guide',          icon: 'psychology',          label: 'AI chat',       roles: ['patient'] },
-    { to: '/ai-call',           icon: 'videocam',            label: 'AI call',       roles: ['patient'] },
-    { to: '/driver',            icon: 'map',                 label: 'Map',           roles: ['driver'] },
-    { to: '/hospitals',         icon: 'local_hospital',      label: 'Hospitals',     roles: ['staff', 'driver'] },
+    { to: '/',                  icon: 'emergency_recording', labelKey: 'nav.dispatch' as const,      roles: ['staff'] },
+    { to: '/request',           icon: 'add_call',            labelKey: 'nav.request' as const,       roles: ['staff'] },
+    { to: '/navigation',        icon: 'map',                 labelKey: 'nav.navigation' as const,    roles: ['staff'] },
+    { to: '/notifications',     icon: 'notifications',       labelKey: 'nav.notifications' as const, roles: ['staff'] },
+    { to: '/staff/approvals',   icon: 'verified_user',       labelKey: 'nav.otpCodes' as const,      roles: ['staff'] },
+    { to: '/patient',           icon: 'sos',                 labelKey: 'nav.sos' as const,           roles: ['patient'] },
+    { to: '/ai-guide',          icon: 'psychology',          labelKey: 'nav.aiChat' as const,        roles: ['patient'] },
+    { to: '/ai-call',           icon: 'videocam',            labelKey: 'nav.aiCall' as const,        roles: ['patient'] },
+    { to: '/driver',            icon: 'map',                 labelKey: 'nav.map' as const,           roles: ['driver'] },
+    { to: '/hospitals',         icon: 'local_hospital',      labelKey: 'nav.hospitals' as const,     roles: ['staff', 'driver'] },
   ];
 
   let navItems = $derived(ALL_ITEMS.filter((i) => i.roles.includes(auth.profile?.role || 'patient')));
@@ -50,7 +52,7 @@
       </div>
       <div style="display: flex; flex-direction: column; line-height: 1.05;">
         <span style="font-family: 'Orbitron', sans-serif; font-size: 17px; font-weight: 900; color: #111; letter-spacing: 0.22em; text-transform: uppercase;">JEEVAN</span>
-        <span style="font-family: 'Share Tech Mono', monospace; font-size: 7px; font-weight: 400; color: #4B4B4B; letter-spacing: 0.12em; text-transform: uppercase;">Precision EMS · AI Dispatch</span>
+        <span style="font-family: 'Share Tech Mono', monospace; font-size: 7px; font-weight: 400; color: #4B4B4B; letter-spacing: 0.12em; text-transform: uppercase;">{t('nav.tagline')}</span>
       </div>
     </div>
 
@@ -68,9 +70,10 @@
 
       {#if auth.profile}
         <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #111;" class="hidden sm:inline">
-          {auth.profile.full_name || auth.profile.email} · {auth.profile.role}
+          {auth.profile.full_name || auth.profile.email} · {roleLabel(auth.profile.role)}{auth.profile.hospital_name ? ` · ${auth.profile.hospital_name}` : ''}
         </span>
-        <button class="btn btn-ghost" style="padding: 6px 10px; font-size: 10px; box-shadow: 3px 3px 0 #111;" onclick={handleLogout}>Logout</button>
+        <LanguageSettings compact />
+        <button class="btn btn-ghost" style="padding: 6px 10px; font-size: 10px; box-shadow: 3px 3px 0 #111;" onclick={handleLogout}>{t('nav.logout')}</button>
       {/if}
     </div>
   </div>
@@ -98,7 +101,7 @@
           letter-spacing: 0.14em;
           text-transform: uppercase;
           line-height: 1.2;
-        ">{item.label}</span>
+        ">{t(item.labelKey)}</span>
       </a>
     {/each}
   </nav>

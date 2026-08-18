@@ -3,6 +3,7 @@
   import MapWidget from '$lib/components/MapWidget.svelte';
   import { apiFetch } from '$lib/auth.svelte';
   import { postToMarker } from '$lib/officers';
+  import { t } from '$lib/i18n.svelte';
 
   let alerts = $state<any[]>([]);
   let monitor = $state<any>(null);
@@ -15,14 +16,14 @@
   let corridor = $state<any>(null);
 
   function flagList(rec: any) {
-    if (!rec) return 'None noted';
+    if (!rec) return t('notif.noneFlags');
     const flags = [];
-    if (rec.cardiac) flags.push('Cardiac');
-    if (rec.diabetes) flags.push('Diabetes');
-    if (rec.epilepsy) flags.push('Epilepsy');
-    if (rec.pregnant) flags.push('Pregnant');
+    if (rec.cardiac) flags.push(t('patient.cardiac'));
+    if (rec.diabetes) flags.push(t('patient.diabetes'));
+    if (rec.epilepsy) flags.push(t('patient.epilepsy'));
+    if (rec.pregnant) flags.push(t('patient.pregnant'));
     if (rec.notes) flags.push(rec.notes);
-    return flags.length ? flags.join(', ') : 'None noted';
+    return flags.length ? flags.join(', ') : t('notif.noneFlags');
   }
 
   async function load() {
@@ -102,7 +103,7 @@
   );
 </script>
 
-<svelte:head><title>JEEVAN — Notifications</title></svelte:head>
+<svelte:head><title>{t('notif.pageTitle')}</title></svelte:head>
 
 <div class="flex-col h-full overflow-y-auto no-sb">
   <div class="p-5 grid grid-cols-12 gap-5 content-start">
@@ -113,26 +114,26 @@
         <div class="absolute top-3 left-3 glass px-3 py-1.5 z-10">
           <div class="flex items-center gap-2">
             <div class="w-2.5 h-2.5 bg-[#FF2D2D] blink" style="border:2px solid #111;"></div>
-            <span class="text-[10px] font-black tracking-widest uppercase text-black">{unread.length ? 'ALERT' : 'STANDBY'}</span>
+            <span class="text-[10px] font-black tracking-widest uppercase text-black">{unread.length ? t('notif.alert') : t('notif.standby')}</span>
           </div>
         </div>
       </div>
 
       <div class="nb-card p-5">
         <div class="flex justify-between items-end mb-4">
-          <h3 class="text-xs font-black uppercase tracking-[0.2em] text-[#4B4B4B]">Staff alerts</h3>
+          <h3 class="text-xs font-black uppercase tracking-[0.2em] text-[#4B4B4B]">{t('notif.staffAlerts')}</h3>
           <span class="text-2xl font-black text-black">{String(unread.length).padStart(2, '0')}</span>
         </div>
         <div class="space-y-3 max-h-64 overflow-y-auto no-sb">
           {#if alerts.length === 0}
-            <p class="text-xs text-[#4B4B4B] font-semibold">No incoming emergency units.</p>
+            <p class="text-xs text-[#4B4B4B] font-semibold">{t('notif.none')}</p>
           {:else}
             {#each alerts as a}
               <div class="p-3 bg-[#FFF3E6] {a.read ? 'opacity-60' : ''}" style="border:3px solid #111;">
                 <p class="nb-chip nb-red" style="color:#fff;">{a.title}</p>
                 <p class="text-xs text-black mt-2 font-semibold">{a.body}</p>
                 {#if !a.read}
-                  <button class="btn btn-primary mt-2 text-[10px]" style="padding:6px 12px;" onclick={() => ack(a.id)}>Acknowledge</button>
+                  <button class="btn btn-primary mt-2 text-[10px]" style="padding:6px 12px;" onclick={() => ack(a.id)}>{t('notif.acknowledge')}</button>
                 {/if}
               </div>
             {/each}
@@ -142,12 +143,12 @@
 
       <div class="nb-card p-5">
         <div class="flex justify-between items-end mb-4">
-          <h3 class="text-xs font-black uppercase tracking-[0.2em] text-[#4B4B4B]">Corridor SMS</h3>
+          <h3 class="text-xs font-black uppercase tracking-[0.2em] text-[#4B4B4B]">{t('notif.sms')}</h3>
           <span class="text-2xl font-black text-black">{String((corridor?.sms || []).length).padStart(2, '0')}</span>
         </div>
         <div class="space-y-3 max-h-64 overflow-y-auto no-sb">
           {#if !(corridor?.sms || []).length}
-            <p class="text-xs text-[#4B4B4B] font-semibold">Police and rescue posts along the route are texted ~3 minutes before the unit arrives.</p>
+            <p class="text-xs text-[#4B4B4B] font-semibold">{t('notif.smsHint')}</p>
           {:else}
             {#each corridor.sms as s}
               <div class="p-3 bg-[#FFF3E6]" style="border:3px solid #111;">
@@ -167,48 +168,49 @@
         {#if latest}
           <div class="flex items-center gap-3 mb-1">
             <span class="material-symbols-outlined">emergency</span>
-            <h2 class="text-xl font-black tracking-tight uppercase">Patient en route</h2>
+            <h2 class="text-xl font-black tracking-tight uppercase">{t('notif.enRoute')}</h2>
           </div>
           <p class="text-white/90 text-sm mt-2 font-semibold">
-            {latest.patient_name || monitor?.patient?.name || 'Patient'}
-            is going to
-            <strong>{latest.hospital_name || monitor?.mission?.hospital_name || 'hospital'}</strong>
+            {t('notif.goingTo', {
+              name: latest.patient_name || monitor?.patient?.name || t('dash.patient'),
+              hospital: latest.hospital_name || monitor?.mission?.hospital_name || t('patient.hospital'),
+            })}
           </p>
           {#if monitor?.mission?.conflict?.reason}
             <p class="text-[11px] text-white mt-3 font-black" style="background:#111;padding:8px;">{monitor.mission.conflict.reason}</p>
           {/if}
           {#if monitor?.mission && monitor.mission.phase !== 'complete'}
-            <button class="btn btn-secondary mt-4 w-full" onclick={endTrip}>End trip / Trip complete</button>
-            <p class="text-[10px] text-white/80 mt-2 uppercase tracking-widest font-bold">Auto-completes at hospital if you skip this</p>
+            <button class="btn btn-secondary mt-4 w-full" onclick={endTrip}>{t('notif.endTrip')}</button>
+            <p class="text-[10px] text-white/80 mt-2 uppercase tracking-widest font-bold">{t('notif.autoComplete')}</p>
           {/if}
         {:else}
-          <h2 class="text-2xl font-black tracking-tight uppercase">Awaiting dispatch</h2>
-          <p class="text-white/80 font-bold tracking-wide uppercase text-xs mt-1">Alerts appear when a patient requests an ambulance</p>
+          <h2 class="text-2xl font-black tracking-tight uppercase">{t('notif.awaiting')}</h2>
+          <p class="text-white/80 font-bold tracking-wide uppercase text-xs mt-1">{t('notif.awaitingHint')}</p>
         {/if}
       </div>
 
       <div class="nb-card p-5">
-        <h3 class="nb-chip nb-blue mb-3" style="color:#fff;">Patient details</h3>
+        <h3 class="nb-chip nb-blue mb-3" style="color:#fff;">{t('notif.patientDetails')}</h3>
         {#if monitor?.patient?.name || monitor?.patient?.email}
           <p class="text-lg font-black text-black">{monitor.patient.name || '—'}</p>
-          <p class="text-xs text-[#4B4B4B] font-semibold">{monitor.patient.email || 'no email'}</p>
+          <p class="text-xs text-[#4B4B4B] font-semibold">{monitor.patient.email || t('notif.noEmail')}</p>
           <p class="text-xs text-black mt-3 font-semibold">HR {monitor.patient.vitals?.heart_rate ?? '—'} bpm · SpO2 {monitor.patient.vitals?.spo2 ?? '—'}%</p>
-          <p class="text-xs text-[#4B4B4B] mt-1 font-semibold">Current: {flagList(monitor.patient.record)}</p>
+          <p class="text-xs text-[#4B4B4B] mt-1 font-semibold">{t('notif.current', { flags: flagList(monitor.patient.record) })}</p>
           {#if monitor.health_profile}
-            <p class="text-xs text-black mt-3 font-semibold">Allergies: {monitor.health_profile.allergies || 'none noted'}</p>
-            <p class="text-xs text-black font-semibold">Medicines: {monitor.health_profile.medicines || 'none noted'}</p>
+            <p class="text-xs text-black mt-3 font-semibold">{t('patient.allergies')}: {monitor.health_profile.allergies || t('notif.noneNoted')}</p>
+            <p class="text-xs text-black font-semibold">{t('patient.medicines')}: {monitor.health_profile.medicines || t('notif.noneNoted')}</p>
           {/if}
         {:else}
-          <p class="text-sm text-[#4B4B4B] font-semibold">No active patient.</p>
+          <p class="text-sm text-[#4B4B4B] font-semibold">{t('notif.noPatient')}</p>
         {/if}
       </div>
     </div>
 
     <div class="col-span-12 lg:col-span-3 flex flex-col gap-4">
       <div class="nb-card p-5">
-        <h3 class="nb-chip nb-red mb-3" style="color:#fff;">Trip reports</h3>
+        <h3 class="nb-chip nb-red mb-3" style="color:#fff;">{t('notif.tripReports')}</h3>
         {#if reports.length === 0}
-          <p class="text-xs text-[#4B4B4B] mb-4 font-semibold">Reports appear when a driver ends a trip.</p>
+          <p class="text-xs text-[#4B4B4B] mb-4 font-semibold">{t('notif.reportsHint')}</p>
         {:else}
           <div class="space-y-3 max-h-64 overflow-y-auto no-sb mb-4">
             {#each reports as r}
@@ -219,9 +221,9 @@
             {/each}
           </div>
         {/if}
-        <h3 class="nb-chip nb-yellow mb-3">Stored cases</h3>
+        <h3 class="nb-chip nb-yellow mb-3">{t('notif.stored')}</h3>
         {#if cases.length === 0}
-          <p class="text-xs text-[#4B4B4B] mb-4 font-semibold">No saved dispatches yet.</p>
+          <p class="text-xs text-[#4B4B4B] mb-4 font-semibold">{t('notif.noCases')}</p>
         {:else}
           <div class="space-y-2 max-h-40 overflow-y-auto no-sb mb-4">
             {#each cases as c}
@@ -233,9 +235,9 @@
             {/each}
           </div>
         {/if}
-        <h3 class="nb-chip mb-3">Past records</h3>
+        <h3 class="nb-chip mb-3">{t('notif.past')}</h3>
         {#if history.length === 0}
-          <p class="text-xs text-[#4B4B4B] font-semibold">No prior records.</p>
+          <p class="text-xs text-[#4B4B4B] font-semibold">{t('notif.noRecords')}</p>
         {:else}
           <div class="space-y-2 max-h-80 overflow-y-auto no-sb">
             {#each history.slice().reverse() as h}

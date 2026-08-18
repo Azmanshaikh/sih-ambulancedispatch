@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { t } from '$lib/i18n.svelte';
 
   interface MapMarker {
     position: [number, number];
@@ -73,6 +74,8 @@
   let navMode = $state(false);
   let heading = $state(0);
   let headingSmoothed = 0;
+  /** Screen Y of the vehicle / map yaw pivot (0–1). Must match --nav-pivot. */
+  const NAV_PIVOT = 0.68;
   let navHint = $state({
     icon: 'navigation',
     dist: '',
@@ -81,6 +84,25 @@
     eta: '',
     arrive: '',
   });
+
+  function cardinal(deg: number) {
+    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const n = ((deg % 360) + 360) % 360;
+    return dirs[Math.round(n / 45) % 8];
+  }
+
+  /** Bearing to a point ~look-ahead meters along the remaining path. */
+  function headingAlong(path: [number, number][]) {
+    if (!path || path.length < 2) return ((headingSmoothed % 360) + 360) % 360;
+    const lookAhead = 40;
+    let acc = 0;
+    let i = 0;
+    for (; i < path.length - 1; i++) {
+      acc += meters(path[i], path[i + 1]);
+      if (acc >= lookAhead) break;
+    }
+    return bearingDeg(path[0], path[Math.min(i + 1, path.length - 1)]);
+  }
 
   const HOSPITAL_SVG = `
     <div class="hosp-building">
@@ -239,16 +261,16 @@
     let d = target - headingSmoothed;
     while (d > 180) d -= 360;
     while (d < -180) d += 360;
-    headingSmoothed = (headingSmoothed + d * 0.42 + 360) % 360;
+    headingSmoothed += d;
     heading = headingSmoothed;
   }
 
   function guidance(path: [number, number][], dest: string) {
     if (!path || path.length < 2) {
-      return { icon: 'navigation', dist: '', text: 'Waiting for route', remain: '', heading: headingSmoothed };
+      return { icon: 'navigation', dist: '', text: 'Waiting for route', remain: '', heading: headingAlong(path) };
     }
     const remainM = pathLength(path);
-    const startBear = bearingDeg(path[0], path[Math.min(2, path.length - 1)]);
+    const startBear = headingAlong(path);
     let toTurn = 0;
     for (let i = 0; i < path.length - 1; i++) {
       toTurn += meters(path[i], path[i + 1]);
@@ -324,8 +346,9 @@
     if (!map || !L) return;
     const z = 17;
     const p = map.project(L.latLng(latlng[0], latlng[1]), z);
-    p.y += map.getSize().y * 0.18;
-    map.setView(map.unproject(p, z), z, { animate: true, duration: 0.7 });
+    // Place the unit at NAV_PIVOT (below screen center) so the road stays under the vehicle.
+    p.y -= map.getSize().y * (NAV_PIVOT - 0.5);
+    map.setView(map.unproject(p, z), z, { animate: true, duration: 0.45 });
   }
 
   function updateHint(drive: ReturnType<typeof clipRoutes>) {
@@ -589,11 +612,37 @@
   );
 </script>
 
-<div class="map-wrap {clazz}" class:is-nav={navMode} style="width: 100%; height: 100%; position: relative;">
+<div
+  class="map-wrap {clazz}"
+  class:is-nav={navMode}
+  style="width: 100%; height: 100%; position: relative; --nav-pivot: {NAV_PIVOT * 100}%;"
+>
   <div class="nav-stage">
     <div class="nav-yaw" style={navMode ? `transform: rotate(${-heading}deg)` : ''}>
       <div bind:this={mapElement} {id} style="width: 100%; height: 100%; border-radius: inherit; z-index: 0;"></div>
     </div>
+    {#if navMode}
+      <div class="nav-vehicle" aria-hidden="true">
+        <svg class="nav-beam" viewBox="0 0 80 90" width="86" height="96">
+          <polygon points="40,78 8,2 72,2" fill="#1a73e8" opacity="0.28" />
+        </svg>
+        <svg class="nav-amb" viewBox="0 0 72 96" width="52" height="70">
+          <ellipse cx="36" cy="82" rx="18" ry="7" fill="#000" opacity="0.32" />
+          <rect x="16" y="40" width="6" height="13" rx="2" fill="#111" />
+          <rect x="50" y="40" width="6" height="13" rx="2" fill="#111" />
+          <rect x="16" y="64" width="6" height="13" rx="2" fill="#111" />
+          <rect x="50" y="64" width="6" height="13" rx="2" fill="#111" />
+          <rect x="20" y="34" width="32" height="48" rx="8" fill="#f8fafc" stroke="#111" stroke-width="2.4" />
+          <path d="M24 38h24v11c0 2.2-1.8 4-4 4H28c-2.2 0-4-1.8-4-4V38Z" fill="#1e3a5f" />
+          <rect x="26" y="35.5" width="10" height="3.4" rx="1" fill="#dc2626" />
+          <rect x="36" y="35.5" width="10" height="3.4" rx="1" fill="#2563eb" />
+          <rect x="20" y="56" width="32" height="7" fill="#dc2626" />
+          <rect x="33.5" y="65" width="5" height="12" fill="#dc2626" />
+          <rect x="30" y="68.2" width="12" height="5" fill="#dc2626" />
+          <rect x="24" y="74" width="24" height="5" rx="1.4" fill="#334155" />
+        </svg>
+      </div>
+    {/if}
   </div>
 
   {#if navMode}
@@ -605,35 +654,37 @@
         <p class="nav-text">{navHint.text}</p>
       </div>
     </div>
-    <div class="nav-chevron" aria-hidden="true">
-      <svg viewBox="0 0 64 64" width="54" height="54">
-        <path d="M32 6 L56 54 L32 42 L8 54 Z" fill="#1a73e8" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
-      </svg>
+    <div class="nav-compass" title="Heading {cardinal(heading)}">
+      <div class="nav-compass-disc" style="transform: rotate({-heading}deg)">
+        <span class="nav-compass-n">N</span>
+        <span class="nav-compass-needle"></span>
+      </div>
+      <span class="nav-compass-label">{cardinal(heading)}</span>
     </div>
     <div class="nav-sheet">
       <div class="nav-stat">
         <strong>{navHint.eta || '—'}</strong>
-        <span>ETA</span>
+        <span>{t('map.eta')}</span>
       </div>
       <div class="nav-stat">
         <strong>{navHint.remain || '—'}</strong>
-        <span>Left</span>
+        <span>{t('map.left')}</span>
       </div>
       <div class="nav-stat">
         <strong>{navHint.arrive || '—'}</strong>
-        <span>Arrive</span>
+        <span>{t('map.arrive')}</span>
       </div>
-      <button type="button" class="nav-exit" onclick={stopNav}>Exit</button>
+      <button type="button" class="nav-exit" onclick={stopNav}>{t('map.exit')}</button>
     </div>
   {/if}
 
   {#if showLegend && !navMode && ((pickupRoute && pickupRoute.length > 1) || (dropRoute && dropRoute.length > 1) || (route && route.length > 1) || extraRoutes.length)}
     <div class="absolute bottom-3 left-3 z-[500] px-3 py-2 text-[10px] font-black uppercase tracking-widest" style="background:#fff;color:#111;border:3px solid #111;box-shadow:3px 3px 0 #111;">
-      <p><span style="color:#FF2D2D">━</span> Ambulance → patient</p>
-      <p><span style="color:#2E5BFF">━</span> Patient → hospital</p>
-      <p><span style="color:#38bdf8">━</span> Other active corridor</p>
-      <p><span style="color:#f59e0b">━</span> Shared / conflict</p>
-      <p><span style="color:#a855f7">━</span> Rerouted unit</p>
+      <p><span style="color:#FF2D2D">━</span> {t('map.ambPatient')}</p>
+      <p><span style="color:#2E5BFF">━</span> {t('map.patientHospital')}</p>
+      <p><span style="color:#38bdf8">━</span> {t('map.otherCorridor')}</p>
+      <p><span style="color:#f59e0b">━</span> {t('map.shared')}</p>
+      <p><span style="color:#a855f7">━</span> {t('map.rerouted')}</p>
     </div>
   {/if}
 
@@ -643,10 +694,10 @@
       class="nav-go"
       class:ready={hasRoute}
       onclick={toggleNav}
-      aria-label="Start in-drive navigation"
+      aria-label={t('map.drive')}
     >
       <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">navigation</span>
-      <span>Drive</span>
+      <span>{t('map.drive')}</span>
     </button>
   {/if}
 </div>
@@ -659,15 +710,19 @@
   .nav-yaw {
     width: 100%;
     height: 100%;
-    transform-origin: 50% 68%;
+    transform-origin: 50% var(--nav-pivot, 68%);
+  }
+  .nav-stage {
+    position: relative;
   }
   .is-nav .nav-stage {
-    transform: perspective(920px) rotateX(54deg) scale(1.42);
-    transform-origin: 50% 88%;
+    transform: perspective(1100px) rotateX(42deg) scale(1.28);
+    transform-origin: 50% 86%;
     will-change: transform;
+    z-index: 1;
   }
   .is-nav .nav-yaw {
-    transition: transform 0.7s ease-out;
+    transition: transform 0.45s ease-out;
     will-change: transform;
   }
   .is-nav :global(.leaflet-container) {
@@ -676,9 +731,9 @@
   .nav-sky {
     pointer-events: none;
     position: absolute;
-    inset: 0 0 42%;
+    inset: 0 0 58%;
     z-index: 420;
-    background: linear-gradient(180deg, rgba(135, 186, 230, 0.55), transparent);
+    background: linear-gradient(180deg, rgba(135, 186, 230, 0.5), transparent);
   }
   .nav-banner {
     position: absolute;
@@ -716,14 +771,83 @@
     opacity: 0.92;
     margin-top: 2px;
   }
-  .nav-chevron {
+  .nav-vehicle {
     position: absolute;
     left: 50%;
-    top: 66%;
+    top: var(--nav-pivot, 68%);
     z-index: 610;
-    transform: translate(-50%, -40%);
-    filter: drop-shadow(2px 3px 0 #111);
+    width: 86px;
+    height: 96px;
+    transform: translate(-50%, -58%);
     pointer-events: none;
+    filter: drop-shadow(0 3px 0 #111);
+  }
+  .nav-beam {
+    position: absolute;
+    left: 50%;
+    bottom: 28px;
+    transform: translateX(-50%);
+    mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
+  }
+  .nav-amb {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+  }
+  .nav-compass {
+    position: absolute;
+    top: 86px;
+    right: 12px;
+    z-index: 620;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+  }
+  .nav-compass-disc {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid #111;
+    box-shadow: 3px 3px 0 #111;
+    position: relative;
+    transition: transform 0.45s ease-out;
+  }
+  .nav-compass-n {
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    color: #dc2626;
+    line-height: 1;
+  }
+  .nav-compass-needle {
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 14px solid #dc2626;
+    transform: translateX(-50%);
+  }
+  .nav-compass-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #111;
+    background: #fff;
+    border: 2px solid #111;
+    padding: 1px 6px;
+    box-shadow: 2px 2px 0 #111;
   }
   .nav-sheet {
     position: absolute;

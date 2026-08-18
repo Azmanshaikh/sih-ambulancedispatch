@@ -3,6 +3,7 @@
   import MapWidget from '$lib/components/MapWidget.svelte';
   import { apiFetch } from '$lib/auth.svelte';
   import { postToMarker } from '$lib/officers';
+  import { t } from '$lib/i18n.svelte';
 
   const BMSIT: [number, number] = [13.1344, 77.5693];
 
@@ -131,7 +132,7 @@
   });
 </script>
 
-<svelte:head><title>JEEVAN — Navigation</title></svelte:head>
+<svelte:head><title>{t('navPage.pageTitle')}</title></svelte:head>
 
 <div class="h-full flex flex-col">
   <div class="flex-1 relative map-wrap rounded-none">
@@ -152,27 +153,27 @@
 
     <div class="absolute top-5 left-5 space-y-3 z-10 pointer-events-none max-w-[calc(100%-2.5rem)]">
       <div class="glass p-5 w-80 max-w-full pointer-events-auto">
-        <p class="nb-chip nb-red mb-2" style="color:#fff;">{selected ? (selected.phase === 'drop' ? 'To hospital' : 'To pickup') : 'Standby'}</p>
+        <p class="nb-chip nb-red mb-2" style="color:#fff;">{selected ? (selected.phase === 'drop' ? t('navPage.toHospital') : t('navPage.toPickup')) : t('navPage.standby')}</p>
         <h2 class="text-xl font-black text-black mb-4 uppercase">
-          {selected ? (selected.hospital_name || selected.hospital?.name || 'Active mission') : 'No active mission'}
+          {selected ? (selected.hospital_name || selected.hospital?.name || t('navPage.activeMission')) : t('navPage.noMission')}
         </h2>
         <div class="flex justify-between mb-1">
-          <span class="text-xs text-[#4B4B4B] font-bold uppercase">ETA</span>
+          <span class="text-xs text-[#4B4B4B] font-bold uppercase">{t('navPage.eta')}</span>
           <span class="text-2xl font-black text-black">{etaLabel || '—'}</span>
         </div>
         <div class="flex justify-between mb-2">
-          <span class="text-xs text-[#4B4B4B] font-bold uppercase">Unit</span>
+          <span class="text-xs text-[#4B4B4B] font-bold uppercase">{t('navPage.unit')}</span>
           <span class="text-sm font-black text-black">{selected?.ambulance_id || '—'}</span>
         </div>
         {#if selected?.patient_name}
-          <p class="text-xs text-black font-semibold mb-3">Patient {selected.patient_name}</p>
+          <p class="text-xs text-black font-semibold mb-3">{t('navPage.patient', { name: selected.patient_name })}</p>
         {/if}
-        <p class="text-[10px] text-[#4B4B4B] font-semibold">Tap an ambulance icon to drive that dispatch. Tap 👮 to call the duty officer.</p>
+        <p class="text-[10px] text-[#4B4B4B] font-semibold">{t('navPage.hint')}</p>
       </div>
 
       {#if activeMissions.length}
         <div class="glass p-3 w-80 max-w-full pointer-events-auto">
-          <p class="text-[10px] font-black uppercase tracking-widest text-[#4B4B4B] mb-2">Live dispatches</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[#4B4B4B] mb-2">{t('navPage.live')}</p>
           <div class="flex flex-col gap-1">
             {#each activeMissions as m}
               <button
@@ -193,15 +194,15 @@
       <div class="glass px-4 py-2.5 flex items-center gap-2 pointer-events-auto">
         <span class="material-symbols-outlined text-[#22C55E] text-lg">traffic</span>
         <div>
-          <p class="text-[9px] font-black text-[#4B4B4B] uppercase">Traffic</p>
-          <p class="text-xs font-black text-black">OPTIMIZED</p>
+          <p class="text-[9px] font-black text-[#4B4B4B] uppercase">{t('navPage.traffic')}</p>
+          <p class="text-xs font-black text-black">{t('navPage.optimized')}</p>
         </div>
       </div>
       <div class="glass px-4 py-2.5 flex items-center gap-2 pointer-events-auto">
         <span class="text-lg">👮</span>
         <div>
-          <p class="text-[9px] font-black text-[#4B4B4B] uppercase">Duty officer</p>
-          <p class="text-xs font-black text-black">TAP ICON TO CALL</p>
+          <p class="text-[9px] font-black text-[#4B4B4B] uppercase">{t('navPage.officer')}</p>
+          <p class="text-xs font-black text-black">{t('navPage.tapCall')}</p>
         </div>
       </div>
     </div>

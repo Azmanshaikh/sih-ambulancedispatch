@@ -33,6 +33,7 @@ def ensure_profile(user_id: str, email: str, full_name: str | None, bootstrap_st
         "status": "active" if bootstrap_staff else "pending",
         "requested_role": None,
         "ambulance_id": None,
+        "hospital_id": None,
         "onboarded": True if bootstrap_staff else False,
         "updated_at": _now(),
     }
@@ -59,24 +60,53 @@ def get_profile(user_id: str) -> dict[str, Any] | None:
         row["onboarded"] = prev["onboarded"]
     else:
         row.setdefault("onboarded", False)
+    if row.get("hospital_id") is None and prev.get("hospital_id") is not None:
+        row["hospital_id"] = prev["hospital_id"]
     _profiles[user_id] = row
     return row
 
 
-_DB_KEYS = {"id", "email", "full_name", "role", "status", "requested_role", "ambulance_id", "updated_at"}
+_DB_KEYS = {"id", "email", "full_name", "role", "status", "requested_role", "ambulance_id", "hospital_id", "updated_at"}
+
+
+def _db_payload(row: dict[str, Any], include_hospital: bool = True) -> dict[str, Any]:
+    keys = _DB_KEYS if include_hospital else _DB_KEYS - {"hospital_id"}
+    payload = {k: row.get(k) for k in keys}
+    if include_hospital:
+        hid = payload.get("hospital_id")
+        if hid is None or hid == "":
+            payload["hospital_id"] = None
+        else:
+            try:
+                payload["hospital_id"] = int(hid)
+            except (TypeError, ValueError):
+                payload["hospital_id"] = None
+    return payload
 
 
 def _save_profile(row: dict[str, Any]) -> dict[str, Any]:
     row["updated_at"] = _now()
     _profiles[row["id"]] = row
-    payload = {k: row.get(k) for k in _DB_KEYS}
+    payload = _db_payload(row, include_hospital=True)
+    saved = False
     if supabase_client is not None:
         try:
             supabase_client.table("profiles").upsert(payload).execute()
-            return row
+            saved = True
         except Exception:
-            pass
-    rest_upsert("profiles", payload)
+            saved = False
+    if not saved:
+        saved = rest_upsert("profiles", payload) is not None
+    if not saved:
+        slim = _db_payload(row, include_hospital=False)
+        if supabase_client is not None:
+            try:
+                supabase_client.table("profiles").upsert(slim).execute()
+                saved = True
+            except Exception:
+                saved = False
+        if not saved:
+            rest_upsert("profiles", slim)
     return row
 
 
@@ -232,7 +262,12 @@ def activate_patient(user_id: str) -> dict[str, Any]:
     return _save_profile(profile)
 
 
-def activate_verified_role(user_id: str, role: str, ambulance_id: str | None = None) -> dict[str, Any]:
+def activate_verified_role(
+    user_id: str,
+    role: str,
+    ambulance_id: str | None = None,
+    hospital_id: int | None = None,
+) -> dict[str, Any]:
     profile = get_profile(user_id)
     if not profile:
         raise ValueError("profile missing")
@@ -244,10 +279,16 @@ def activate_verified_role(user_id: str, role: str, ambulance_id: str | None = N
     profile["onboarded"] = True
     if role == "driver" and ambulance_id:
         profile["ambulance_id"] = ambulance_id
+    if role == "staff":
+        hid = hospital_id if hospital_id is not None else profile.get("hospital_id")
+        try:
+            profile["hospital_id"] = int(hid) if hid is not None and hid != "" else None
+        except (TypeError, ValueError):
+            profile["hospital_id"] = None
     return _save_profile(profile)
 
 
-def mark_otp_pending(user_id: str, requested_role: str) -> dict[str, Any]:
+def mark_otp_pending(user_id: str, requested_role: str, hospital_id: int | None = None) -> dict[str, Any]:
     profile = get_profile(user_id)
     if not profile:
         raise ValueError("profile missing")
@@ -255,6 +296,13 @@ def mark_otp_pending(user_id: str, requested_role: str) -> dict[str, Any]:
     profile["requested_role"] = requested_role
     if requested_role != "driver":
         profile["ambulance_id"] = None
+    if requested_role == "staff":
+        try:
+            profile["hospital_id"] = int(hospital_id) if hospital_id is not None else None
+        except (TypeError, ValueError):
+            profile["hospital_id"] = None
+    elif requested_role == "driver":
+        profile["hospital_id"] = None
     return _save_profile(profile)
 
 

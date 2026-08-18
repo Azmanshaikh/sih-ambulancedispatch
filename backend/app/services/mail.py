@@ -17,6 +17,7 @@ def send_staff_otp_email(
     applicant_name: str | None,
     requested_role: str,
     code: str,
+    hospital_name: str | None = None,
 ) -> dict:
     recipients = head_staff_emails()
     if not recipients:
@@ -33,12 +34,13 @@ def send_staff_otp_email(
         return {"sent": False, "to": recipients, "error": "smtp not configured"}
 
     who = applicant_name or applicant_email
+    hospital_line = f" Hospital: {hospital_name}." if hospital_name else ""
     msg = EmailMessage()
     msg["Subject"] = f"JEEVAN access OTP · {requested_role}"
     msg["From"] = from_addr
     msg["To"] = ", ".join(recipients)
     msg.set_content(
-        f"{who} ({applicant_email}) wants to join JEEVAN as {requested_role}.\n\n"
+        f"{who} ({applicant_email}) wants to join JEEVAN as {requested_role}.{hospital_line}\n\n"
         f"OTP: {code}\n\n"
         "Give this code only if you know them. It expires in 15 minutes.\n"
         "You can also see pending codes under Staff → OTP codes."

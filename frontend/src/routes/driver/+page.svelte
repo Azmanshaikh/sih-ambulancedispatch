@@ -3,6 +3,7 @@
   import MapWidget from '$lib/components/MapWidget.svelte';
   import { apiFetch } from '$lib/auth.svelte';
   import { postToMarker } from '$lib/officers';
+  import { t } from '$lib/i18n.svelte';
 
   let mission = $state<any>(null);
   let markers = $state<any[]>([]);
@@ -113,24 +114,24 @@
   });
 </script>
 
-<svelte:head><title>JEEVAN — Driver mission</title></svelte:head>
+<svelte:head><title>{t('driver.pageTitle')}</title></svelte:head>
 
 <div class="h-full flex flex-col relative">
   {#if alertBanner}
     <div class="absolute inset-0 z-30 flex items-center justify-center p-4" style="background:rgba(17,17,17,0.82);">
       <div class="nb-card-lg bg-white p-8 max-w-md w-[90%] text-center" style="border:4px solid #111;">
         <p class="nb-chip nb-red mx-auto mb-3" style="color:#fff;">{alertBanner.title}</p>
-        <h2 class="text-2xl font-black mb-3 uppercase">You are assigned this job</h2>
+        <h2 class="text-2xl font-black mb-3 uppercase">{t('driver.assigned')}</h2>
         <p class="text-sm text-black mb-2 font-semibold">{alertBanner.body}</p>
         {#if alertBanner.pickup}
-          <p class="text-xs uppercase tracking-widest text-[#4B4B4B] mt-3 font-bold">Pickup</p>
+          <p class="text-xs uppercase tracking-widest text-[#4B4B4B] mt-3 font-bold">{t('driver.pickup')}</p>
           <p class="font-black">{alertBanner.pickup}</p>
         {/if}
         {#if alertBanner.drop}
-          <p class="text-xs uppercase tracking-widest text-[#4B4B4B] mt-3 font-bold">Drop</p>
+          <p class="text-xs uppercase tracking-widest text-[#4B4B4B] mt-3 font-bold">{t('driver.drop')}</p>
           <p class="font-black">{alertBanner.drop}</p>
         {/if}
-        <button class="btn btn-primary mt-6 w-full py-3" onclick={ackAlert}>Acknowledge</button>
+        <button class="btn btn-primary mt-6 w-full py-3" onclick={ackAlert}>{t('driver.acknowledge')}</button>
       </div>
     </div>
   {/if}
@@ -150,32 +151,32 @@
     <div class="absolute top-5 left-5 z-10 w-80 max-w-[calc(100%-2.5rem)] pointer-events-none">
       <div class="glass p-5 pointer-events-auto">
         {#if !mission}
-          <p class="nb-chip nb-red mb-2" style="color:#fff;">Standby</p>
-          <h2 class="text-xl font-black mb-2 uppercase">No assignment</h2>
-          <p class="text-xs text-[#4B4B4B] font-semibold">You will be alerted when a patient requests dispatch.</p>
+          <p class="nb-chip nb-red mb-2" style="color:#fff;">{t('driver.standby')}</p>
+          <h2 class="text-xl font-black mb-2 uppercase">{t('driver.noAssignment')}</h2>
+          <p class="text-xs text-[#4B4B4B] font-semibold">{t('driver.alertHint')}</p>
         {:else}
           <p class="nb-chip nb-red mb-2" style="color:#fff;">
-            {mission.phase === 'complete' ? 'Trip complete' : mission.phase === 'drop' ? 'Heading to drop' : 'Heading to pickup'}
+            {mission.phase === 'complete' ? t('driver.tripComplete') : mission.phase === 'drop' ? t('driver.toDrop') : t('driver.toPickup')}
           </p>
           <h2 class="text-lg font-black mb-2 uppercase">{mission.pickup_person}</h2>
           {#if mission.phase === 'complete'}
-            <p class="text-xs text-black font-semibold">Patient handed over. A trip report was generated for staff and the patient.</p>
+            <p class="text-xs text-black font-semibold">{t('driver.handover')}</p>
           {:else}
             {#if mission.phase !== 'drop'}
-              <p class="text-xs text-black font-semibold mb-3">Go to {mission.pickup_name}</p>
-              <button class="btn btn-primary w-full mb-2" onclick={arrivedPickup}>Arrived at pickup</button>
+              <p class="text-xs text-black font-semibold mb-3">{t('driver.goTo', { name: mission.pickup_name })}</p>
+              <button class="btn btn-primary w-full mb-2" onclick={arrivedPickup}>{t('driver.arrivedPickup')}</button>
             {:else}
-              <p class="text-xs text-black font-semibold mb-1">Patient on board</p>
-              <p class="nb-chip nb-blue mt-3 mb-1" style="color:#fff;">Final destination</p>
+              <p class="text-xs text-black font-semibold mb-1">{t('driver.onBoard')}</p>
+              <p class="nb-chip nb-blue mt-3 mb-1" style="color:#fff;">{t('driver.destination')}</p>
               <p class="text-sm font-black mb-3">{mission.destination}</p>
             {/if}
             <button class="btn btn-secondary w-full py-3" onclick={endTrip}>
-              End trip / Trip complete
+              {t('driver.endTrip')}
             </button>
-            <p class="text-[10px] text-[#4B4B4B] mt-2 font-semibold">Auto-completes when the unit reaches hospital if you do not tap this.</p>
+            <p class="text-[10px] text-[#4B4B4B] mt-2 font-semibold">{t('driver.autoComplete')}</p>
           {/if}
-          <p class="text-xs text-[#4B4B4B] mt-2 font-bold">ETA {mission.eta_minutes ?? '—'} min · {mission.ambulance_id}</p>
-          <p class="text-[10px] text-[#4B4B4B] mt-2 font-semibold">Tap a 👮 / 🛟 icon to call the duty officer.</p>
+          <p class="text-xs text-[#4B4B4B] mt-2 font-bold">{t('navPage.eta')} {mission.eta_minutes ?? '—'} min · {mission.ambulance_id}</p>
+          <p class="text-[10px] text-[#4B4B4B] mt-2 font-semibold">{t('driver.callHint')}</p>
         {/if}
       </div>
     </div>

@@ -39,6 +39,13 @@ html {
   height: 100%;
 }
 
+html[lang="hi"] body {
+  font-family: 'Noto Sans Devanagari', 'Inter', sans-serif;
+}
+html[lang="kn"] body {
+  font-family: 'Noto Sans Kannada', 'Inter', sans-serif;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--clr-bg);

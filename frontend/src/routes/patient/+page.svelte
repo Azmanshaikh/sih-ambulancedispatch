@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
   import { auth, apiFetch } from '$lib/auth.svelte';
+  import { t } from '$lib/i18n.svelte';
 
   const BMSIT = { name: 'BMSIT College, Avalahalli, Yelahanka', lat: 13.1344, lng: 77.5693 };
 
@@ -76,7 +77,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(health),
     });
-    saveMsg = res.ok ? 'Saved for hospital handover' : 'Could not save';
+    saveMsg = res.ok ? t('patient.saved') : t('patient.saveFailed');
   }
 
   function applyLive(payload: any) {
@@ -125,11 +126,15 @@
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'SOS failed');
-      requestMsg = `SOS sent · nearest ${data.data?.ambulance_id} → ${data.data?.hospital_name} (${data.data?.eta_minutes} min)`;
+      if (!res.ok) throw new Error(data.detail || t('patient.sosFailed'));
+      requestMsg = t('patient.sosSent', {
+        unit: data.data?.ambulance_id || '',
+        hospital: data.data?.hospital_name || '',
+        eta: data.data?.eta_minutes ?? '',
+      });
       applyLive(data.data);
     } catch (e: any) {
-      requestMsg = e?.message || 'Could not send SOS';
+      requestMsg = e?.message || t('patient.sosError');
     } finally {
       requesting = false;
     }
@@ -149,7 +154,7 @@
   });
 </script>
 
-<svelte:head><title>JEEVAN — Patient</title></svelte:head>
+<svelte:head><title>{t('patient.pageTitle')}</title></svelte:head>
 
 <div class="h-full overflow-hidden p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
   <div class="lg:col-span-4 flex flex-col gap-4 overflow-y-auto no-sb pb-3">
@@ -159,90 +164,90 @@
       disabled={requesting}
       onclick={emergencySos}
     >
-      {requesting ? 'SENDING SOS…' : '🚨 EMERGENCY SOS'}
+      {requesting ? t('patient.sending') : t('patient.sos')}
     </button>
     {#if requestMsg}<p class="nb-card p-2 text-xs text-black font-semibold">{requestMsg}</p>{/if}
 
     <div class="grid grid-cols-2 gap-3">
       <a href="/ai-guide" class="btn btn-secondary" style="padding:16px 10px;flex-direction:column;gap:6px;">
         <span class="material-symbols-outlined" style="font-size:26px;">forum</span>
-        <span>AI Chatbot</span>
+        <span>{t('patient.chatbot')}</span>
       </a>
       <a href="/ai-call" class="btn btn-blue" style="padding:16px 10px;flex-direction:column;gap:6px;">
         <span class="material-symbols-outlined" style="font-size:26px;">videocam</span>
-        <span>Video Call</span>
+        <span>{t('patient.videoCall')}</span>
       </a>
     </div>
 
     <section class="nb-card p-5">
-      <h2 class="nb-chip nb-red mb-3" style="color:#fff;">Vitals</h2>
-      <p class="text-[10px] text-[#4B4B4B] uppercase mb-4 font-bold">Mock sensor · random live values</p>
+      <h2 class="nb-chip nb-red mb-3" style="color:#fff;">{t('patient.vitals')}</h2>
+      <p class="text-[10px] text-[#4B4B4B] uppercase mb-4 font-bold">{t('patient.vitalsHint')}</p>
       <div class="grid grid-cols-2 gap-3">
         <div class="nb-yellow p-3" style="border:3px solid #111;">
           <div class="text-3xl font-black">{vitals.heart_rate}<span class="text-xs ml-1">bpm</span></div>
-          <div class="text-[10px] uppercase tracking-widest font-bold">Heart rate</div>
+          <div class="text-[10px] uppercase tracking-widest font-bold">{t('patient.heartRate')}</div>
         </div>
         <div class="nb-yellow p-3" style="border:3px solid #111;">
           <div class="text-3xl font-black">{vitals.spo2}<span class="text-xs ml-1">%</span></div>
-          <div class="text-[10px] uppercase tracking-widest font-bold">SpO2</div>
+          <div class="text-[10px] uppercase tracking-widest font-bold">{t('patient.spo2')}</div>
         </div>
         <div class="nb-yellow p-3" style="border:3px solid #111;">
           <div class="text-2xl font-black">{vitals.bp_sys}/{vitals.bp_dia}</div>
-          <div class="text-[10px] uppercase tracking-widest font-bold">Blood pressure</div>
+          <div class="text-[10px] uppercase tracking-widest font-bold">{t('patient.bp')}</div>
         </div>
         <div class="nb-yellow p-3" style="border:3px solid #111;">
           <div class="text-2xl font-black">{vitals.temperature_c}<span class="text-xs ml-1">°C</span></div>
-          <div class="text-[10px] uppercase tracking-widest font-bold">Temperature</div>
+          <div class="text-[10px] uppercase tracking-widest font-bold">{t('patient.temp')}</div>
         </div>
         <div class="nb-yellow p-3 col-span-2" style="border:3px solid #111;">
           <div class="text-2xl font-black">{vitals.resp_rate}<span class="text-xs ml-1">/min</span></div>
-          <div class="text-[10px] uppercase tracking-widest font-bold">Respiration</div>
+          <div class="text-[10px] uppercase tracking-widest font-bold">{t('patient.resp')}</div>
         </div>
       </div>
     </section>
 
     <section class="nb-card p-5">
-      <h2 class="nb-chip nb-red mb-2" style="color:#fff;">Health records</h2>
-      <p class="text-[10px] text-[#4B4B4B] uppercase mb-3 font-bold">Fill this before an emergency so hospitals have allergies, visits, and doctors</p>
-      <label class="text-[10px] uppercase tracking-widest text-black font-black">Allergies</label>
+      <h2 class="nb-chip nb-red mb-2" style="color:#fff;">{t('patient.healthRecords')}</h2>
+      <p class="text-[10px] text-[#4B4B4B] uppercase mb-3 font-bold">{t('patient.healthHint')}</p>
+      <label class="text-[10px] uppercase tracking-widest text-black font-black">{t('patient.allergies')}</label>
       <textarea class="nb-input text-sm mb-2 mt-1" rows="2" bind:value={health.allergies}></textarea>
-      <label class="text-[10px] uppercase tracking-widest text-black font-black">Current medicines</label>
+      <label class="text-[10px] uppercase tracking-widest text-black font-black">{t('patient.medicines')}</label>
       <textarea class="nb-input text-sm mb-2 mt-1" rows="2" bind:value={health.medicines}></textarea>
-      <label class="text-[10px] uppercase tracking-widest text-black font-black">Other conditions</label>
+      <label class="text-[10px] uppercase tracking-widest text-black font-black">{t('patient.conditions')}</label>
       <textarea class="nb-input text-sm mb-3 mt-1" rows="2" bind:value={health.conditions}></textarea>
       <div class="grid grid-cols-2 gap-2 text-xs font-bold mb-3">
-        <label class="flex items-center gap-2"><input type="checkbox" bind:checked={health.cardiac} /> Cardiac</label>
-        <label class="flex items-center gap-2"><input type="checkbox" bind:checked={health.diabetes} /> Diabetes</label>
-        <label class="flex items-center gap-2"><input type="checkbox" bind:checked={health.epilepsy} /> Epilepsy</label>
-        <label class="flex items-center gap-2"><input type="checkbox" bind:checked={health.pregnant} /> Pregnant</label>
+        <label class="flex items-center gap-2"><input type="checkbox" bind:checked={health.cardiac} /> {t('patient.cardiac')}</label>
+        <label class="flex items-center gap-2"><input type="checkbox" bind:checked={health.diabetes} /> {t('patient.diabetes')}</label>
+        <label class="flex items-center gap-2"><input type="checkbox" bind:checked={health.epilepsy} /> {t('patient.epilepsy')}</label>
+        <label class="flex items-center gap-2"><input type="checkbox" bind:checked={health.pregnant} /> {t('patient.pregnant')}</label>
       </div>
-      <p class="text-[10px] uppercase tracking-widest text-black font-black mb-1">Previous hospital visits</p>
+      <p class="text-[10px] uppercase tracking-widest text-black font-black mb-1">{t('patient.visits')}</p>
       {#each health.visits as v, i}
         <div class="grid grid-cols-3 gap-1 mb-1">
-          <input class="nb-input p-1 text-xs" placeholder="Hospital" bind:value={v.hospital} />
-          <input class="nb-input p-1 text-xs" placeholder="When" bind:value={v.when} />
-          <input class="nb-input p-1 text-xs" placeholder="Reason" bind:value={v.reason} />
+          <input class="nb-input p-1 text-xs" placeholder={t('patient.hospital')} bind:value={v.hospital} />
+          <input class="nb-input p-1 text-xs" placeholder={t('patient.when')} bind:value={v.when} />
+          <input class="nb-input p-1 text-xs" placeholder={t('patient.reason')} bind:value={v.reason} />
         </div>
       {/each}
-      <button class="btn btn-ghost mb-3 mt-1" style="padding:5px 10px;font-size:10px;" onclick={() => (health.visits = [...health.visits, { hospital: '', when: '', reason: '' }])}>+ Visit</button>
-      <p class="text-[10px] uppercase tracking-widest text-black font-black mb-1">Doctors consulted</p>
+      <button class="btn btn-ghost mb-3 mt-1" style="padding:5px 10px;font-size:10px;" onclick={() => (health.visits = [...health.visits, { hospital: '', when: '', reason: '' }])}>{t('patient.addVisit')}</button>
+      <p class="text-[10px] uppercase tracking-widest text-black font-black mb-1">{t('patient.doctors')}</p>
       {#each health.doctors as d}
         <div class="grid grid-cols-3 gap-1 mb-1">
-          <input class="nb-input p-1 text-xs" placeholder="Name" bind:value={d.name} />
-          <input class="nb-input p-1 text-xs" placeholder="Specialty" bind:value={d.specialty} />
-          <input class="nb-input p-1 text-xs" placeholder="Notes" bind:value={d.notes} />
+          <input class="nb-input p-1 text-xs" placeholder={t('patient.name')} bind:value={d.name} />
+          <input class="nb-input p-1 text-xs" placeholder={t('patient.specialty')} bind:value={d.specialty} />
+          <input class="nb-input p-1 text-xs" placeholder={t('patient.notes')} bind:value={d.notes} />
         </div>
       {/each}
-      <button class="btn btn-ghost mb-3 mt-1" style="padding:5px 10px;font-size:10px;" onclick={() => (health.doctors = [...health.doctors, { name: '', specialty: '', notes: '' }])}>+ Doctor</button>
-      <label class="text-[10px] uppercase tracking-widest text-black font-black">Extra notes</label>
+      <button class="btn btn-ghost mb-3 mt-1" style="padding:5px 10px;font-size:10px;" onclick={() => (health.doctors = [...health.doctors, { name: '', specialty: '', notes: '' }])}>{t('patient.addDoctor')}</button>
+      <label class="text-[10px] uppercase tracking-widest text-black font-black">{t('patient.extraNotes')}</label>
       <textarea class="nb-input text-sm mb-3 mt-1" rows="2" bind:value={health.notes}></textarea>
-      <button class="btn btn-primary w-full" onclick={saveHealth}>Save records</button>
+      <button class="btn btn-primary w-full" onclick={saveHealth}>{t('patient.saveRecords')}</button>
       {#if saveMsg}<p class="text-xs mt-2 font-bold">{saveMsg}</p>{/if}
     </section>
 
     {#if reports.length}
       <section class="nb-card p-5">
-        <h2 class="nb-chip nb-red mb-3" style="color:#fff;">Trip reports</h2>
+        <h2 class="nb-chip nb-red mb-3" style="color:#fff;">{t('patient.tripReports')}</h2>
         {#each reports as r}
           <article class="mb-3 p-3 bg-[#FFF3E6]" style="border:3px solid #111;">
             <p class="text-[10px] uppercase text-[#4B4B4B] font-bold">{r.hospital_name} · {r.created_at?.slice(0, 16) || ''}</p>

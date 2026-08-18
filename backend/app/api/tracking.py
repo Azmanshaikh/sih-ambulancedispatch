@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from typing import Any, List
 from pydantic import BaseModel
 
@@ -12,6 +12,7 @@ from app.services.fleet import (
     get_ambulances,
     get_hospitals,
 )
+from app.services.geocode import geocode_query, reverse_geocode
 from app.services.runtime_state import push_alert, save_mission, set_medical_record
 
 router = APIRouter(prefix="/tracking", tags=["Tracking"])
@@ -30,6 +31,26 @@ class DispatchRequest(BaseModel):
     pregnant: bool = False
     notes: str = ""
     priority: int | None = None
+    analysis: str = ""
+
+
+class GeocodeBody(BaseModel):
+    query: str = ""
+    lat: float | None = None
+    lng: float | None = None
+
+
+@router.post("/geocode")
+async def lookup_place(body: GeocodeBody, _user: dict[str, Any] = Depends(require_roles("staff", "driver", "patient"))):
+    if body.query.strip():
+        hit = geocode_query(body.query)
+        if not hit:
+            raise HTTPException(status_code=404, detail="Address not found")
+        return {"status": "success", **hit}
+    if body.lat is not None and body.lng is not None:
+        hit = reverse_geocode(float(body.lat), float(body.lng))
+        return {"status": "success", **(hit or {"lat": body.lat, "lng": body.lng, "address": f"{body.lat:.5f}, {body.lng:.5f}"})}
+    raise HTTPException(status_code=400, detail="Provide query or lat/lng")
 
 
 @router.get("/fleet")
@@ -126,6 +147,8 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
             "diabetes": req.diabetes,
             "epilepsy": req.epilepsy,
             "pregnant": req.pregnant,
+            "notes": req.notes,
+            "analysis": req.analysis,
             "conflict": result.get("conflict") or {"status": "none"},
         }
     )

@@ -1,5 +1,6 @@
 -- JEEVAN: Gmail auth profiles + staff-gated role requests
--- Run in the Supabase SQL editor.
+-- Copy this entire file into the Supabase SQL editor and run it.
+-- Safe to re-run on an existing project.
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -9,8 +10,12 @@ create table if not exists public.profiles (
   status text not null default 'active' check (status in ('active', 'pending')),
   requested_role text check (requested_role is null or requested_role in ('driver', 'staff')),
   ambulance_id text,
+  hospital_id integer,
   updated_at timestamptz default now()
 );
+
+-- Existing projects created the table before hospital_id existed.
+alter table public.profiles add column if not exists hospital_id integer;
 
 create table if not exists public.role_requests (
   id bigint generated always as identity primary key,
@@ -59,3 +64,4 @@ create policy "role_requests_insert_own"
 
 create index if not exists role_requests_status_idx on public.role_requests (status);
 create index if not exists profiles_role_idx on public.profiles (role);
+create index if not exists profiles_hospital_id_idx on public.profiles (hospital_id);

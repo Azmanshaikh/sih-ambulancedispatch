@@ -8,6 +8,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { auth, homeFor, initAuth, needsOnboarding } from '$lib/auth.svelte';
+  import { initI18n } from '$lib/i18n.svelte';
   import { supabaseConfigured } from '$lib/supabase';
   import { browser } from '$app/environment';
 
@@ -32,6 +33,7 @@
   }
 
   onMount(async () => {
+    initI18n();
     await initAuth();
     const path = page.url.pathname;
     if (!auth.session && !PUBLIC.includes(path)) {

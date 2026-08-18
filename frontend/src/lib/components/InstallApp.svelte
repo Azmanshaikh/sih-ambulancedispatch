@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { onMount } from 'svelte';
+  import { t } from '$lib/i18n.svelte';
 
   let deferred: any = $state(null);
   let visible = $state(false);
@@ -63,17 +64,17 @@
   <div class="install-banner">
     <img src="/icon-192.png" alt="" width="40" height="40" />
     <div class="install-copy">
-      <p class="install-title">Install JEEVAN</p>
+      <p class="install-title">{t('install.title')}</p>
       {#if iosHint}
-        <p class="install-sub">Safari → Share → Add to Home Screen</p>
+        <p class="install-sub">{t('install.ios')}</p>
       {:else}
-        <p class="install-sub">Add to your phone home screen</p>
+        <p class="install-sub">{t('install.other')}</p>
       {/if}
     </div>
     {#if deferred}
-      <button class="btn btn-primary" type="button" onclick={install}>Install</button>
+      <button class="btn btn-primary" type="button" onclick={install}>{t('install.install')}</button>
     {/if}
-    <button class="btn btn-ghost" type="button" onclick={dismiss}>Not now</button>
+    <button class="btn btn-ghost" type="button" onclick={dismiss}>{t('install.later')}</button>
   </div>
 {/if}
 

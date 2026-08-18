@@ -47,6 +47,8 @@ def _from_alert(alert: dict[str, Any]) -> dict[str, Any] | None:
         "email": merged.get("otp_email") or payload.get("otp_email") or "",
         "full_name": merged.get("otp_name") or payload.get("otp_name") or merged.get("otp_email") or "",
         "requested_role": merged.get("otp_role") or payload.get("otp_role") or "",
+        "hospital_id": merged.get("otp_hospital_id") or payload.get("otp_hospital_id"),
+        "hospital_name": merged.get("otp_hospital") or payload.get("otp_hospital") or "",
         "code": code,
         "attempts": int(merged.get("otp_attempts") or payload.get("otp_attempts") or 0),
         "created_at": merged.get("created_at") or payload.get("created_at"),
@@ -87,6 +89,8 @@ def _mark_used(row: dict[str, Any]) -> None:
         "otp_email": row.get("email"),
         "otp_name": row.get("full_name"),
         "otp_role": row.get("requested_role"),
+        "otp_hospital_id": row.get("hospital_id"),
+        "otp_hospital": row.get("hospital_name"),
         "otp_user_id": row.get("user_id"),
         "otp_expires_at": row.get("expires_at"),
         "otp_emailed_to": row.get("emailed_to") or [],
@@ -98,15 +102,24 @@ def _mark_used(row: dict[str, Any]) -> None:
     rest_update("dispatch_alerts", {"id": f"eq.{alert_id}"}, {"payload": payload, "read": True})
 
 
-def issue_otp(user_id: str, email: str, full_name: str | None, requested_role: str) -> dict[str, Any]:
+def issue_otp(
+    user_id: str,
+    email: str,
+    full_name: str | None,
+    requested_role: str,
+    hospital_id: int | None = None,
+    hospital_name: str | None = None,
+) -> dict[str, Any]:
     code = f"{secrets.randbelow(1_000_000):06d}"
     expires_at = (_now() + timedelta(minutes=15)).isoformat()
-    mail = send_staff_otp_email(email, full_name, requested_role, code)
+    mail = send_staff_otp_email(email, full_name, requested_role, code, hospital_name)
     row = {
         "user_id": user_id,
         "email": email,
         "full_name": full_name or email,
         "requested_role": requested_role,
+        "hospital_id": hospital_id,
+        "hospital_name": hospital_name or "",
         "code": code,
         "attempts": 0,
         "created_at": _now().isoformat(),
@@ -123,13 +136,17 @@ def issue_otp(user_id: str, email: str, full_name: str | None, requested_role: s
     alert = push_alert(
         "staff",
         _OTP_TITLE,
-        f"{who} ({email}) wants to join as {requested_role}. OTP: {code}. Sent to {dest}.",
+        f"{who} ({email}) wants to join as {requested_role}"
+        + (f" at {hospital_name}" if hospital_name else "")
+        + f". OTP: {code}. Sent to {dest}.",
         extra={
             "kind": "access_otp",
             "otp": code,
             "otp_email": email,
             "otp_name": who,
             "otp_role": requested_role,
+            "otp_hospital_id": hospital_id,
+            "otp_hospital": hospital_name or "",
             "otp_user_id": user_id,
             "otp_expires_at": expires_at,
             "otp_emailed_to": row["emailed_to"],
