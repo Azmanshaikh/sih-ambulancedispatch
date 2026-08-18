@@ -38,6 +38,27 @@ _POSTS: list[dict[str, Any]] = [
 _alerted: set[str] = set()
 _alerted_posts: dict[str, str] = {}
 
+# Demo duty officers — tap-to-call uses the shared number below.
+CORRIDOR_CALL_PHONE = "8147621940"
+_OFFICER_NAMES: dict[str, str] = {
+    "TP-01": "SI Ramesh Kumar",
+    "TP-02": "SI Priya Nair",
+    "TP-03": "SI Arjun Hegde",
+    "TP-04": "SI Kavitha Rao",
+    "TP-05": "SI Imran Pasha",
+    "TP-06": "SI Deepak Gowda",
+    "TP-07": "SI Anitha Sharma",
+    "TP-08": "SI Vikram Singh",
+    "TP-09": "SI Nandini Reddy",
+    "TP-10": "SI Suresh Babu",
+    "TP-11": "SI Meena Krishnan",
+    "TP-12": "SI Farhan Ali",
+    "TP-13": "SI Lakshmi Prasad",
+    "RS-01": "SI Harish Menon",
+    "RS-02": "SI Divya Shetty",
+    "RS-03": "SI Rohan Patil",
+}
+
 
 def get_posts() -> list[dict[str, Any]]:
     now_alerted = set(_alerted_posts)
@@ -46,6 +67,8 @@ def get_posts() -> list[dict[str, Any]]:
         row = dict(post)
         row["alerted"] = post["id"] in now_alerted
         row["last_unit"] = _alerted_posts.get(post["id"])
+        row["officer_name"] = _OFFICER_NAMES.get(post["id"], "SI Duty Officer")
+        row["call_phone"] = CORRIDOR_CALL_PHONE
         rows.append(row)
     return rows
 
@@ -575,6 +598,8 @@ def corridor_snapshot() -> dict[str, Any]:
                 "conflict": m.get("conflict") or {"status": "none"},
                 "eta_minutes": m.get("eta_minutes"),
                 "patient_name": m.get("patient_name"),
+                "pickup": m.get("pickup"),
+                "hospital": m.get("hospital"),
                 "pickup_route": m.get("pickup_route") or [],
                 "route": m.get("route") or m.get("drop_route") or [],
             }

@@ -5,12 +5,16 @@
   let otps = $state<any[]>([]);
   let profiles = $state<any[]>([]);
   let message = $state('');
+  let loadError = $state('');
 
   async function load() {
     const [otpRes, reqRes] = await Promise.all([apiFetch('/accounts/otps'), apiFetch('/accounts/requests')]);
     if (otpRes.ok) {
       const data = await otpRes.json();
       otps = data.otps || [];
+      loadError = '';
+    } else {
+      loadError = 'Could not load OTPs. Sign in as staff and confirm the backend is up.';
     }
     if (reqRes.ok) {
       const data = await reqRes.json();
@@ -23,6 +27,10 @@
     const t = setInterval(load, 2000);
     return () => clearInterval(t);
   });
+
+  let pendingProfiles = $derived(
+    profiles.filter((p) => p.status === 'pending' && p.requested_role && !otps.some((o) => o.user_id === p.id || o.email === p.email))
+  );
 </script>
 
 <svelte:head><title>JEEVAN — Access OTPs</title></svelte:head>
@@ -31,11 +39,12 @@
   <div class="max-w-4xl mx-auto">
     <h1 class="text-3xl font-black uppercase tracking-tight mb-2 text-black">Access OTPs</h1>
     <p class="text-xs text-[#4B4B4B] uppercase tracking-widest mb-6 font-bold">
-      Drivers and new staff must ask you for this code. Do not share it unless you know them.
+      Codes are also emailed to the head staff inbox. Share a code only if you know the person.
     </p>
     {#if message}<p class="nb-card p-2 text-sm text-black mb-3 font-bold">{message}</p>{/if}
+    {#if loadError}<p class="nb-card p-2 text-sm text-black mb-3 font-bold">{loadError}</p>{/if}
 
-    {#if otps.length === 0}
+    {#if otps.length === 0 && pendingProfiles.length === 0}
       <p class="nb-card p-3 text-sm text-black font-semibold">No pending OTPs.</p>
     {:else}
       <div class="space-y-3">
@@ -44,11 +53,22 @@
             <div>
               <p class="font-black text-black">{o.full_name || o.email}</p>
               <p class="text-xs text-[#4B4B4B] font-semibold">{o.email} · wants <strong>{o.requested_role}</strong></p>
+              {#if o.emailed_to?.length}
+                <p class="text-[10px] uppercase tracking-widest text-black font-bold mt-1">
+                  {o.email_sent ? 'Emailed to' : 'For'} {o.emailed_to.join(', ')}
+                </p>
+              {/if}
             </div>
             <div class="text-right nb-yellow p-2" style="border:3px solid #111;">
               <p class="text-[10px] uppercase tracking-widest text-black font-bold">OTP</p>
               <p class="text-3xl font-black tracking-[0.3em] text-black">{o.code}</p>
             </div>
+          </div>
+        {/each}
+        {#each pendingProfiles as p}
+          <div class="nb-card p-4">
+            <p class="font-black text-black">{p.full_name || p.email}</p>
+            <p class="text-xs text-[#4B4B4B] font-semibold">{p.email} · wants <strong>{p.requested_role}</strong> · ask them to tap Driver/Staff again to mint a fresh code</p>
           </div>
         {/each}
       </div>

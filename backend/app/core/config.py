@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str | None = None
     VITE_SUPABASE_ANON_KEY: str | None = None
     STAFF_BOOTSTRAP_EMAILS: str = ""
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
     CORS_ORIGINS: str = ""
     REDIS_URL: str = "redis://localhost:6379/0"
     GOOGLE_MAPS_API_KEY: str | None = None

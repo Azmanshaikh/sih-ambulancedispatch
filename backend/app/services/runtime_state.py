@@ -187,8 +187,7 @@ def list_active_missions() -> list[dict[str, Any]]:
             continue
         if key == "latest" or key.startswith("patient:"):
             continue
-        phase = mission.get("phase") or "pickup"
-        if phase not in ("pickup", "drop"):
+        if not is_live_mission(mission):
             continue
         mid = str(mission.get("id") or key)
         if mid in seen:
@@ -199,36 +198,76 @@ def list_active_missions() -> list[dict[str, Any]]:
     return active
 
 
+def is_live_mission(mission: dict[str, Any] | None) -> bool:
+    if not mission:
+        return False
+    if (mission.get("phase") or "pickup") not in ("pickup", "drop"):
+        return False
+    raw = mission.get("phase_started_at") or mission.get("created_at")
+    if not raw:
+        return True
+    try:
+        started = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - started).total_seconds() > 40 * 60:
+            return False
+    except Exception:
+        return True
+    return True
+
+
+def live_mission_or_none(mission: dict[str, Any] | None) -> dict[str, Any] | None:
+    return mission if is_live_mission(mission) else None
+
+
 def get_latest_mission() -> dict[str, Any] | None:
-    if _missions.get("latest"):
-        return _missions["latest"]
-    rows = rest_select("dispatch_cases", {"select": "*", "order": "created_at.desc", "limit": "1"})
+    latest = live_mission_or_none(_missions.get("latest"))
+    if latest:
+        return latest
+    actives = list_active_missions()
+    if actives:
+        _missions["latest"] = actives[0]
+        return actives[0]
+    rows = rest_select(
+        "dispatch_cases",
+        {
+            "select": "*",
+            "order": "created_at.desc",
+            "limit": "8",
+            "phase": "in.(pickup,drop)",
+        },
+    )
     if not rows:
         return None
-    row = rows[0]
-    mission = {
-        "id": row.get("id"),
-        "patient_id": row.get("patient_id"),
-        "patient_name": row.get("patient_name"),
-        "patient_email": row.get("patient_email"),
-        "ambulance_id": row.get("ambulance_id"),
-        "hospital_name": row.get("hospital_name"),
-        "hospital": row.get("hospital"),
-        "pickup": row.get("pickup"),
-        "route": row.get("route") or [],
-        "pickup_route": row.get("pickup_route") or [],
-        "eta_minutes": row.get("eta_minutes"),
-        "pickup_minutes": row.get("pickup_minutes"),
-        "transport_minutes": row.get("transport_minutes"),
-        "phase": row.get("phase") or "pickup",
-        "report": row.get("report") or (row.get("medical") or {}).get("report"),
-    }
-    _missions["latest"] = mission
-    if mission.get("ambulance_id"):
-        _missions[f"amb:{mission['ambulance_id']}"] = mission
-    if mission.get("patient_id"):
-        _missions[f"patient:{mission['patient_id']}"] = mission
-    return mission
+    for row in rows:
+        mission = {
+            "id": row.get("id"),
+            "patient_id": row.get("patient_id"),
+            "patient_name": row.get("patient_name"),
+            "patient_email": row.get("patient_email"),
+            "ambulance_id": row.get("ambulance_id"),
+            "hospital_name": row.get("hospital_name"),
+            "hospital": row.get("hospital"),
+            "pickup": row.get("pickup"),
+            "route": row.get("route") or [],
+            "pickup_route": row.get("pickup_route") or [],
+            "eta_minutes": row.get("eta_minutes"),
+            "pickup_minutes": row.get("pickup_minutes"),
+            "transport_minutes": row.get("transport_minutes"),
+            "phase": row.get("phase") or "pickup",
+            "created_at": row.get("created_at"),
+            "report": row.get("report") or (row.get("medical") or {}).get("report"),
+        }
+        if not is_live_mission(mission):
+            continue
+        _missions["latest"] = mission
+        if mission.get("ambulance_id"):
+            _missions[f"amb:{mission['ambulance_id']}"] = mission
+        if mission.get("patient_id"):
+            _missions[f"patient:{mission['patient_id']}"] = mission
+        return mission
+    return None
 
 
 def set_mission_phase(phase: str, ambulance_id: str | None = None) -> dict[str, Any] | None:

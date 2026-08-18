@@ -43,7 +43,7 @@ async def live_fleet(_user: dict[str, Any] = Depends(require_roles("staff"))):
 
 
 @router.get("/corridor")
-async def corridor_status(_user: dict[str, Any] = Depends(require_roles("staff"))):
+async def corridor_status(_user: dict[str, Any] = Depends(require_roles("staff", "driver"))):
     snap = corridor_snapshot()
     return {"status": "success", **snap}
 

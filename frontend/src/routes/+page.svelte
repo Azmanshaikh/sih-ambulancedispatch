@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
   import { apiFetch } from '$lib/auth.svelte';
+  import { postToMarker } from '$lib/officers';
 
   const BMSIT = {
     name: 'BMSIT College, Avalahalli, Yelahanka',
@@ -28,6 +29,7 @@
   let extraRoutes = $state<any[]>([]);
   let corridor = $state<any>(null);
   let activeMissions = $state<any[]>([]);
+  let selectedAmbulanceId = $state('');
   let assignedIds = $derived(new Set([assignedUnit, ...activeMissions.map((m) => m.ambulance_id)].filter(Boolean)));
   let availableCount = $derived(ambulances.filter((a) => a.status === 'available').length);
   let conflictReason = $derived(
@@ -61,11 +63,49 @@
   }
 
   function postMarkers(posts: any[] = []) {
-    return posts.map((p) => ({
-      position: [p.lat, p.lng] as [number, number],
-      popup: `${p.kind === 'rescue' ? 'Rescue' : 'Traffic'} · ${p.name}${p.alerted ? '<br/>ALERT SENT' : ''}`,
-      type: p.kind === 'rescue' ? (p.alerted ? 'rescue_alert' : 'rescue') : p.alerted ? 'police_alert' : 'police',
-    }));
+    return posts.map((p) => postToMarker(p, true));
+  }
+
+  function extraRoutesFor(missions: any[], selectedId: string) {
+    const extras: any[] = [];
+    for (const m of missions) {
+      if (!m || m.ambulance_id === selectedId) continue;
+      const pickup = m.pickup_route || [];
+      const drop = m.drop_route || m.route || [];
+      if (pickup.length > 1) {
+        extras.push({ id: `${m.id}-pickup`, points: pickup, color: '#fb7185', kind: 'pickup', label: `${m.ambulance_id} pickup` });
+      }
+      if (drop.length > 1) {
+        extras.push({
+          id: `${m.id}-drop`,
+          points: drop,
+          color: m.conflict?.status === 'rerouted' ? '#a855f7' : '#38bdf8',
+          kind: 'drop',
+          label: `${m.ambulance_id} → ${m.hospital_name || 'hospital'}`,
+        });
+      }
+    }
+    for (const r of corridor?.extra_routes || []) {
+      if (r.kind === 'overlap') extras.push(r);
+    }
+    return extras;
+  }
+
+  function focusMission(mission: any | null) {
+    if (!mission || mission.phase === 'complete') return;
+    selectedAmbulanceId = mission.ambulance_id || selectedAmbulanceId;
+    applyPayload(mission);
+    extraRoutes = extraRoutesFor(activeMissions, selectedAmbulanceId);
+  }
+
+  function selectAmbulance(id: string) {
+    selectedAmbulanceId = id;
+    const hit =
+      activeMissions.find((m) => m.ambulance_id === id) ||
+      (monitor?.mission?.ambulance_id === id ? monitor.mission : null);
+    if (hit && hit.phase !== 'complete') focusMission(hit);
+    else extraRoutes = extraRoutesFor(activeMissions, id);
+    markers = buildMarkers();
   }
 
   function buildMarkers(fleet = ambulances, hosp = hospitals, extra: any[] = []) {
@@ -76,6 +116,9 @@
       position: [a.lat, a.lng] as [number, number],
       popup: `🚑 ${a.id} · ${a.label}<br/><span style="font-weight:600;color:#6B6B6B">${a.status}${assigned.has(a.id) ? ' · assigned' : ''}</span>`,
       type: 'ambulance',
+      id: a.id,
+      ambulanceId: a.id,
+      hasMission: assigned.has(a.id),
     }));
     const hospMarks = hosp.map((h: any) => ({
       position: [h.lat, h.lng] as [number, number],
@@ -92,6 +135,25 @@
       ...postMarkers(corridor?.posts || []),
       ...extra,
     ];
+  }
+
+  function clearMissionUi() {
+    pickupRoute = [];
+    dropRoute = [];
+    extraRoutes = [];
+    etaLabel = '';
+    selectedHospital = null;
+    assignedUnit = '';
+    constraints = null;
+    confidence = null;
+    reason = '';
+    candidates = [];
+    pickupMinutes = null;
+    transportMinutes = null;
+    dispatchStatus = 'Waiting for SOS';
+    selectedAmbulanceId = '';
+    extraRoutes = extraRoutesFor(activeMissions, '');
+    markers = buildMarkers();
   }
 
   async function loadFleet() {
@@ -121,13 +183,9 @@
       const res = await apiFetch('/tracking/corridor');
       if (!res.ok) return;
       corridor = await res.json();
-      activeMissions = corridor.missions || [];
-      const latestId = monitor?.mission?.id;
-      extraRoutes = (corridor.extra_routes || []).filter((r: any) => {
-        if (r.kind === 'overlap') return true;
-        if (latestId && String(r.id || '').startsWith(String(latestId))) return false;
-        return true;
-      });
+      const liveMissions = corridor.missions || [];
+      if (liveMissions.length) activeMissions = liveMissions;
+      extraRoutes = extraRoutesFor(activeMissions, selectedAmbulanceId || assignedUnit);
       markers = buildMarkers();
     } catch {
       /* ignore */
@@ -139,8 +197,14 @@
       const res = await apiFetch('/accounts/monitor');
       if (!res.ok) return;
       monitor = await res.json();
-      if (monitor?.mission) applyPayload(monitor.mission);
-      if (monitor?.active_missions?.length) activeMissions = monitor.active_missions;
+      const liveList = (monitor.active_missions || []).filter((m: any) => m && m.phase !== 'complete');
+      activeMissions = liveList;
+      const keep = liveList.find((m: any) => m.ambulance_id === selectedAmbulanceId);
+      const latest = monitor?.mission && monitor.mission.phase !== 'complete' ? monitor.mission : null;
+      const live = keep || latest || liveList[0] || null;
+      if (live) focusMission(live);
+      else clearMissionUi();
+      markers = buildMarkers();
     } catch {
       /* ignore */
     }
@@ -188,24 +252,29 @@
           <span class="nb-chip nb-red" style="color:#fff;">{dispatchStatus}</span>
         </div>
 
-        <p class="text-[10px] text-[#4B4B4B] font-semibold">Emergency shortest path. Nearby traffic police get an SMS to clear the corridor. Multiple units stay live.</p>
+        <p class="text-[10px] text-[#4B4B4B] font-semibold">Tap an assigned ambulance on the map to drive that dispatch. Tap a police/rescue icon to call the duty officer.</p>
 
         <div class="space-y-2 overflow-y-auto no-sb flex-1 pr-1">
           {#each ambulances as a}
-            <div class="flex items-center justify-between bg-white px-3 py-2 {assignedIds.has(a.id) ? 'nb-red' : ''}" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+            <button
+              type="button"
+              onclick={() => selectAmbulance(a.id)}
+              class="flex items-center justify-between bg-white px-3 py-2 w-full text-left {assignedIds.has(a.id) ? 'nb-red' : ''} {selectedAmbulanceId === a.id ? 'ring-2 ring-black' : ''}"
+              style="border:3px solid #111;box-shadow:3px 3px 0 #111;cursor:pointer;"
+            >
               <div>
                 <p class="text-[12px] font-black {assignedIds.has(a.id) ? 'text-white' : 'text-black'}">{a.id}</p>
                 <p class="text-[9px] {assignedIds.has(a.id) ? 'text-white/80' : 'text-[#4B4B4B]'} uppercase tracking-wide font-bold">{a.label}</p>
               </div>
               <span class="nb-chip {a.status === 'available' ? 'nb-green' : a.status === 'dispatched' ? 'nb-red' : ''}" style="color:{a.status === 'idle' ? '#111' : '#fff'};">{a.status}</span>
-            </div>
+            </button>
           {/each}
         </div>
       </section>
     </div>
 
     <div class="col-span-6 relative overflow-hidden nb-card-lg" style="border:4px solid #111;">
-      <MapWidget id="dash-map" {markers} {etaLabel} {pickupRoute} {dropRoute} {extraRoutes} showLegend center={[BMSIT.lat, BMSIT.lng]} />
+      <MapWidget id="dash-map" {markers} {etaLabel} {pickupRoute} {dropRoute} {extraRoutes} {selectedAmbulanceId} officerCallEnabled showLegend center={[BMSIT.lat, BMSIT.lng]} onSelectAmbulance={selectAmbulance} />
       <div class="absolute inset-0 pointer-events-none z-10" style="padding: 0.9rem;">
         <div class="flex justify-between items-start pointer-events-auto gap-2">
           <div class="glass px-3 py-2">
@@ -323,12 +392,14 @@
                 <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">{activeMissions.length} unit{activeMissions.length === 1 ? '' : 's'}</span>
               </div>
               {#each activeMissions as m}
-                <p class="text-[10px] text-black font-semibold mt-1">
-                  {m.ambulance_id} · {m.priority_label || 'standard'} · {m.phase} → {m.hospital_name}
-                  {#if m.conflict?.status && m.conflict.status !== 'none'}
-                    <span class="text-[#b45309]"> · {m.conflict.status}</span>
-                  {/if}
-                </p>
+                <button type="button" class="block w-full text-left" onclick={() => selectAmbulance(m.ambulance_id)}>
+                  <p class="text-[10px] font-semibold mt-1 {selectedAmbulanceId === m.ambulance_id ? 'text-[#FF2D2D] font-black' : 'text-black'}">
+                    {m.ambulance_id} · {m.priority_label || 'standard'} · {m.phase} → {m.hospital_name}
+                    {#if m.conflict?.status && m.conflict.status !== 'none'}
+                      <span class="text-[#b45309]"> · {m.conflict.status}</span>
+                    {/if}
+                  </p>
+                </button>
               {/each}
             </div>
           {/if}

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
   import { apiFetch } from '$lib/auth.svelte';
+  import { postToMarker } from '$lib/officers';
 
   let mission = $state<any>(null);
   let markers = $state<any[]>([]);
@@ -10,24 +11,35 @@
   let etaLabel = $state('');
   let alertBanner = $state<any>(null);
   let lastAlertId = $state('');
+  let posts = $state<any[]>([]);
 
   function applyMission(m: any) {
-    mission = m;
-    if (!m) {
-      markers = [];
+    if (!m || m.phase === 'complete') {
+      mission = null;
       pickupRoute = [];
       dropRoute = [];
       etaLabel = '';
+      markers = posts.map((p) => postToMarker(p, true));
       return;
     }
+    mission = m;
     const pickup = m.pickup || {};
     const hosp = m.hospital || {};
     const drv = m.driver_location || {};
     const pts: any[] = [];
-    if (drv.lat) pts.push({ position: [drv.lat, drv.lng], popup: `Unit ${m.ambulance_id}`, type: 'ambulance' });
+    if (drv.lat) {
+      pts.push({
+        position: [drv.lat, drv.lng],
+        popup: `Unit ${m.ambulance_id}`,
+        type: 'ambulance',
+        id: m.ambulance_id,
+        ambulanceId: m.ambulance_id,
+        hasMission: true,
+      });
+    }
     if (pickup.lat) pts.push({ position: [pickup.lat, pickup.lng], popup: `Pickup · ${m.pickup_person}`, type: 'incident' });
     if (hosp.lat) pts.push({ position: [hosp.lat, hosp.lng], popup: `Hospital · ${m.destination}`, type: 'hospital_selected' });
-    markers = pts;
+    markers = [...pts, ...posts.map((p) => postToMarker(p, true))];
     pickupRoute = m.pickup_route || [];
     dropRoute = m.drop_route || [];
     etaLabel = m.eta_label || '';
@@ -38,6 +50,19 @@
     if (!res.ok) return;
     const data = await res.json();
     applyMission(data.mission);
+  }
+
+  async function loadPosts() {
+    try {
+      const res = await apiFetch('/tracking/corridor');
+      if (!res.ok) return;
+      const data = await res.json();
+      posts = data.posts || [];
+      if (mission) applyMission(mission);
+      else markers = posts.map((p) => postToMarker(p, true));
+    } catch {
+      /* ignore */
+    }
   }
 
   async function loadAlerts() {
@@ -78,9 +103,11 @@
   onMount(() => {
     loadMission();
     loadAlerts();
+    loadPosts();
     const t = setInterval(() => {
       loadMission();
       loadAlerts();
+      loadPosts();
     }, 2000);
     return () => clearInterval(t);
   });
@@ -109,7 +136,17 @@
   {/if}
 
   <div class="flex-1 relative">
-    <MapWidget id="driver-map" clazz="absolute inset-0" {markers} {pickupRoute} {dropRoute} {etaLabel} showLegend />
+    <MapWidget
+      id="driver-map"
+      clazz="absolute inset-0"
+      {markers}
+      {pickupRoute}
+      {dropRoute}
+      {etaLabel}
+      selectedAmbulanceId={mission?.ambulance_id || ''}
+      officerCallEnabled
+      showLegend
+    />
     <div class="absolute top-5 left-5 z-10 w-80 max-w-[calc(100%-2.5rem)] pointer-events-none">
       <div class="glass p-5 pointer-events-auto">
         {#if !mission}
@@ -138,6 +175,7 @@
             <p class="text-[10px] text-[#4B4B4B] mt-2 font-semibold">Auto-completes when the unit reaches hospital if you do not tap this.</p>
           {/if}
           <p class="text-xs text-[#4B4B4B] mt-2 font-bold">ETA {mission.eta_minutes ?? '—'} min · {mission.ambulance_id}</p>
+          <p class="text-[10px] text-[#4B4B4B] mt-2 font-semibold">Tap a 👮 / 🛟 icon to call the duty officer.</p>
         {/if}
       </div>
     </div>

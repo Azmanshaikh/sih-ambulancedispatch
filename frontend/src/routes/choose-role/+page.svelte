@@ -8,6 +8,7 @@
   let otpSent = $state(Boolean(auth.profile?.requested_role && auth.profile?.status === 'pending'));
   let wanted = $state(auth.profile?.requested_role || '');
   let code = $state('');
+  let otpHint = $state('');
 
   async function choose(role: 'patient' | 'driver' | 'staff') {
     picking = true;
@@ -24,6 +25,7 @@
       if (data.otp_sent) {
         otpSent = true;
         wanted = role;
+        otpHint = data.message || 'OTP sent to head staff.';
         return;
       }
       goto(homeFor(auth.profile?.role), { replaceState: true });
@@ -81,7 +83,8 @@
       </div>
     {:else}
       <p style="font-size:13px;color:#111;margin:0 0 12px;font-weight:600;">
-        OTP for <strong>{wanted}</strong> was sent to staff. Ask them for the 6-digit code.
+        OTP for <strong>{wanted}</strong> was sent to head staff.
+        {otpHint} Ask them for the 6-digit code.
       </p>
       <input
         class="nb-input"

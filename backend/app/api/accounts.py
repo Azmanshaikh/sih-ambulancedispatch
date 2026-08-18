@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.core.security import get_current_user, require_roles
 from app.services.fleet import BMSIT, get_ambulances
+from app.services.mail import head_staff_emails
 from app.services.otp import issue_otp, list_active_otps, verify_otp
 from app.services.profiles import (
     activate_patient,
@@ -27,6 +28,7 @@ from app.services.runtime_state import (
     enrich_mission,
     get_latest_mission,
     get_medical_record,
+    live_mission_or_none,
     get_mission_for_ambulance,
     get_mission_for_patient,
     list_active_missions,
@@ -127,13 +129,23 @@ async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_c
         return {"status": "success", "user": row, "otp_sent": False}
 
     pending = mark_otp_pending(user["id"], body.role)
-    issue_otp(user["id"], user["email"], pending.get("full_name"), body.role)
+    issued = issue_otp(user["id"], user["email"], pending.get("full_name"), body.role)
     pending["onboarded"] = False
+    emailed_to = issued.get("emailed_to") or head_staff_emails()
+    emailed = bool(issued.get("email_sent"))
+    dest = ", ".join(emailed_to) if emailed_to else "head staff"
+    message = (
+        f"OTP emailed to {dest}."
+        if emailed
+        else f"OTP is waiting for {dest} on the staff OTP codes page."
+    )
     return {
         "status": "success",
         "user": pending,
         "otp_sent": True,
-        "message": "OTP sent to staff. Ask them for the code.",
+        "otp_email_sent": emailed,
+        "otp_emailed_to": emailed_to,
+        "message": message,
     }
 
 
@@ -194,15 +206,11 @@ async def live_mission(user: dict[str, Any] = Depends(get_current_user)):
     profile = user.get("profile") or {}
     role = profile.get("role")
     if role == "driver":
-        mission = enrich_mission(get_mission_for_ambulance(profile.get("ambulance_id")))
-        if not mission:
-            mission = enrich_mission(get_latest_mission())
+        mission = live_mission_or_none(enrich_mission(get_mission_for_ambulance(profile.get("ambulance_id"))))
     elif role == "patient":
-        mission = enrich_mission(get_mission_for_patient(user["id"]))
-        if not mission:
-            mission = enrich_mission(get_latest_mission())
+        mission = live_mission_or_none(enrich_mission(get_mission_for_patient(user["id"])))
     elif role == "staff":
-        mission = enrich_mission(get_latest_mission())
+        mission = live_mission_or_none(enrich_mission(get_latest_mission()))
     else:
         raise HTTPException(status_code=403, detail="Not allowed for this role")
     if not mission:
@@ -331,12 +339,12 @@ async def staff_cases(_user: dict[str, Any] = Depends(require_roles("staff"))):
 
 @router.get("/monitor")
 async def staff_monitor(user: dict[str, Any] = Depends(require_roles("staff"))):
-    mission = enrich_mission(get_latest_mission())
+    mission = live_mission_or_none(enrich_mission(get_latest_mission()))
     active = [enrich_mission(m) for m in list_active_missions()]
     patient_id = (mission or {}).get("patient_id")
     vitals = tick_vitals(patient_id) if patient_id else {"heart_rate": None, "spo2": None, "source": "none"}
     record = get_medical_record(patient_id) if patient_id else {}
-    pickup = (mission or {}).get("pickup") or BMSIT
+    pickup = (mission or {}).get("pickup") if mission else None
     return {
         "status": "success",
         "unread_alerts": unread_count("staff"),
@@ -344,13 +352,13 @@ async def staff_monitor(user: dict[str, Any] = Depends(require_roles("staff"))):
             "id": patient_id,
             "name": (mission or {}).get("patient_name"),
             "email": (mission or {}).get("patient_email"),
-            "lat": pickup.get("lat") if isinstance(pickup, dict) else BMSIT["lat"],
-            "lng": pickup.get("lng") if isinstance(pickup, dict) else BMSIT["lng"],
-            "address": pickup.get("name") if isinstance(pickup, dict) else BMSIT["name"],
+            "lat": pickup.get("lat") if isinstance(pickup, dict) else None,
+            "lng": pickup.get("lng") if isinstance(pickup, dict) else None,
+            "address": pickup.get("name") if isinstance(pickup, dict) else None,
             "vitals": vitals,
             "record": record,
             "history": (record or {}).get("history") or [],
-        },
+        } if mission else None,
         "driver": (mission or {}).get("driver_location"),
         "mission": mission,
         "active_missions": active,

@@ -98,7 +98,15 @@
     const res = await apiFetch('/accounts/mission');
     if (!res.ok) return;
     const data = await res.json();
-    if (data.mission) applyLive(data.mission);
+    if (data.mission && data.mission.phase !== 'complete') applyLive(data.mission);
+    else {
+      pickupRoute = [];
+      dropRoute = [];
+      etaLabel = '';
+      markers = [
+        { position: [BMSIT.lat, BMSIT.lng], popup: `📍 You · ${BMSIT.name}`, type: 'incident' },
+      ];
+    }
   }
 
   async function emergencySos() {

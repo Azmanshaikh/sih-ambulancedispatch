@@ -4,17 +4,104 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from app.core.supabase import rest_select, rest_update
+from app.services.mail import head_staff_emails, send_staff_otp_email
 from app.services.runtime_state import push_alert
 
 _otps: dict[str, dict[str, Any]] = {}
+_OTP_TITLE = "ACCESS OTP"
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _parse_dt(raw: str | None) -> datetime | None:
+    if not raw:
+        return None
+    try:
+        value = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+    except Exception:
+        return None
+
+
+def _public(row: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in row.items() if k != "code"}
+
+
+def _from_alert(alert: dict[str, Any]) -> dict[str, Any] | None:
+    payload = alert.get("payload") if isinstance(alert.get("payload"), dict) else {}
+    merged = {**payload, **alert}
+    code = str(merged.get("otp") or payload.get("otp") or "")
+    user_id = str(merged.get("otp_user_id") or payload.get("otp_user_id") or "")
+    if not code or not user_id:
+        return None
+    if merged.get("otp_used") or payload.get("otp_used"):
+        return None
+    return {
+        "alert_id": str(alert.get("id") or ""),
+        "user_id": user_id,
+        "email": merged.get("otp_email") or payload.get("otp_email") or "",
+        "full_name": merged.get("otp_name") or payload.get("otp_name") or merged.get("otp_email") or "",
+        "requested_role": merged.get("otp_role") or payload.get("otp_role") or "",
+        "code": code,
+        "attempts": int(merged.get("otp_attempts") or payload.get("otp_attempts") or 0),
+        "created_at": merged.get("created_at") or payload.get("created_at"),
+        "expires_at": merged.get("otp_expires_at") or payload.get("otp_expires_at"),
+        "used": False,
+        "emailed_to": merged.get("otp_emailed_to") or payload.get("otp_emailed_to") or [],
+        "email_sent": bool(merged.get("otp_email_sent") or payload.get("otp_email_sent")),
+    }
+
+
+def _load_persisted() -> dict[str, dict[str, Any]]:
+    rows = rest_select(
+        "dispatch_alerts",
+        {"title": f"eq.{_OTP_TITLE}", "select": "*", "order": "created_at.desc", "limit": "40"},
+    )
+    found: dict[str, dict[str, Any]] = {}
+    now = _now()
+    for alert in rows:
+        row = _from_alert(alert)
+        if not row:
+            continue
+        exp = _parse_dt(row.get("expires_at"))
+        if exp and exp < now:
+            continue
+        user_id = row["user_id"]
+        if user_id not in found:
+            found[user_id] = row
+    return found
+
+
+def _mark_used(row: dict[str, Any]) -> None:
+    row["used"] = True
+    alert_id = row.get("alert_id")
+    if not alert_id:
+        return
+    payload = {
+        "otp": row.get("code"),
+        "otp_email": row.get("email"),
+        "otp_name": row.get("full_name"),
+        "otp_role": row.get("requested_role"),
+        "otp_user_id": row.get("user_id"),
+        "otp_expires_at": row.get("expires_at"),
+        "otp_emailed_to": row.get("emailed_to") or [],
+        "otp_email_sent": row.get("email_sent"),
+        "otp_used": True,
+        "otp_attempts": row.get("attempts") or 0,
+        "kind": "access_otp",
+    }
+    rest_update("dispatch_alerts", {"id": f"eq.{alert_id}"}, {"payload": payload, "read": True})
+
+
 def issue_otp(user_id: str, email: str, full_name: str | None, requested_role: str) -> dict[str, Any]:
     code = f"{secrets.randbelow(1_000_000):06d}"
+    expires_at = (_now() + timedelta(minutes=15)).isoformat()
+    mail = send_staff_otp_email(email, full_name, requested_role, code)
     row = {
         "user_id": user_id,
         "email": email,
@@ -23,47 +110,69 @@ def issue_otp(user_id: str, email: str, full_name: str | None, requested_role: s
         "code": code,
         "attempts": 0,
         "created_at": _now().isoformat(),
-        "expires_at": (_now() + timedelta(minutes=15)).isoformat(),
+        "expires_at": expires_at,
         "used": False,
+        "emailed_to": mail.get("to") or head_staff_emails(),
+        "email_sent": bool(mail.get("sent")),
+        "email_error": mail.get("error"),
     }
     _otps[user_id] = row
     print(f"[JEEVAN OTP] {requested_role} for {email}: {code}")
     who = full_name or email
-    push_alert(
+    dest = ", ".join(row["emailed_to"]) or "head staff"
+    alert = push_alert(
         "staff",
-        "ACCESS OTP",
-        f"{who} ({email}) wants to join as {requested_role}. OTP: {code}. Give this code only if you know them.",
-        extra={"otp": code, "otp_email": email, "otp_role": requested_role},
+        _OTP_TITLE,
+        f"{who} ({email}) wants to join as {requested_role}. OTP: {code}. Sent to {dest}.",
+        extra={
+            "kind": "access_otp",
+            "otp": code,
+            "otp_email": email,
+            "otp_name": who,
+            "otp_role": requested_role,
+            "otp_user_id": user_id,
+            "otp_expires_at": expires_at,
+            "otp_emailed_to": row["emailed_to"],
+            "otp_email_sent": row["email_sent"],
+            "otp_used": False,
+        },
     )
-    return {k: v for k, v in row.items() if k != "code"}
+    row["alert_id"] = alert.get("id")
+    out = _public(row)
+    return out
 
 
 def list_active_otps() -> list[dict[str, Any]]:
     now = _now()
-    out = []
-    for row in _otps.values():
+    merged: dict[str, dict[str, Any]] = dict(_load_persisted())
+    for user_id, row in _otps.items():
         if row.get("used"):
             continue
-        exp = datetime.fromisoformat(row["expires_at"])
-        if exp < now:
+        exp = _parse_dt(row.get("expires_at"))
+        if exp and exp < now:
             continue
-        out.append(dict(row))
+        merged[user_id] = dict(row)
+    out = list(merged.values())
     out.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return out
 
 
 def verify_otp(user_id: str, code: str) -> dict[str, Any]:
-    row = _otps.get(user_id)
+    persisted = _load_persisted()
+    row = _otps.get(user_id) or persisted.get(user_id)
     if not row or row.get("used"):
         raise ValueError("No OTP pending. Choose Driver or Staff again.")
-    exp = datetime.fromisoformat(row["expires_at"])
-    if exp < _now():
+    exp = _parse_dt(row.get("expires_at"))
+    if exp and exp < _now():
         raise ValueError("OTP expired. Request a new one.")
     row["attempts"] = int(row.get("attempts") or 0) + 1
     if row["attempts"] > 8:
         raise ValueError("Too many attempts. Request a new OTP.")
     entered = "".join(ch for ch in (code or "") if ch.isdigit())
-    if entered != row["code"]:
+    if entered != str(row.get("code") or ""):
+        _otps[user_id] = row
         raise ValueError("Wrong OTP. Ask staff for the current code.")
     row["used"] = True
+    _otps[user_id] = row
+    _mark_used(row)
     return row

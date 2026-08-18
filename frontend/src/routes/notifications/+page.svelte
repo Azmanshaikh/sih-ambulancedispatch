@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
   import { apiFetch } from '$lib/auth.svelte';
+  import { postToMarker } from '$lib/officers';
 
   let alerts = $state<any[]>([]);
   let monitor = $state<any>(null);
@@ -40,20 +41,26 @@
     if (mRes.ok) {
       monitor = await mRes.json();
       cases = monitor.cases || [];
-      const p = monitor.patient || {};
-      const d = monitor.driver || {};
-      const h = monitor.mission?.hospital || {};
-      pickupRoute = monitor.mission?.pickup_route || [];
-      dropRoute = monitor.mission?.drop_route || monitor.mission?.route || [];
+      const live = monitor.mission && monitor.mission.phase !== 'complete' ? monitor.mission : null;
+      const p = live ? monitor.patient || {} : {};
+      const d = live ? monitor.driver || {} : {};
+      const h = live?.hospital || {};
+      pickupRoute = live?.pickup_route || [];
+      dropRoute = live?.drop_route || live?.route || [];
       reports = monitor.reports || [];
-      const posts = (corridor?.posts || []).map((post: any) => ({
-        position: [post.lat, post.lng],
-        popup: `${post.kind === 'rescue' ? 'Rescue' : 'Traffic'} · ${post.name}${post.alerted ? ' · ALERT SENT' : ''}`,
-        type: post.kind === 'rescue' ? (post.alerted ? 'rescue_alert' : 'rescue') : post.alerted ? 'police_alert' : 'police',
-      }));
+      const posts = (corridor?.posts || []).map((post: any) => postToMarker(post, true));
       markers = [
         p.lat ? { position: [p.lat, p.lng], popup: `Patient · ${p.name || ''}`, type: 'incident' } : null,
-        d.lat ? { position: [d.lat, d.lng], popup: `Driver · ${d.id}`, type: 'ambulance' } : null,
+        d.lat
+          ? {
+              position: [d.lat, d.lng],
+              popup: `Driver · ${d.id}`,
+              type: 'ambulance',
+              id: live?.ambulance_id,
+              ambulanceId: live?.ambulance_id,
+              hasMission: true,
+            }
+          : null,
         h.lat ? { position: [h.lat, h.lng], popup: `Hospital · ${h.name}`, type: 'hospital_selected' } : null,
         ...posts,
       ].filter(Boolean);
@@ -102,7 +109,7 @@
 
     <div class="col-span-12 lg:col-span-4 flex flex-col gap-4">
       <div class="relative overflow-hidden nb-card-lg map-wrap" style="height: 220px;border:4px solid #111;">
-        <MapWidget id="notif-map" clazz="absolute inset-0" {markers} {pickupRoute} {dropRoute} {extraRoutes} showLegend />
+        <MapWidget id="notif-map" clazz="absolute inset-0" {markers} {pickupRoute} {dropRoute} {extraRoutes} officerCallEnabled showLegend />
         <div class="absolute top-3 left-3 glass px-3 py-1.5 z-10">
           <div class="flex items-center gap-2">
             <div class="w-2.5 h-2.5 bg-[#FF2D2D] blink" style="border:2px solid #111;"></div>

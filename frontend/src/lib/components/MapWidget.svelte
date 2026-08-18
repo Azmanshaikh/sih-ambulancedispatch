@@ -6,6 +6,12 @@
     position: [number, number];
     popup?: string;
     type?: string;
+    id?: string;
+    ambulanceId?: string;
+    hasMission?: boolean;
+    officerName?: string;
+    phone?: string;
+    postId?: string;
   }
 
   interface ExtraRoute {
@@ -29,6 +35,9 @@
     zoom?: number;
     fitRoute?: boolean;
     showLegend?: boolean;
+    selectedAmbulanceId?: string;
+    officerCallEnabled?: boolean;
+    onSelectAmbulance?: (id: string) => void;
   }
 
   const BMSIT: [number, number] = [13.1344, 77.5693];
@@ -46,6 +55,9 @@
     zoom = 13,
     fitRoute = true,
     showLegend = false,
+    selectedAmbulanceId = '',
+    officerCallEnabled = false,
+    onSelectAmbulance,
   }: Props = $props();
 
   let mapElement: HTMLElement;
@@ -56,6 +68,7 @@
   let etaMarker: any = null;
   let lastRouteKey = '';
   let overview: { center: any; zoom: number } | null = null;
+  let pendingNav = false;
 
   let navMode = $state(false);
   let heading = $state(0);
@@ -156,6 +169,31 @@
       .map((m) => m.position as [number, number]);
   }
 
+  function markerAmbulanceId(m: MapMarker) {
+    return m.ambulanceId || m.id || '';
+  }
+
+  function ambulancePosById(id: string | undefined) {
+    if (!id) return null;
+    const hit = markers.find((m) => m.type === 'ambulance' && markerAmbulanceId(m) === id);
+    return hit?.position ? (hit.position as [number, number]) : null;
+  }
+
+  function popupHtml(marker: MapMarker) {
+    const isOfficer = Boolean(marker.type && (marker.type.startsWith('police') || marker.type.startsWith('rescue')));
+    if (officerCallEnabled && isOfficer && marker.phone) {
+      const tel = marker.phone.replace(/\D/g, '');
+      const href = tel.length === 10 ? `tel:+91${tel}` : `tel:${tel}`;
+      const name = marker.officerName || 'SI Duty Officer';
+      return `<div class="officer-card">
+        <p class="officer-name">${name}</p>
+        <p class="officer-station">${marker.popup || ''}</p>
+        <a class="officer-call" href="${href}">Call ${marker.phone}</a>
+      </div>`;
+    }
+    return `<span style="font-weight:700;font-size:13px">${marker.popup || ''}</span>`;
+  }
+
   function nearestAmbulance(path: [number, number][] | null | undefined) {
     const ambs = ambulancePositions();
     if (!ambs.length || !path || path.length < 2) return null;
@@ -243,8 +281,9 @@
   function clipRoutes() {
     const redFull = pickupRoute && pickupRoute.length > 1 ? pickupRoute : route;
     const blueFull = dropRoute && dropRoute.length > 1 ? dropRoute : null;
-    const ambOnRed = nearestAmbulance(redFull);
-    const ambOnBlue = nearestAmbulance(blueFull);
+    const selectedPos = ambulancePosById(selectedAmbulanceId);
+    const ambOnRed = selectedPos || nearestAmbulance(redFull);
+    const ambOnBlue = selectedPos || nearestAmbulance(blueFull);
     let red = remainingPath(redFull, ambOnRed);
     let blue = remainingPath(blueFull, ambOnBlue);
     let onDrop = false;
@@ -258,7 +297,7 @@
         blue = blueFull;
       }
     }
-    const follow = ambOnRed || ambOnBlue || ambulancePositions()[0] || null;
+    const follow = selectedPos || ambOnRed || ambOnBlue || ambulancePositions()[0] || null;
     const remaining = red.length > 1 ? red : blue.length > 1 ? blue : [];
     return { redFull, blueFull, red, blue, follow, remaining, onDrop, dest: onDrop || !red.length ? 'hospital' : 'patient' };
   }
@@ -331,25 +370,32 @@
         22,
         'amb-marker'
       ),
+      ambulance_selected: makeIcon(
+        `<span class="amb-icon" style="font-size:26px;line-height:1">🚑</span>`,
+        26,
+        'amb-marker amb-selected'
+      ),
       hospital: makeIcon(HOSPITAL_SVG, 28, 'hosp-marker'),
       hospital_selected: makeIcon(HOSPITAL_SVG, 34, 'hosp-marker hosp-selected'),
       police: makeIcon(
         `<span style="font-size:18px;line-height:1;filter:grayscale(0.2)">👮</span>`,
-        18
+        18,
+        'officer-marker'
       ),
       police_alert: makeIcon(
         `<span style="font-size:20px;line-height:1">👮</span>`,
         20,
-        'amb-marker'
+        'amb-marker officer-marker'
       ),
       rescue: makeIcon(
         `<span style="font-size:18px;line-height:1">🛟</span>`,
-        18
+        18,
+        'officer-marker'
       ),
       rescue_alert: makeIcon(
         `<span style="font-size:20px;line-height:1">🛟</span>`,
         20,
-        'amb-marker'
+        'amb-marker officer-marker'
       ),
       default: makeIcon(`<span style="font-size:22px">📍</span>`, 22),
     };
@@ -359,6 +405,7 @@
       ? markers.filter((m) => {
           const t = m.type || '';
           if (t === 'incident' || t === 'hospital_selected') return true;
+          if (t.startsWith('police') || t.startsWith('rescue')) return true;
           if (t === 'ambulance' && drive.follow) {
             return dist2(m.position, drive.follow) < 1e-12;
           }
@@ -368,23 +415,35 @@
 
     shown.forEach((marker) => {
       if (navMode && marker.type === 'ambulance') return;
+      const ambId = markerAmbulanceId(marker);
+      const selectedAmb = marker.type === 'ambulance' && ambId && ambId === selectedAmbulanceId;
+      const iconKey = selectedAmb ? 'ambulance_selected' : marker.type || 'default';
       const m = L.marker(marker.position, {
-        icon: ICONS[marker.type || 'default'] || ICONS.default,
+        icon: ICONS[iconKey] || ICONS.default,
         zIndexOffset:
-          marker.type === 'hospital_selected'
-            ? 600
-            : marker.type === 'incident'
-              ? 500
-              : marker.type === 'ambulance'
-                ? 700
-                : marker.type?.includes('alert')
-                  ? 800
-                  : 0,
+          selectedAmb
+            ? 900
+            : marker.type === 'hospital_selected'
+              ? 600
+              : marker.type === 'incident'
+                ? 500
+                : marker.type === 'ambulance'
+                  ? 700
+                  : marker.type?.includes('alert')
+                    ? 800
+                    : 0,
       }).addTo(map);
-      if (marker.popup) {
-        m.bindPopup(`<span style="font-weight:700;font-size:13px">${marker.popup}</span>`, {
-          className: 'custom-popup',
+      const isOfficer = Boolean(marker.type && (marker.type.startsWith('police') || marker.type.startsWith('rescue')));
+      if (marker.hasMission && ambId) {
+        m.on('click', () => {
+          pendingNav = true;
+          onSelectAmbulance?.(ambId);
         });
+      } else if (marker.popup || (officerCallEnabled && isOfficer && marker.phone)) {
+        m.bindPopup(popupHtml(marker), { className: 'custom-popup', maxWidth: 260 });
+      }
+      if (marker.type === 'ambulance' && ambId && !marker.hasMission) {
+        m.on('click', () => onSelectAmbulance?.(ambId));
       }
       mapMarkers.push(m);
     });
@@ -509,7 +568,18 @@
     const _x = extraRoutes;
     const _e = etaLabel;
     const _n = navMode;
-    if (map && L) updateMap();
+    const _s = selectedAmbulanceId;
+    if (map && L) {
+      updateMap();
+      const ready =
+        (pickupRoute && pickupRoute.length > 1) ||
+        (dropRoute && dropRoute.length > 1) ||
+        (route && route.length > 1);
+      if (pendingNav && ready) {
+        pendingNav = false;
+        if (!navMode) queueMicrotask(() => startNav());
+      }
+    }
   });
 
   let hasRoute = $derived(
@@ -567,7 +637,7 @@
     </div>
   {/if}
 
-  {#if !navMode}
+  {#if !navMode && hasRoute}
     <button
       type="button"
       class="nav-go"
@@ -736,5 +806,44 @@
   }
   .nav-go:not(.ready) {
     background: #2E5BFF;
+  }
+  :global(.amb-marker) {
+    cursor: pointer;
+  }
+  :global(.officer-marker) {
+    cursor: pointer;
+  }
+  :global(.amb-selected .amb-icon) {
+    filter: drop-shadow(0 0 6px #FF2D2D) drop-shadow(0 0 2px #111);
+  }
+  :global(.custom-popup .officer-card) {
+    min-width: 160px;
+  }
+  :global(.custom-popup .officer-name) {
+    margin: 0;
+    font-weight: 800;
+    font-size: 14px;
+    color: #111;
+  }
+  :global(.custom-popup .officer-station) {
+    margin: 4px 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #4B4B4B;
+    line-height: 1.35;
+  }
+  :global(.custom-popup .officer-call) {
+    display: block;
+    padding: 8px 10px;
+    background: #FF2D2D;
+    color: #fff !important;
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    text-align: center;
+    border: 3px solid #111;
+    box-shadow: 2px 2px 0 #111;
   }
 </style>
