@@ -55,6 +55,19 @@
   let mapPolylines: any[] = [];
   let etaMarker: any = null;
   let lastRouteKey = '';
+  let overview: { center: any; zoom: number } | null = null;
+
+  let navMode = $state(false);
+  let heading = $state(0);
+  let headingSmoothed = 0;
+  let navHint = $state({
+    icon: 'navigation',
+    dist: '',
+    text: 'Start drive',
+    remain: '',
+    eta: '',
+    arrive: '',
+  });
 
   const HOSPITAL_SVG = `
     <div class="hosp-building">
@@ -83,16 +96,217 @@
     return `${r.length}:${a[0]},${a[1]}:${b[0]},${b[1]}`;
   }
 
-  function drawLine(points: [number, number][], color: string, halo: string) {
-    const h = L.polyline(points, { color: halo, weight: 10, opacity: 0.28 }).addTo(map);
+  function dist2(a: [number, number], b: [number, number]) {
+    const dlat = a[0] - b[0];
+    const dlng = a[1] - b[1];
+    return dlat * dlat + dlng * dlng;
+  }
+
+  function meters(a: [number, number], b: [number, number]) {
+    const R = 6371000;
+    const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+    const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+    const lat1 = (a[0] * Math.PI) / 180;
+    const lat2 = (b[0] * Math.PI) / 180;
+    const h =
+      Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+
+  function bearingDeg(a: [number, number], b: [number, number]) {
+    const lat1 = (a[0] * Math.PI) / 180;
+    const lat2 = (b[0] * Math.PI) / 180;
+    const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+    const y = Math.sin(dLng) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+    return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+  }
+
+  function pathLength(path: [number, number][]) {
+    let s = 0;
+    for (let i = 0; i < path.length - 1; i++) s += meters(path[i], path[i + 1]);
+    return s;
+  }
+
+  function formatDist(m: number) {
+    if (m >= 1000) return `${(m / 1000).toFixed(1)} km`;
+    return `${Math.max(10, Math.round(m / 10) * 10)} m`;
+  }
+
+  function closestOnPath(path: [number, number][], pos: [number, number]) {
+    let best = { dist2: Infinity, idx: 0, point: path[0] as [number, number], t: 0 };
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i];
+      const b = path[i + 1];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const len2 = dx * dx + dy * dy || 1e-12;
+      let t = ((pos[0] - a[0]) * dx + (pos[1] - a[1]) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const point: [number, number] = [a[0] + t * dx, a[1] + t * dy];
+      const d = dist2(pos, point);
+      if (d < best.dist2) best = { dist2: d, idx: i, point, t };
+    }
+    return best;
+  }
+
+  function ambulancePositions() {
+    return markers
+      .filter((m) => m.type === 'ambulance' && m.position)
+      .map((m) => m.position as [number, number]);
+  }
+
+  function nearestAmbulance(path: [number, number][] | null | undefined) {
+    const ambs = ambulancePositions();
+    if (!ambs.length || !path || path.length < 2) return null;
+    let bestPos: [number, number] | null = null;
+    let bestD = Infinity;
+    for (const pos of ambs) {
+      const hit = closestOnPath(path, pos);
+      if (hit.dist2 < bestD) {
+        bestD = hit.dist2;
+        bestPos = pos;
+      }
+    }
+    return bestPos;
+  }
+
+  /** Keep only the road still ahead of the unit so traveled red/blue vanishes. */
+  function remainingPath(
+    path: [number, number][] | null | undefined,
+    from: [number, number] | null
+  ): [number, number][] {
+    if (!path || path.length < 2) return [];
+    if (!from) return path;
+    const hit = closestOnPath(path, from);
+    if (hit.dist2 > 0.0025 * 0.0025) return path;
+    const rest = path.slice(hit.idx + 1);
+    if (!rest.length) return [];
+    const last = path[path.length - 1];
+    if (dist2(from, last) < 0.00018 * 0.00018) return [];
+    if (dist2(from, rest[0]) < 1e-14) return rest;
+    return [from, ...rest];
+  }
+
+  function traveledPath(full: [number, number][] | null | undefined, remaining: [number, number][]) {
+    if (!full || full.length < 2 || !remaining.length) return [];
+    const hit = closestOnPath(full, remaining[0]);
+    const done = full.slice(0, hit.idx + 1);
+    if (!done.length) return [];
+    if (dist2(done[done.length - 1], remaining[0]) < 1e-14) return done;
+    return [...done, remaining[0]];
+  }
+
+  function setHeading(target: number) {
+    let d = target - headingSmoothed;
+    while (d > 180) d -= 360;
+    while (d < -180) d += 360;
+    headingSmoothed = (headingSmoothed + d * 0.42 + 360) % 360;
+    heading = headingSmoothed;
+  }
+
+  function guidance(path: [number, number][], dest: string) {
+    if (!path || path.length < 2) {
+      return { icon: 'navigation', dist: '', text: 'Waiting for route', remain: '', heading: headingSmoothed };
+    }
+    const remainM = pathLength(path);
+    const startBear = bearingDeg(path[0], path[Math.min(2, path.length - 1)]);
+    let toTurn = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      toTurn += meters(path[i], path[i + 1]);
+      const b = bearingDeg(path[i], path[i + 1]);
+      let delta = b - startBear;
+      while (delta > 180) delta -= 360;
+      while (delta < -180) delta += 360;
+      if (Math.abs(delta) > 38 && toTurn > 28) {
+        const sharp = Math.abs(delta) > 120 ? 'sharp ' : Math.abs(delta) < 55 ? 'slight ' : '';
+        const left = delta < 0;
+        return {
+          icon: Math.abs(delta) > 120 ? (left ? 'u_turn_left' : 'u_turn_right') : left ? 'turn_left' : 'turn_right',
+          dist: formatDist(toTurn),
+          text: `Turn ${sharp}${left ? 'left' : 'right'}`,
+          remain: formatDist(remainM),
+          heading: startBear,
+        };
+      }
+      if (toTurn > 450) break;
+    }
+    return {
+      icon: remainM < 80 ? 'flag' : 'straight',
+      dist: formatDist(remainM),
+      text: remainM < 80 ? `Arriving · ${dest}` : `Continue to ${dest}`,
+      remain: formatDist(remainM),
+      heading: startBear,
+    };
+  }
+
+  function clipRoutes() {
+    const redFull = pickupRoute && pickupRoute.length > 1 ? pickupRoute : route;
+    const blueFull = dropRoute && dropRoute.length > 1 ? dropRoute : null;
+    const ambOnRed = nearestAmbulance(redFull);
+    const ambOnBlue = nearestAmbulance(blueFull);
+    let red = remainingPath(redFull, ambOnRed);
+    let blue = remainingPath(blueFull, ambOnBlue);
+    let onDrop = false;
+    if (redFull && redFull.length > 1 && blueFull && blueFull.length > 1 && ambOnRed) {
+      const dPickup = closestOnPath(redFull, ambOnRed).dist2;
+      const dDrop = closestOnPath(blueFull, ambOnBlue || ambOnRed).dist2;
+      if (dDrop < dPickup) {
+        red = [];
+        onDrop = true;
+      } else {
+        blue = blueFull;
+      }
+    }
+    const follow = ambOnRed || ambOnBlue || ambulancePositions()[0] || null;
+    const remaining = red.length > 1 ? red : blue.length > 1 ? blue : [];
+    return { redFull, blueFull, red, blue, follow, remaining, onDrop, dest: onDrop || !red.length ? 'hospital' : 'patient' };
+  }
+
+  function drawLine(points: [number, number][], color: string, halo: string, drive = false) {
+    const casing = L.polyline(points, {
+      color: drive ? '#fff' : halo,
+      weight: drive ? 16 : 10,
+      opacity: drive ? 0.95 : 0.28,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(map);
     const main = L.polyline(points, {
       color,
-      weight: 5,
+      weight: drive ? 9 : 5,
       opacity: 1,
       lineCap: 'round',
       lineJoin: 'round',
     }).addTo(map);
-    mapPolylines.push(h, main);
+    mapPolylines.push(casing, main);
+  }
+
+  function applyNavCamera(latlng: [number, number]) {
+    if (!map || !L) return;
+    const z = 17;
+    const p = map.project(L.latLng(latlng[0], latlng[1]), z);
+    p.y += map.getSize().y * 0.18;
+    map.setView(map.unproject(p, z), z, { animate: true, duration: 0.7 });
+  }
+
+  function updateHint(drive: ReturnType<typeof clipRoutes>) {
+    const g = guidance(drive.remaining, drive.dest);
+    const mins = Number.parseInt(String(etaLabel).replace(/[^\d]/g, ''), 10);
+    const eta = etaLabel || (Number.isFinite(mins) ? `${mins} min` : '—');
+    let arrive = '';
+    if (Number.isFinite(mins) && mins > 0) {
+      const t = new Date(Date.now() + mins * 60000);
+      arrive = t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+    navHint = {
+      icon: g.icon,
+      dist: g.dist,
+      text: g.text,
+      remain: g.remain,
+      eta,
+      arrive,
+    };
+    if (drive.remaining.length > 1) setHeading(g.heading);
   }
 
   function updateMap() {
@@ -140,10 +354,32 @@
       default: makeIcon(`<span style="font-size:22px">📍</span>`, 22),
     };
 
-    markers.forEach((marker) => {
+    const drive = clipRoutes();
+    const shown = navMode
+      ? markers.filter((m) => {
+          const t = m.type || '';
+          if (t === 'incident' || t === 'hospital_selected') return true;
+          if (t === 'ambulance' && drive.follow) {
+            return dist2(m.position, drive.follow) < 1e-12;
+          }
+          return false;
+        })
+      : markers;
+
+    shown.forEach((marker) => {
+      if (navMode && marker.type === 'ambulance') return;
       const m = L.marker(marker.position, {
         icon: ICONS[marker.type || 'default'] || ICONS.default,
-        zIndexOffset: marker.type === 'hospital_selected' ? 600 : marker.type === 'incident' ? 500 : marker.type === 'ambulance' ? 700 : marker.type?.includes('alert') ? 800 : 0,
+        zIndexOffset:
+          marker.type === 'hospital_selected'
+            ? 600
+            : marker.type === 'incident'
+              ? 500
+              : marker.type === 'ambulance'
+                ? 700
+                : marker.type?.includes('alert')
+                  ? 800
+                  : 0,
       }).addTo(map);
       if (marker.popup) {
         m.bindPopup(`<span style="font-weight:700;font-size:13px">${marker.popup}</span>`, {
@@ -153,19 +389,29 @@
       mapMarkers.push(m);
     });
 
-    const red = pickupRoute && pickupRoute.length > 1 ? pickupRoute : route;
-    const blue = dropRoute && dropRoute.length > 1 ? dropRoute : null;
-    if (red && red.length > 1) drawLine(red, '#dc2626', '#7f1d1d');
-    if (blue && blue.length > 1) drawLine(blue, '#2563eb', '#1e3a8a');
-    extraRoutes.forEach((r) => {
-      if (r.points && r.points.length > 1) {
-        const color = r.color || '#38bdf8';
-        drawLine(r.points, color, r.halo || color);
-      }
-    });
+    if (navMode) {
+      const doneRed = traveledPath(drive.redFull, drive.red);
+      const doneBlue = traveledPath(drive.blueFull, drive.blue);
+      if (doneRed.length > 1) drawLine(doneRed, '#94a3b8', '#cbd5e1', true);
+      if (doneBlue.length > 1) drawLine(doneBlue, '#94a3b8', '#cbd5e1', true);
+    }
 
-    const etaOn = (blue && blue.length > 1 ? blue : red) || [];
-    if (etaLabel && etaOn.length > 1) {
+    if (drive.red.length > 1) drawLine(drive.red, '#dc2626', '#7f1d1d', navMode);
+    if (drive.blue.length > 1) drawLine(drive.blue, navMode ? '#1a73e8' : '#2563eb', '#1e3a8a', navMode);
+
+    if (!navMode) {
+      extraRoutes.forEach((r) => {
+        if (r.points && r.points.length > 1) {
+          const color = r.color || '#38bdf8';
+          const clip = r.kind === 'pickup' || r.kind === 'drop';
+          const pts = clip ? remainingPath(r.points, nearestAmbulance(r.points)) : r.points;
+          if (pts.length > 1) drawLine(pts, color, r.halo || color);
+        }
+      });
+    }
+
+    const etaOn = (drive.blue.length > 1 ? drive.blue : drive.red) || [];
+    if (!navMode && etaLabel && etaOn.length > 1) {
       const mid = etaOn[Math.floor(etaOn.length / 2)];
       etaMarker = L.marker(mid, {
         icon: L.divIcon({
@@ -179,13 +425,13 @@
       }).addTo(map);
     }
 
-    const key = `${routeKey(red)}|${routeKey(blue)}|${extraRoutes.length}`;
-    if (fitRoute && key !== '||0' && key !== lastRouteKey) {
+    const key = `${routeKey(drive.redFull)}|${routeKey(drive.blueFull)}|${extraRoutes.length}`;
+    if (fitRoute && !navMode && key !== '||0' && key !== lastRouteKey) {
       lastRouteKey = key;
       try {
         const boundsPts = [
-          ...(red || []),
-          ...(blue || []),
+          ...(drive.redFull || []),
+          ...(drive.blueFull || []),
           ...extraRoutes.flatMap((r) => r.points || []),
         ];
         if (boundsPts.length) map.fitBounds(boundsPts, { padding: [56, 56], maxZoom: 14 });
@@ -193,6 +439,51 @@
         /* ignore */
       }
     }
+
+    updateHint(drive);
+    if (navMode && drive.follow) applyNavCamera(drive.follow);
+    else if (navMode && drive.remaining.length) applyNavCamera(drive.remaining[0]);
+  }
+
+  function setMapInteractive(on: boolean) {
+    if (!map) return;
+    if (on) {
+      map.dragging.enable();
+      map.scrollWheelZoom.enable();
+      map.touchZoom.enable();
+      map.doubleClickZoom.enable();
+    } else {
+      map.dragging.disable();
+      map.scrollWheelZoom.disable();
+      map.touchZoom.disable();
+      map.doubleClickZoom.disable();
+    }
+  }
+
+  function startNav() {
+    if (!map) return;
+    overview = { center: map.getCenter(), zoom: map.getZoom() };
+    navMode = true;
+    setMapInteractive(false);
+    updateMap();
+  }
+
+  function stopNav() {
+    navMode = false;
+    setMapInteractive(true);
+    headingSmoothed = 0;
+    heading = 0;
+    lastRouteKey = '';
+    if (overview) {
+      map.setView(overview.center, overview.zoom, { animate: true });
+      overview = null;
+    }
+    updateMap();
+  }
+
+  function toggleNav() {
+    if (navMode) stopNav();
+    else startNav();
   }
 
   onMount(async () => {
@@ -217,13 +508,56 @@
     const _d = dropRoute;
     const _x = extraRoutes;
     const _e = etaLabel;
+    const _n = navMode;
     if (map && L) updateMap();
   });
+
+  let hasRoute = $derived(
+    (pickupRoute && pickupRoute.length > 1) ||
+      (dropRoute && dropRoute.length > 1) ||
+      (route && route.length > 1)
+  );
 </script>
 
-<div class="map-wrap {clazz}" style="width: 100%; height: 100%; position: relative;">
-  <div bind:this={mapElement} {id} style="width: 100%; height: 100%; border-radius: inherit; z-index: 0;"></div>
-  {#if showLegend && ((pickupRoute && pickupRoute.length > 1) || (dropRoute && dropRoute.length > 1) || (route && route.length > 1) || extraRoutes.length)}
+<div class="map-wrap {clazz}" class:is-nav={navMode} style="width: 100%; height: 100%; position: relative;">
+  <div class="nav-stage">
+    <div class="nav-yaw" style={navMode ? `transform: rotate(${-heading}deg)` : ''}>
+      <div bind:this={mapElement} {id} style="width: 100%; height: 100%; border-radius: inherit; z-index: 0;"></div>
+    </div>
+  </div>
+
+  {#if navMode}
+    <div class="nav-sky"></div>
+    <div class="nav-banner">
+      <span class="material-symbols-outlined nav-turn">{navHint.icon}</span>
+      <div>
+        <p class="nav-dist">{navHint.dist || '—'}</p>
+        <p class="nav-text">{navHint.text}</p>
+      </div>
+    </div>
+    <div class="nav-chevron" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="54" height="54">
+        <path d="M32 6 L56 54 L32 42 L8 54 Z" fill="#1a73e8" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="nav-sheet">
+      <div class="nav-stat">
+        <strong>{navHint.eta || '—'}</strong>
+        <span>ETA</span>
+      </div>
+      <div class="nav-stat">
+        <strong>{navHint.remain || '—'}</strong>
+        <span>Left</span>
+      </div>
+      <div class="nav-stat">
+        <strong>{navHint.arrive || '—'}</strong>
+        <span>Arrive</span>
+      </div>
+      <button type="button" class="nav-exit" onclick={stopNav}>Exit</button>
+    </div>
+  {/if}
+
+  {#if showLegend && !navMode && ((pickupRoute && pickupRoute.length > 1) || (dropRoute && dropRoute.length > 1) || (route && route.length > 1) || extraRoutes.length)}
     <div class="absolute bottom-3 left-3 z-[500] px-3 py-2 text-[10px] font-black uppercase tracking-widest" style="background:#fff;color:#111;border:3px solid #111;box-shadow:3px 3px 0 #111;">
       <p><span style="color:#FF2D2D">━</span> Ambulance → patient</p>
       <p><span style="color:#2E5BFF">━</span> Patient → hospital</p>
@@ -232,4 +566,175 @@
       <p><span style="color:#a855f7">━</span> Rerouted unit</p>
     </div>
   {/if}
+
+  {#if !navMode}
+    <button
+      type="button"
+      class="nav-go"
+      class:ready={hasRoute}
+      onclick={toggleNav}
+      aria-label="Start in-drive navigation"
+    >
+      <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">navigation</span>
+      <span>Drive</span>
+    </button>
+  {/if}
 </div>
+
+<style>
+  .map-wrap {
+    overflow: hidden;
+  }
+  .nav-stage,
+  .nav-yaw {
+    width: 100%;
+    height: 100%;
+    transform-origin: 50% 68%;
+  }
+  .is-nav .nav-stage {
+    transform: perspective(920px) rotateX(54deg) scale(1.42);
+    transform-origin: 50% 88%;
+    will-change: transform;
+  }
+  .is-nav .nav-yaw {
+    transition: transform 0.7s ease-out;
+    will-change: transform;
+  }
+  .is-nav :global(.leaflet-container) {
+    background: #cfdcc8;
+  }
+  .nav-sky {
+    pointer-events: none;
+    position: absolute;
+    inset: 0 0 42%;
+    z-index: 420;
+    background: linear-gradient(180deg, rgba(135, 186, 230, 0.55), transparent);
+  }
+  .nav-banner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 620;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: min(78%, 340px);
+    max-width: calc(100% - 24px);
+    padding: 10px 16px;
+    background: #1a73e8;
+    color: #fff;
+    border: 3px solid #111;
+    box-shadow: 4px 4px 0 #111;
+  }
+  .nav-turn {
+    font-size: 36px;
+    line-height: 1;
+  }
+  .nav-dist {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+  .nav-text {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.92;
+    margin-top: 2px;
+  }
+  .nav-chevron {
+    position: absolute;
+    left: 50%;
+    top: 66%;
+    z-index: 610;
+    transform: translate(-50%, -40%);
+    filter: drop-shadow(2px 3px 0 #111);
+    pointer-events: none;
+  }
+  .nav-sheet {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 620;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 3px solid #111;
+    box-shadow: 4px 4px 0 #111;
+  }
+  .nav-stat {
+    flex: 1;
+    min-width: 0;
+  }
+  .nav-stat strong {
+    display: block;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.1;
+  }
+  .nav-stat span {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #4B4B4B;
+  }
+  .nav-exit {
+    border: 3px solid #111;
+    background: #FF2D2D;
+    color: #fff;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 #111;
+  }
+  .nav-go {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 620;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 64px;
+    height: 64px;
+    background: #1a73e8;
+    color: #fff;
+    border: 3px solid #111;
+    box-shadow: 4px 4px 0 #111;
+    cursor: pointer;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 800;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .nav-go:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #111;
+  }
+  .nav-go:active {
+    transform: translate(3px, 3px);
+    box-shadow: 0 0 0 #111;
+  }
+  .nav-go :global(.material-symbols-outlined) {
+    font-size: 26px;
+    line-height: 1;
+  }
+  .nav-go:not(.ready) {
+    background: #2E5BFF;
+  }
+</style>

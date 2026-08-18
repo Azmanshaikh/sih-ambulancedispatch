@@ -29,6 +29,7 @@
   let corridor = $state<any>(null);
   let activeMissions = $state<any[]>([]);
   let assignedIds = $derived(new Set([assignedUnit, ...activeMissions.map((m) => m.ambulance_id)].filter(Boolean)));
+  let availableCount = $derived(ambulances.filter((a) => a.status === 'available').length);
   let conflictReason = $derived(
     monitor?.mission?.conflict?.reason ||
       activeMissions.find((m) => m.conflict?.reason)?.conflict?.reason ||
