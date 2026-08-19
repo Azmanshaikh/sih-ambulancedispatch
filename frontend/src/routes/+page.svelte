@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
+  import RouteReasoningPopup from '$lib/components/RouteReasoningPopup.svelte';
   import { apiFetch } from '$lib/auth.svelte';
   import { postToMarker } from '$lib/officers';
   import { t } from '$lib/i18n.svelte';
@@ -41,6 +42,44 @@
       activeMissions.find((m) => m.conflict?.reason)?.conflict?.reason ||
       ''
   );
+
+  let currentDecision = $derived.by(() => {
+    if (!assignedUnit && !selectedHospital && !pickupRoute.length && !dropRoute.length) {
+      return null;
+    }
+    const matchingMission = activeMissions.find((m) => m.ambulance_id === (selectedAmbulanceId || assignedUnit))
+      || (monitor?.mission?.ambulance_id === (selectedAmbulanceId || assignedUnit) ? monitor.mission : null)
+      || monitor?.mission
+      || null;
+
+    return {
+      id: matchingMission?.id || `${assignedUnit || 'unit'}-${selectedHospital?.id || 'hosp'}`,
+      ambulance_id: assignedUnit || matchingMission?.ambulance_id || selectedAmbulanceId,
+      ambulance: matchingMission?.ambulance || ambulances.find((a) => a.id === (assignedUnit || selectedAmbulanceId)),
+      assigned_ambulance_type_label: assignedAmbulanceType || matchingMission?.assigned_ambulance_type_label,
+      assigned_ambulance_type: matchingMission?.assigned_ambulance_type,
+      match_status: matchingMission?.match_status || (fallbackReason ? 'fallback' : 'exact'),
+      fallback_reason: fallbackReason || matchingMission?.fallback_reason,
+      hospital: selectedHospital || matchingMission?.hospital,
+      hospital_name: selectedHospital?.name || matchingMission?.hospital_name,
+      eta_minutes: etaLabel ? parseInt(etaLabel) : matchingMission?.eta_minutes,
+      pickup_minutes: pickupMinutes ?? matchingMission?.pickup_minutes,
+      transport_minutes: transportMinutes ?? matchingMission?.transport_minutes,
+      pickup_route: pickupRoute,
+      drop_route: dropRoute,
+      route: dropRoute,
+      constraints: constraints || matchingMission?.constraints,
+      confidence: confidence ?? matchingMission?.confidence,
+      reason: reason || matchingMission?.reason,
+      priority: matchingMission?.priority ?? 1,
+      priority_label: matchingMission?.priority_label,
+      emergency_category: matchingMission?.emergency_category,
+      is_raining: matchingMission?.is_raining,
+      conflict: matchingMission?.conflict,
+      conflictReason: conflictReason || matchingMission?.conflict?.reason,
+      phase: matchingMission?.phase || 'pickup',
+    };
+  });
 
   function applyPayload(payload: any) {
     if (!payload) return;
@@ -318,6 +357,7 @@
           </div>
         </div>
       </div>
+      <RouteReasoningPopup decision={currentDecision} />
     </div>
 
     <div class="col-span-3 flex flex-col gap-4 overflow-y-auto no-sb pb-3">

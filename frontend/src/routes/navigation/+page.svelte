@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
+  import RouteReasoningPopup from '$lib/components/RouteReasoningPopup.svelte';
   import { apiFetch } from '$lib/auth.svelte';
   import { postToMarker } from '$lib/officers';
   import { t } from '$lib/i18n.svelte';
@@ -20,6 +21,36 @@
   let markers = $state<any[]>([]);
   let etaLabel = $state('');
   let selected = $state<any>(null);
+
+  let currentDecision = $derived.by(() => {
+    if (!selected && !pickupRoute.length && !dropRoute.length) return null;
+    return {
+      id: selected?.id,
+      ambulance_id: selected?.ambulance_id || selectedAmbulanceId,
+      ambulance: selected?.ambulance || ambulances.find((a) => a.id === (selected?.ambulance_id || selectedAmbulanceId)),
+      assigned_ambulance_type_label: selected?.assigned_ambulance_type_label,
+      assigned_ambulance_type: selected?.assigned_ambulance_type,
+      match_status: selected?.match_status || 'exact',
+      fallback_reason: selected?.fallback_reason,
+      hospital: selected?.hospital,
+      hospital_name: selected?.hospital_name || selected?.hospital?.name,
+      eta_minutes: selected?.eta_minutes ?? (etaLabel ? parseInt(etaLabel) : null),
+      pickup_minutes: selected?.pickup_minutes,
+      transport_minutes: selected?.transport_minutes,
+      pickup_route: pickupRoute,
+      drop_route: dropRoute,
+      route: dropRoute,
+      constraints: selected?.constraints,
+      confidence: selected?.confidence,
+      reason: selected?.reason,
+      priority: selected?.priority ?? 1,
+      priority_label: selected?.priority_label,
+      emergency_category: selected?.emergency_category,
+      is_raining: selected?.is_raining,
+      conflict: selected?.conflict,
+      phase: selected?.phase || 'pickup',
+    };
+  });
 
   let assignedIds = $derived(new Set(activeMissions.map((m) => m.ambulance_id).filter(Boolean)));
 
@@ -208,5 +239,7 @@
         </div>
       </div>
     </div>
+
+    <RouteReasoningPopup decision={currentDecision} />
   </div>
 </div>
