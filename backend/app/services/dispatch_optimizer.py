@@ -9,6 +9,36 @@ import requests
 EMERGENCY_ETA_FACTOR = 0.70
 RAIN_ETA_FACTOR = 1.08
 
+EMERGENCY_REQUIREMENTS: dict[str, dict[str, Any]] = {
+    "general_medical": {"types": ["BLS"], "fallback": ["ALS", "BLS"], "specialties": ["Emergency", "General"]},
+    "cardiac": {"types": ["ALS"], "fallback": ["ALS", "BLS"], "specialties": ["Cardiac", "ICU", "Emergency"]},
+    "respiratory": {"types": ["ALS"], "fallback": ["ALS", "BLS"], "specialties": ["ICU", "Emergency"]},
+    "neurological": {"types": ["ALS"], "fallback": ["ALS", "BLS"], "specialties": ["Neuro", "Emergency", "ICU"]},
+    "trauma": {"types": ["ALS"], "fallback": ["ALS", "BLS"], "specialties": ["Trauma", "Emergency"]},
+    "obstetric": {"types": ["ALS"], "fallback": ["ALS", "BLS"], "specialties": ["Emergency", "ICU"]},
+    "pediatric": {"types": ["NEONATAL_PEDIATRIC"], "fallback": ["ALS", "BLS"], "specialties": ["Pediatric", "Emergency"]},
+    "bariatric_accessible": {"types": ["BARIATRIC_ACCESSIBLE"], "fallback": ["ALS", "BLS"], "specialties": ["Emergency", "General"]},
+}
+
+
+def dispatch_requirement(category: str | None, flags: dict[str, bool] | None = None, age_group: str | None = None, accessibility_need: bool = False) -> dict[str, Any]:
+    """Resolve the caller's category into the safest capability requirement."""
+    flags = flags or {}
+    selected = (category or "general_medical").strip().lower()
+    if accessibility_need:
+        selected = "bariatric_accessible"
+    elif age_group in ("infant", "child") and selected == "general_medical":
+        selected = "pediatric"
+    elif flags.get("cardiac"):
+        selected = "cardiac"
+    elif flags.get("epilepsy"):
+        selected = "neurological"
+    elif flags.get("pregnant"):
+        selected = "obstetric"
+    if selected not in EMERGENCY_REQUIREMENTS:
+        selected = "general_medical"
+    return {"category": selected, **EMERGENCY_REQUIREMENTS[selected]}
+
 
 class DispatchOptimizer:
     def __init__(self):
@@ -271,10 +301,11 @@ class DispatchOptimizer:
             enrich=enrich,
         )
 
-    def optimize_dispatch(self, incident_location: tuple, ambulances: List[Dict]) -> dict:
+    def optimize_dispatch(self, incident_location: tuple, ambulances: List[Dict], requirement: dict[str, Any] | None = None) -> dict:
         if not ambulances:
             return {"ambulance_id": None, "route": []}
 
+        requirement = requirement or dispatch_requirement(None)
         pick = self._pick_ambulance(
             incident_location,
             [
@@ -285,12 +316,16 @@ class DispatchOptimizer:
                 }
                 for a in ambulances
             ],
+            requirement=requirement,
         )
         unit = (pick or {}).get("ambulance") or ambulances[0]
         return {
             "ambulance_id": unit.get("id"),
             "route": (pick or {}).get("pickup_route") or [],
             "eta_seconds": (pick or {}).get("pickup_seconds") or 0,
+            "emergency_category": requirement["category"],
+            "assigned_ambulance_type": unit.get("ambulance_type"),
+            "match_status": (pick or {}).get("match_status") or "unassigned",
         }
 
     def _peak_traffic_factor(self) -> float:
@@ -317,9 +352,23 @@ class DispatchOptimizer:
         incident_location: tuple,
         ambulances: List[Dict[str, Any]],
         is_raining: bool = False,
+        requirement: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
+        requirement = requirement or dispatch_requirement(None)
         available = [a for a in ambulances if a.get("status") in (None, "available")]
-        pool = available or [a for a in ambulances if a.get("status") != "busy"] or ambulances
+        exact = [a for a in available if a.get("ambulance_type", "BLS") in requirement["types"]]
+        fallback: list[dict[str, Any]] = []
+        for ambulance_type in requirement["fallback"]:
+            tier = [a for a in available if a.get("ambulance_type", "BLS") == ambulance_type]
+            if tier:
+                fallback = tier
+                break
+        if exact:
+            pool, match_status = exact, "exact"
+        elif fallback:
+            pool, match_status = fallback, "fallback"
+        else:
+            pool, match_status = available, "last_resort"
         if not pool:
             return None
         shortlist = sorted(
@@ -343,6 +392,7 @@ class DispatchOptimizer:
                 "ambulance": unit,
                 "pickup_seconds": duration if duration != float("inf") else 0,
                 "pickup_route": coords,
+                "match_status": match_status,
             }
             if best is None or row["pickup_seconds"] < best["pickup_seconds"]:
                 best = row
@@ -354,11 +404,22 @@ class DispatchOptimizer:
         hospitals: List[Dict[str, Any]],
         ambulances: List[Dict[str, Any]],
         is_raining: bool = False,
+        requirement: dict[str, Any] | None = None,
     ) -> dict:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         self._detect_tomtom()
-        pickup = self._pick_ambulance(incident_location, ambulances, is_raining=is_raining)
+        requirement = requirement or dispatch_requirement(None)
+        pickup = self._pick_ambulance(incident_location, ambulances, is_raining=is_raining, requirement=requirement)
+
+        beds_available = [h for h in hospitals if int(h.get("available_beds") or 0) > 0]
+        hospital_pool = beds_available or hospitals
+        matching_hospitals = [
+            h for h in hospital_pool
+            if set(h.get("specializations") or []).intersection(requirement["specialties"])
+        ]
+        hospital_match_status = "specialty_match" if matching_hospitals else "capacity_fallback"
+        hospital_pool = matching_hospitals or hospital_pool
 
         def score_hospital(hosp: Dict[str, Any]) -> dict[str, Any] | None:
             dest = (float(hosp["lat"]), float(hosp["lng"]))
@@ -386,7 +447,7 @@ class DispatchOptimizer:
 
         scored: list[dict[str, Any]] = []
         with ThreadPoolExecutor(max_workers=8) as pool:
-            futures = [pool.submit(score_hospital, hosp) for hosp in hospitals]
+            futures = [pool.submit(score_hospital, hosp) for hosp in hospital_pool]
             for fut in as_completed(futures):
                 row = fut.result()
                 if row:
@@ -396,7 +457,7 @@ class DispatchOptimizer:
 
         if best is None:
             nearest = min(
-                hospitals,
+                hospital_pool,
                 key=lambda h: (h["lat"] - incident_location[0]) ** 2 + (h["lng"] - incident_location[1]) ** 2,
             )
             best = {
@@ -421,6 +482,7 @@ class DispatchOptimizer:
         transport_min = round(float(best.get("transport_seconds") or eta) / 60, 1)
         specs = ", ".join(hospital.get("specializations") or [])
         amb_label = (assigned or {}).get("label") or (assigned or {}).get("id") or "nearest unit"
+        match_status = (pickup or {}).get("match_status") or "unassigned"
         engine = best.get("engine") or "direct"
         shortest_km = best.get("shortest_km")
         fastest_min = best.get("fastest_min")
@@ -434,7 +496,7 @@ class DispatchOptimizer:
             metric_note = f" Graph compared shortest {shortest_km} km vs fastest {fastest_min} min."
         reason = (
             f"{engine_note}: emergency corridor (traffic delays waived). "
-            f"Nearest ambulance {amb_label} assigned. "
+            f"{(assigned or {}).get('type_label') or 'Ambulance'} {amb_label} assigned ({match_status.replace('_', ' ')} match). "
             f"{hospital.get('name')} is the fastest destination "
             f"({pickup_min} min pickup + {transport_min} min to hospital).{metric_note}"
             + (f" Specialties: {specs}." if specs else "")
@@ -442,6 +504,14 @@ class DispatchOptimizer:
         return {
             "ambulance_id": assigned["id"] if assigned else None,
             "ambulance": assigned,
+            "emergency_category": requirement["category"],
+            "required_ambulance_types": requirement["types"],
+            "assigned_ambulance_type": (assigned or {}).get("ambulance_type"),
+            "assigned_ambulance_type_label": (assigned or {}).get("type_label"),
+            "match_status": match_status,
+            "fallback_reason": (
+                None if match_status == "exact" else "No available exact-match unit; the safest available dispatch option was selected."
+            ),
             "hospital": hospital,
             "hospital_id": hospital.get("id"),
             "hospital_name": hospital.get("name"),
@@ -461,6 +531,7 @@ class DispatchOptimizer:
                 "shortest_km": shortest_km,
                 "fastest_min": fastest_min,
                 "graph_nodes": best.get("graph_nodes"),
+                "hospital_match_status": hospital_match_status,
             },
             "candidates": [
                 {
@@ -480,8 +551,20 @@ class DispatchOptimizer:
 optimizer = DispatchOptimizer()
 
 
-def get_optimal_ambulance(incident_lat: float, incident_lng: float, available_ambulances: list) -> dict:
-    return optimizer.optimize_dispatch((incident_lat, incident_lng), available_ambulances)
+def get_optimal_ambulance(
+    incident_lat: float,
+    incident_lng: float,
+    available_ambulances: list,
+    emergency_category: str | None = None,
+    flags: dict[str, bool] | None = None,
+    age_group: str | None = None,
+    accessibility_need: bool = False,
+) -> dict:
+    return optimizer.optimize_dispatch(
+        (incident_lat, incident_lng),
+        available_ambulances,
+        dispatch_requirement(emergency_category, flags, age_group, accessibility_need),
+    )
 
 
 def get_optimal_hospital_dispatch(
@@ -490,7 +573,12 @@ def get_optimal_hospital_dispatch(
     hospitals: list,
     ambulances: list,
     is_raining: bool = False,
+    emergency_category: str | None = None,
+    flags: dict[str, bool] | None = None,
+    age_group: str | None = None,
+    accessibility_need: bool = False,
 ) -> dict:
     return optimizer.optimize_hospital_dispatch(
-        (incident_lat, incident_lng), hospitals, ambulances, is_raining
+        (incident_lat, incident_lng), hospitals, ambulances, is_raining,
+        dispatch_requirement(emergency_category, flags, age_group, accessibility_need),
     )

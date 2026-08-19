@@ -23,6 +23,7 @@
   let pickupRoute = $state<[number, number][]>([]);
   let dropRoute = $state<[number, number][]>([]);
   let etaLabel = $state('');
+  let ambulanceType = $state('');
   let reports = $state<any[]>([]);
   let health = $state({
     allergies: '',
@@ -85,6 +86,7 @@
     pickupRoute = payload.pickup_route || [];
     dropRoute = payload.drop_route || payload.route || [];
     if (payload.eta_minutes != null) etaLabel = `${payload.eta_minutes} min`;
+    ambulanceType = payload.assigned_ambulance_type_label || payload.ambulance?.type_label || ambulanceType;
     const pickup = payload.pickup || BMSIT;
     const hosp = payload.hospital;
     const amb = payload.driver_location || payload.ambulance;
@@ -131,7 +133,7 @@
         unit: data.data?.ambulance_id || '',
         hospital: data.data?.hospital_name || '',
         eta: data.data?.eta_minutes ?? '',
-      });
+      }) + (data.data?.assigned_ambulance_type_label ? ` · ${data.data.assigned_ambulance_type_label}` : '');
       applyLive(data.data);
     } catch (e: any) {
       requestMsg = e?.message || t('patient.sosError');
@@ -167,6 +169,7 @@
       {requesting ? t('patient.sending') : t('patient.sos')}
     </button>
     {#if requestMsg}<p class="nb-card p-2 text-xs text-black font-semibold">{requestMsg}</p>{/if}
+    {#if ambulanceType}<p class="text-[10px] font-black uppercase tracking-widest text-[#DC2626]">Assigned capability: {ambulanceType}</p>{/if}
 
     <div class="grid grid-cols-2 gap-3">
       <a href="/ai-guide" class="btn btn-secondary" style="padding:16px 10px;flex-direction:column;gap:6px;">

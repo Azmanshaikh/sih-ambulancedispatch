@@ -25,6 +25,8 @@
   let diabetes = $state(false);
   let epilepsy = $state(false);
   let pregnant = $state(false);
+  let emergencyCategory = $state('general_medical');
+  let accessibilityNeed = $state(false);
   let address = $state(BMSIT.name);
   let pinLat = $state(BMSIT.lat);
   let pinLng = $state(BMSIT.lng);
@@ -123,6 +125,9 @@
           diabetes,
           epilepsy,
           pregnant,
+          emergency_category: emergencyCategory,
+          age_group: age,
+          accessibility_need: accessibilityNeed,
         }),
       });
       if (!res.ok) {
@@ -278,6 +283,23 @@
               <option value="elderly">{t('request.elderly')}</option>
             </select>
           </div>
+
+          <div>
+            <label for="emergency-category" style="display: block; font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px;">Emergency type</label>
+            <select id="emergency-category" bind:value={emergencyCategory} style="width: 100%; background: #F5F5F5; border: 3px solid #111; border-radius: 0; padding: 8px 10px; font-size: 13px; color: #1A1A1A; outline: none; font-family: 'Inter', sans-serif;">
+              <option value="general_medical">General medical</option>
+              <option value="cardiac">Cardiac / chest pain</option>
+              <option value="respiratory">Breathing emergency</option>
+              <option value="neurological">Stroke / seizure</option>
+              <option value="trauma">Trauma / accident</option>
+              <option value="obstetric">Pregnancy / labour</option>
+              <option value="pediatric">Infant / child emergency</option>
+              <option value="bariatric_accessible">Mobility / bariatric transport</option>
+            </select>
+            <p style="margin:6px 0 0;font-size:10px;color:#4B4B4B;font-weight:600;">We send the nearest ambulance equipped for this emergency.</p>
+          </div>
+
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #1A1A1A; cursor: pointer; font-weight: 600;"><input type="checkbox" bind:checked={accessibilityNeed} style="accent-color: #DC2626;" /> Mobility, wheelchair, or bariatric accommodation needed</label>
 
           <div style="padding-top: 12px; border-top: 2px solid #E0E0E0;">
             <p style="font-size: 10px; font-weight: 700; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.2em; margin: 0 0 10px;">{t('request.history')}</p>

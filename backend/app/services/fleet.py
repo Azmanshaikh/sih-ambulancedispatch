@@ -97,25 +97,48 @@ _HOSPITAL_SEED: list[dict[str, Any]] = [
     },
 ]
 
+AMBULANCE_TYPES: dict[str, dict[str, Any]] = {
+    "BLS": {"label": "Basic Life Support", "crew": "EMT crew", "equipment": "Oxygen, AED, first-aid and stretcher"},
+    "ALS": {"label": "Advanced Life Support", "crew": "Paramedic / critical-care crew", "equipment": "Cardiac monitor, defibrillator, ventilator and emergency drugs"},
+    "NEONATAL_PEDIATRIC": {"label": "Neonatal & Pediatric", "crew": "Pediatric transport crew", "equipment": "Pediatric equipment and neonatal transport support"},
+    "BARIATRIC_ACCESSIBLE": {"label": "Bariatric & Accessible", "crew": "Specialist transport crew", "equipment": "Powered stretcher, ramp and mobility accommodation"},
+}
+
+
+def _unit(id: str, label: str, lat: float, lng: float, status: str, ambulance_type: str) -> dict[str, Any]:
+    profile = AMBULANCE_TYPES[ambulance_type]
+    return {
+        "id": id,
+        "label": label,
+        "lat": lat,
+        "lng": lng,
+        "status": status,
+        "ambulance_type": ambulance_type,
+        "type_label": profile["label"],
+        "crew": profile["crew"],
+        "equipment": profile["equipment"],
+    }
+
+
 _AMBULANCE_SEED: list[dict[str, Any]] = [
-    {"id": "AMB-101", "label": "Kempegowda Airport", "lat": 13.1989, "lng": 77.7063, "status": "available"},
-    {"id": "AMB-102", "label": "Devanahalli", "lat": 13.2475, "lng": 77.7138, "status": "available"},
-    {"id": "AMB-103", "label": "Doddaballapur", "lat": 13.2916, "lng": 77.5413, "status": "available"},
-    {"id": "AMB-104", "label": "Rajankunte", "lat": 13.1784, "lng": 77.5612, "status": "available"},
-    {"id": "AMB-105", "label": "Hunasamaranahalli", "lat": 13.1678, "lng": 77.6215, "status": "available"},
-    {"id": "AMB-106", "label": "Trumpet Interchange", "lat": 13.1712, "lng": 77.6554, "status": "available"},
-    {"id": "AMB-107", "label": "Hessarghatta", "lat": 13.1396, "lng": 77.4872, "status": "available"},
-    {"id": "AMB-108", "label": "Peenya Industrial", "lat": 13.0284, "lng": 77.5141, "status": "available"},
-    {"id": "AMB-109", "label": "Jalahalli Cross", "lat": 13.0398, "lng": 77.5468, "status": "available"},
-    {"id": "AMB-110", "label": "RT Nagar", "lat": 13.0246, "lng": 77.5942, "status": "available"},
-    {"id": "AMB-111", "label": "Hennur Junction", "lat": 13.0302, "lng": 77.6384, "status": "enroute"},
-    {"id": "AMB-112", "label": "Kothanur", "lat": 13.0624, "lng": 77.6418, "status": "available"},
-    {"id": "AMB-113", "label": "Bettahalasuru", "lat": 13.1628, "lng": 77.6310, "status": "available"},
-    {"id": "AMB-114", "label": "Singanayakanahalli", "lat": 13.1762, "lng": 77.5448, "status": "available"},
-    {"id": "AMB-115", "label": "Thanisandra Main", "lat": 13.0482, "lng": 77.6320, "status": "busy"},
-    {"id": "AMB-116", "label": "Hebbal Kempapura", "lat": 13.0448, "lng": 77.6126, "status": "available"},
-    {"id": "AMB-117", "label": "Chikkabanavara", "lat": 13.0842, "lng": 77.5016, "status": "available"},
-    {"id": "AMB-118", "label": "BIAL Cargo Road", "lat": 13.1894, "lng": 77.6898, "status": "available"},
+    _unit("AMB-101", "Kempegowda Airport", 13.1989, 77.7063, "available", "BLS"),
+    _unit("AMB-102", "Devanahalli", 13.2475, 77.7138, "available", "BLS"),
+    _unit("AMB-103", "Doddaballapur", 13.2916, 77.5413, "available", "BLS"),
+    _unit("AMB-104", "Rajankunte", 13.1784, 77.5612, "available", "BLS"),
+    _unit("AMB-105", "Hunasamaranahalli", 13.1678, 77.6215, "available", "BLS"),
+    _unit("AMB-106", "Trumpet Interchange", 13.1712, 77.6554, "available", "ALS"),
+    _unit("AMB-107", "Hessarghatta", 13.1396, 77.4872, "available", "BLS"),
+    _unit("AMB-108", "Peenya Industrial", 13.0284, 77.5141, "available", "ALS"),
+    _unit("AMB-109", "Jalahalli Cross", 13.0398, 77.5468, "available", "ALS"),
+    _unit("AMB-110", "RT Nagar", 13.0246, 77.5942, "available", "ALS"),
+    _unit("AMB-111", "Hennur Junction", 13.0302, 77.6384, "enroute", "NEONATAL_PEDIATRIC"),
+    _unit("AMB-112", "Kothanur", 13.0624, 77.6418, "available", "BLS"),
+    _unit("AMB-113", "Bettahalasuru", 13.1628, 77.6310, "available", "BLS"),
+    _unit("AMB-114", "Singanayakanahalli", 13.1762, 77.5448, "available", "NEONATAL_PEDIATRIC"),
+    _unit("AMB-115", "Thanisandra Main", 13.0482, 77.6320, "busy", "BARIATRIC_ACCESSIBLE"),
+    _unit("AMB-116", "Hebbal Kempapura", 13.0448, 77.6126, "available", "ALS"),
+    _unit("AMB-117", "Chikkabanavara", 13.0842, 77.5016, "available", "BARIATRIC_ACCESSIBLE"),
+    _unit("AMB-118", "BIAL Cargo Road", 13.1894, 77.6898, "available", "BLS"),
 ]
 
 _fleet: list[dict[str, Any]] = []
@@ -193,6 +216,10 @@ def get_ambulances() -> list[dict[str, Any]]:
                 "lat": round(unit["lat"], 6),
                 "lng": round(unit["lng"], 6),
                 "status": unit["status"],
+                "ambulance_type": unit["ambulance_type"],
+                "type_label": unit["type_label"],
+                "crew": unit["crew"],
+                "equipment": unit["equipment"],
                 "location": (unit["lat"], unit["lng"]),
             }
         )
@@ -210,6 +237,10 @@ def get_ambulance(ambulance_id: str) -> dict[str, Any] | None:
                 "lat": round(unit["lat"], 6),
                 "lng": round(unit["lng"], 6),
                 "status": unit["status"],
+                "ambulance_type": unit["ambulance_type"],
+                "type_label": unit["type_label"],
+                "crew": unit["crew"],
+                "equipment": unit["equipment"],
             }
     return None
 

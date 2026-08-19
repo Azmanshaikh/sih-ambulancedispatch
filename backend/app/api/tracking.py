@@ -14,6 +14,7 @@ from app.services.fleet import (
 )
 from app.services.geocode import geocode_query, reverse_geocode
 from app.services.runtime_state import push_alert, save_mission, set_medical_record
+from app.services.weather import is_raining_at, weather_snapshot
 
 router = APIRouter(prefix="/tracking", tags=["Tracking"])
 
@@ -32,6 +33,9 @@ class DispatchRequest(BaseModel):
     notes: str = ""
     priority: int | None = None
     analysis: str = ""
+    emergency_category: str = "general_medical"
+    age_group: str | None = None
+    accessibility_need: bool = False
 
 
 class GeocodeBody(BaseModel):
@@ -69,6 +73,16 @@ async def corridor_status(_user: dict[str, Any] = Depends(require_roles("staff",
     return {"status": "success", **snap}
 
 
+@router.get("/weather")
+async def weather_at(
+    lat: float,
+    lng: float,
+    _user: dict[str, Any] = Depends(require_roles("staff", "patient")),
+):
+    snap = await asyncio.to_thread(weather_snapshot, lat, lng)
+    return {"status": "success", **snap}
+
+
 @router.post("/dispatch")
 async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends(require_roles("staff", "patient"))):
     ambulances = get_ambulances()
@@ -80,18 +94,26 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
         "pregnant": req.pregnant,
     }
     priority = mission_priority(flags, req.priority)
+    if req.is_raining:
+        is_raining = True
+    else:
+        is_raining = await asyncio.to_thread(is_raining_at, req.incident_lat, req.incident_lng)
     result = await asyncio.to_thread(
         get_optimal_hospital_dispatch,
         req.incident_lat,
         req.incident_lng,
         hospitals,
         ambulances,
-        req.is_raining,
+        is_raining,
+        req.emergency_category,
+        flags,
+        req.age_group,
+        req.accessibility_need,
     )
     result = resolve_conflict(
         result,
         priority=priority,
-        is_raining=req.is_raining,
+        is_raining=is_raining,
         exclude_ambulance=result.get("ambulance_id"),
     )
     if result.get("ambulance_id"):
@@ -125,6 +147,7 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
         "lng": req.incident_lng,
         "address": req.address,
     }
+    result["is_raining"] = is_raining
     mission = save_mission(
         {
             **result,
@@ -143,6 +166,14 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
             "phase": "pickup",
             "priority": priority,
             "priority_label": {5: "cardiac", 4: "pregnant", 3: "epilepsy", 2: "diabetes", 1: "standard"}.get(priority, "standard"),
+            "emergency_category": result.get("emergency_category"),
+            "required_ambulance_types": result.get("required_ambulance_types") or [],
+            "assigned_ambulance_type": result.get("assigned_ambulance_type"),
+            "assigned_ambulance_type_label": result.get("assigned_ambulance_type_label"),
+            "match_status": result.get("match_status"),
+            "fallback_reason": result.get("fallback_reason"),
+            "accessibility_need": req.accessibility_need,
+            "age_group": req.age_group,
             "cardiac": req.cardiac,
             "diabetes": req.diabetes,
             "epilepsy": req.epilepsy,
@@ -160,7 +191,7 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
         f"Pick up {patient_name} at {req.address}, then drop at {hospital_name}. Emergency corridor — shortest path.",
         ambulance_id=result.get("ambulance_id"),
         mission_id=mission.get("id"),
-        extra={"pickup": req.address, "drop": hospital_name, "patient_name": patient_name},
+        extra={"pickup": req.address, "drop": hospital_name, "patient_name": patient_name, "ambulance_type": result.get("assigned_ambulance_type"), "match_status": result.get("match_status")},
     )
     push_alert(
         "staff",
@@ -192,7 +223,15 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
 @router.post("/dispatch-ambulance")
 async def dispatch_nearest_ambulance(req: DispatchRequest, _user: dict[str, Any] = Depends(require_roles("staff"))):
     mock_ambulances = get_ambulances()
-    result = get_optimal_ambulance(req.incident_lat, req.incident_lng, mock_ambulances)
+    result = get_optimal_ambulance(
+        req.incident_lat,
+        req.incident_lng,
+        mock_ambulances,
+        req.emergency_category,
+        {"cardiac": req.cardiac, "epilepsy": req.epilepsy, "pregnant": req.pregnant},
+        req.age_group,
+        req.accessibility_need,
+    )
     return {"status": "success", "data": result}
 
 

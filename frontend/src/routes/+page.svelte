@@ -27,6 +27,8 @@
   let candidates = $state<any[]>([]);
   let pickupMinutes = $state<number | null>(null);
   let transportMinutes = $state<number | null>(null);
+  let assignedAmbulanceType = $state('');
+  let fallbackReason = $state('');
   let monitor = $state<any>(null);
   let extraRoutes = $state<any[]>([]);
   let corridor = $state<any>(null);
@@ -52,6 +54,8 @@
     candidates = payload.candidates || [];
     pickupMinutes = payload.pickup_minutes ?? null;
     transportMinutes = payload.transport_minutes ?? null;
+    assignedAmbulanceType = payload.assigned_ambulance_type_label || payload.ambulance?.type_label || '';
+    fallbackReason = payload.fallback_reason || '';
     const mins = payload.eta_minutes ?? Math.round((payload.eta_seconds || 0) / 60);
     if (mins) etaLabel = `${mins} min`;
     if (payload.hospital_name) {
@@ -159,6 +163,8 @@
     candidates = [];
     pickupMinutes = null;
     transportMinutes = null;
+    assignedAmbulanceType = '';
+    fallbackReason = '';
     dispatchStatus = '';
     selectedAmbulanceId = '';
     extraRoutes = extraRoutesFor(activeMissions, '');
@@ -274,6 +280,7 @@
               <div>
                 <p class="text-[12px] font-black {assignedIds.has(a.id) ? 'text-white' : 'text-black'}">{a.id}</p>
                 <p class="text-[9px] {assignedIds.has(a.id) ? 'text-white/80' : 'text-[#4B4B4B]'} uppercase tracking-wide font-bold">{a.label}</p>
+                <p class="text-[9px] {assignedIds.has(a.id) ? 'text-white/80' : 'text-[#DC2626]'} uppercase tracking-wide font-black">{a.type_label || a.ambulance_type || 'BLS'}</p>
               </div>
               <span class="nb-chip {a.status === 'available' ? 'nb-green' : a.status === 'dispatched' ? 'nb-red' : ''}" style="color:{a.status === 'idle' ? '#111' : '#fff'};">{a.status}</span>
             </button>
@@ -345,7 +352,10 @@
             <p class="text-[10px] mt-2 font-black" style="background:#FFD23F;color:#111;padding:6px;border:2px solid #111;">{conflictReason}</p>
           {/if}
           {#if assignedUnit}
-            <p class="nb-chip mt-2" style="background:#FFD23F;color:#111;">{t('dash.assigned', { unit: assignedUnit })}</p>
+            <p class="nb-chip mt-2" style="background:#FFD23F;color:#111;">{t('dash.assigned', { unit: assignedUnit })}{assignedAmbulanceType ? ` · ${assignedAmbulanceType}` : ''}</p>
+          {/if}
+          {#if fallbackReason}
+            <p class="text-[10px] mt-2 font-black" style="background:#FFD23F;color:#111;padding:6px;border:2px solid #111;">Capability fallback: {fallbackReason}</p>
           {/if}
           {#if candidates.length}
             <div class="mt-3 space-y-1 bg-white text-black p-2" style="border:3px solid #111;">

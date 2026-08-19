@@ -119,6 +119,12 @@ def _persist_case(mission: dict[str, Any]) -> None:
                 "priority_band": mission.get("priority_band"),
                 "priority_color": mission.get("priority_color"),
                 "priority_label": mission.get("priority_label"),
+                "emergency_category": mission.get("emergency_category"),
+                "required_ambulance_types": mission.get("required_ambulance_types") or [],
+                "assigned_ambulance_type": mission.get("assigned_ambulance_type"),
+                "assigned_ambulance_type_label": mission.get("assigned_ambulance_type_label"),
+                "match_status": mission.get("match_status"),
+                "fallback_reason": mission.get("fallback_reason"),
             },
         },
     )
@@ -269,6 +275,12 @@ def get_latest_mission() -> dict[str, Any] | None:
             "priority_band": (row.get("medical") or {}).get("priority_band"),
             "priority_color": (row.get("medical") or {}).get("priority_color"),
             "priority_label": (row.get("medical") or {}).get("priority_label"),
+            "emergency_category": (row.get("medical") or {}).get("emergency_category"),
+            "required_ambulance_types": (row.get("medical") or {}).get("required_ambulance_types") or [],
+            "assigned_ambulance_type": (row.get("medical") or {}).get("assigned_ambulance_type"),
+            "assigned_ambulance_type_label": (row.get("medical") or {}).get("assigned_ambulance_type_label"),
+            "match_status": (row.get("medical") or {}).get("match_status"),
+            "fallback_reason": (row.get("medical") or {}).get("fallback_reason"),
         }
         if not is_live_mission(mission):
             continue
