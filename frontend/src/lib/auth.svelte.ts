@@ -1,7 +1,7 @@
 import { supabase } from '$lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
-export type Role = 'patient' | 'driver' | 'staff';
+export type Role = 'patient' | 'driver' | 'staff' | 'doctor';
 
 export type Profile = {
   id: string;
@@ -37,6 +37,7 @@ export function homeFor(role?: string | null) {
   const r = role || auth.profile?.role;
   if (r === 'staff') return '/';
   if (r === 'driver') return '/driver';
+  if (r === 'doctor') return '/doctor';
   return '/patient';
 }
 

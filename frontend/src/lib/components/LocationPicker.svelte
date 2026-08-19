@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { t } from '$lib/i18n.svelte';
+  import { configureLeaflet } from '$lib/leaflet';
 
   interface Props {
     lat?: number;
@@ -34,6 +35,7 @@
     if (!browser) return;
     L = (await import('leaflet')).default;
     await import('leaflet/dist/leaflet.css');
+    configureLeaflet(L);
     map = L.map(mapElement, { zoomControl: true }).setView([lat, lng], 14);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '' }).addTo(map);
     syncPin(lat, lng);

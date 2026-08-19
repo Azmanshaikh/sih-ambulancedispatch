@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.security import get_current_user, require_roles
+from app.services.corridor import apply_condition_score, display_priority_label, priority_band_of, resolve_conflict
 from app.services.fleet import BMSIT, get_ambulances, get_hospital
 from app.services.mail import head_staff_emails
 from app.services.otp import issue_otp, list_active_otps, verify_otp
@@ -39,7 +40,10 @@ from app.services.runtime_state import (
     set_mission_phase,
     tick_vitals,
     unread_count,
+    push_alert,
 )
+
+router = APIRouter(prefix="/accounts", tags=["Accounts"])
 
 def _with_hospital(profile: dict[str, Any]) -> dict[str, Any]:
     row = dict(profile or {})
@@ -49,11 +53,11 @@ def _with_hospital(profile: dict[str, Any]) -> dict[str, Any]:
 
 
 class RoleRequestBody(BaseModel):
-    requested_role: Literal["driver", "staff"]
+    requested_role: Literal["driver", "staff", "doctor"]
 
 
 class ChooseRoleBody(BaseModel):
-    role: Literal["patient", "driver", "staff"]
+    role: Literal["patient", "driver", "staff", "doctor"]
     hospital_id: int | None = None
 
 
@@ -103,11 +107,15 @@ class PhaseBody(BaseModel):
     phase: Literal["pickup", "drop", "complete"]
 
 
+class ConditionBody(BaseModel):
+    score: int
+
+
 @router.get("/me")
 async def me(user: dict[str, Any] = Depends(get_current_user)):
     profile = user.get("profile") or {}
     needs_onboarding = profile.get("status") != "active" or not profile.get("onboarded")
-    if profile.get("role") in ("driver", "staff") and profile.get("status") == "active":
+    if profile.get("role") in ("driver", "staff", "doctor") and profile.get("status") == "active":
         needs_onboarding = False
     if profile.get("onboarded") is True and profile.get("status") == "active":
         needs_onboarding = False
@@ -179,7 +187,7 @@ async def confirm_otp(body: VerifyOtpBody, user: dict[str, Any] = Depends(get_cu
         raise HTTPException(status_code=400, detail=str(e))
     ambulance_id = None
     hospital_id = None
-    if row["requested_role"] == "driver":
+    if row["requested_role"] in ("driver", "doctor"):
         units = [a for a in get_ambulances() if a.get("status") == "available"]
         ambulance_id = (units[0]["id"] if units else None) or (get_ambulances()[0]["id"] if get_ambulances() else None)
     if row["requested_role"] == "staff":
@@ -232,7 +240,7 @@ async def bind_ambulance(user_id: str, body: DecideBody, user: dict[str, Any] = 
 async def live_mission(user: dict[str, Any] = Depends(get_current_user)):
     profile = user.get("profile") or {}
     role = profile.get("role")
-    if role == "driver":
+    if role in ("driver", "doctor"):
         mission = live_mission_or_none(enrich_mission(get_mission_for_ambulance(profile.get("ambulance_id"))))
     elif role == "patient":
         mission = live_mission_or_none(enrich_mission(get_mission_for_patient(user["id"])))
@@ -248,6 +256,7 @@ async def live_mission(user: dict[str, Any] = Depends(get_current_user)):
     eta = mission.get("pickup_minutes") if phase == "pickup" else mission.get("transport_minutes")
     if eta is None:
         eta = mission.get("eta_minutes")
+    band = priority_band_of(mission)
     return {
         "status": "success",
         "mission": {
@@ -268,9 +277,60 @@ async def live_mission(user: dict[str, Any] = Depends(get_current_user)):
             "pickup": mission.get("pickup"),
             "conflict": mission.get("conflict"),
             "priority": mission.get("priority"),
-            "priority_label": mission.get("priority_label"),
+            "priority_label": display_priority_label(mission),
+            "condition_score": mission.get("condition_score"),
+            "priority_band": band,
+            "priority_color": mission.get("priority_color"),
             "report": mission.get("report"),
         },
+    }
+
+
+@router.post("/mission/condition")
+async def mission_condition(body: ConditionBody, user: dict[str, Any] = Depends(require_roles("doctor"))):
+    try:
+        score = int(body.score)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Score must be 1 to 10")
+    if score < 1 or score > 10:
+        raise HTTPException(status_code=400, detail="Score must be 1 to 10")
+    profile = user.get("profile") or {}
+    mission = live_mission_or_none(get_mission_for_ambulance(profile.get("ambulance_id")))
+    if not mission:
+        raise HTTPException(status_code=404, detail="No active mission")
+    apply_condition_score(mission, score)
+    resolved = resolve_conflict(
+        {
+            "ambulance_id": mission.get("ambulance_id"),
+            "pickup_route": mission.get("pickup_route") or [],
+            "route": mission.get("drop_route") or mission.get("route") or [],
+        },
+        priority=int(mission.get("priority") or 1),
+        exclude_ambulance=mission.get("ambulance_id"),
+    )
+    mission["conflict"] = resolved.get("conflict")
+    if resolved.get("pickup_route"):
+        mission["pickup_route"] = resolved["pickup_route"]
+    if resolved.get("route"):
+        mission["route"] = resolved["route"]
+        mission["drop_route"] = resolved["route"]
+    save_mission(mission)
+    band = mission.get("priority_band") or "urgent"
+    push_alert(
+        "staff",
+        "Patient condition updated",
+        f"Unit {mission.get('ambulance_id')}: score {score}/10 · {band}",
+        ambulance_id=mission.get("ambulance_id"),
+        mission_id=mission.get("id"),
+    )
+    return {
+        "status": "success",
+        "condition_score": mission.get("condition_score"),
+        "priority": mission.get("priority"),
+        "priority_band": band,
+        "priority_color": mission.get("priority_color"),
+        "priority_label": display_priority_label(mission),
+        "mission": enrich_mission(mission),
     }
 
 
@@ -292,19 +352,20 @@ async def mission_phase(body: PhaseBody, user: dict[str, Any] = Depends(require_
 @router.get("/alerts")
 async def get_alerts(user: dict[str, Any] = Depends(get_current_user)):
     role = (user.get("profile") or {}).get("role")
-    if role not in ("driver", "staff"):
+    if role not in ("driver", "staff", "doctor"):
         raise HTTPException(status_code=403, detail="Not allowed for this role")
     amb_id = (user.get("profile") or {}).get("ambulance_id")
-    alerts = list_alerts(role, amb_id if role == "driver" else None)
-    if role == "driver" and amb_id and not alerts:
+    unit = role in ("driver", "doctor")
+    alerts = list_alerts(role, amb_id if unit else None)
+    if unit and amb_id and not alerts:
         alerts = list_alerts("driver")
-    return {"status": "success", "alerts": alerts, "unread": unread_count(role, amb_id if role == "driver" else None)}
+    return {"status": "success", "alerts": alerts, "unread": unread_count(role, amb_id if unit else None)}
 
 
 @router.post("/alerts/{alert_id}/ack")
 async def acknowledge_alert(alert_id: str, user: dict[str, Any] = Depends(get_current_user)):
     role = (user.get("profile") or {}).get("role")
-    if role not in ("driver", "staff"):
+    if role not in ("driver", "staff", "doctor"):
         raise HTTPException(status_code=403, detail="Not allowed for this role")
     alert = ack_alert(alert_id)
     if not alert:

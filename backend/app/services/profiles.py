@@ -129,8 +129,8 @@ def list_profiles() -> list[dict[str, Any]]:
 
 
 def request_role(user_id: str, requested_role: str) -> dict[str, Any]:
-    if requested_role not in ("driver", "staff"):
-        raise ValueError("requested_role must be driver or staff")
+    if requested_role not in ("driver", "staff", "doctor"):
+        raise ValueError("requested_role must be driver, staff, or doctor")
     profile = get_profile(user_id)
     if not profile:
         raise ValueError("profile missing")
@@ -224,7 +224,7 @@ def decide_request(request_id: str | int, reviewer_id: str, approve: bool, ambul
         profile["role"] = row["requested_role"]
         profile["status"] = "active"
         profile["requested_role"] = None
-        if row["requested_role"] == "driver" and ambulance_id:
+        if row["requested_role"] in ("driver", "doctor") and ambulance_id:
             profile["ambulance_id"] = ambulance_id
         _save_profile(profile)
     elif profile and not approve:
@@ -271,13 +271,13 @@ def activate_verified_role(
     profile = get_profile(user_id)
     if not profile:
         raise ValueError("profile missing")
-    if role not in ("driver", "staff"):
+    if role not in ("driver", "staff", "doctor"):
         raise ValueError("invalid role")
     profile["role"] = role
     profile["status"] = "active"
     profile["requested_role"] = None
     profile["onboarded"] = True
-    if role == "driver" and ambulance_id:
+    if role in ("driver", "doctor") and ambulance_id:
         profile["ambulance_id"] = ambulance_id
     if role == "staff":
         hid = hospital_id if hospital_id is not None else profile.get("hospital_id")
@@ -294,14 +294,14 @@ def mark_otp_pending(user_id: str, requested_role: str, hospital_id: int | None 
         raise ValueError("profile missing")
     profile["status"] = "pending"
     profile["requested_role"] = requested_role
-    if requested_role != "driver":
+    if requested_role not in ("driver", "doctor"):
         profile["ambulance_id"] = None
     if requested_role == "staff":
         try:
             profile["hospital_id"] = int(hospital_id) if hospital_id is not None else None
         except (TypeError, ValueError):
             profile["hospital_id"] = None
-    elif requested_role == "driver":
+    elif requested_role in ("driver", "doctor"):
         profile["hospital_id"] = None
     return _save_profile(profile)
 

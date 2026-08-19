@@ -36,6 +36,7 @@
         id: m.ambulance_id,
         ambulanceId: m.ambulance_id,
         hasMission: true,
+        priorityBand: m.priority_band,
       });
     }
     if (pickup.lat) pts.push({ position: [pickup.lat, pickup.lng], popup: `Pickup · ${m.pickup_person}`, type: 'incident' });

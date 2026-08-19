@@ -13,6 +13,7 @@ from app.services.patient_care import (
     list_chat,
     list_medical_analyses,
     nemotron_chat,
+    nvidia_transcribe,
     save_medical_analysis,
     start_tavus_conversation,
 )
@@ -32,19 +33,29 @@ class IntakeConfirmBody(BaseModel):
     recap: str = ""
 
 
-@router.get("/chat/history")
-async def chat_history(user: dict[str, Any] = Depends(require_roles("patient"))):
-    return {"status": "success", "messages": list_chat(user["id"])}
+def _nvidia_http_error(exc: Exception, *, asr: bool = False) -> HTTPException:
+    raw = str(exc)
+    low = raw.lower()
+    if "unauthorized" in low or "authentication" in low or "401" in low or "invalid api key" in low:
+        return HTTPException(
+            status_code=502,
+            detail="AI chat is unavailable: the NVIDIA API key is invalid or expired. Update NVIDIA_API_KEY.",
+        )
+    if "forbidden" in low or "403" in low or "not found for account" in low:
+        if asr:
+            return HTTPException(
+                status_code=502,
+                detail="Voice chat needs an NVIDIA speech model. Set NVIDIA_ASR_MODEL to nvidia/nemotron-3-nano-omni-30b-a3b-reasoning (text chat models cannot transcribe audio).",
+            )
+        return HTTPException(
+            status_code=502,
+            detail="AI chat is unavailable: your NVIDIA key can't access the configured models. Set NVIDIA_MODEL to a model you have access to (e.g. nvidia/nemotron-mini-4b-instruct).",
+        )
+    return HTTPException(status_code=502, detail=raw[:300])
 
 
-@router.post("/chat")
-async def chat(body: ChatBody, user: dict[str, Any] = Depends(require_roles("patient"))):
-    if not settings.NVIDIA_API_KEY:
-        raise HTTPException(status_code=500, detail="NVIDIA_API_KEY not configured in .env")
-    if not body.message.strip():
-        raise HTTPException(status_code=400, detail="Message required")
-
-    stored = list_chat(user["id"], limit=16)
+async def _complete_patient_chat(user_id: str, message: str, history: list[dict[str, str]] | None = None) -> str:
+    stored = list_chat(user_id, limit=16)
     messages = [
         {
             "role": "system",
@@ -56,33 +67,60 @@ async def chat(body: ChatBody, user: dict[str, Any] = Depends(require_roles("pat
             ),
         }
     ]
-    source = stored or body.history[-8:]
+    source = stored or (history or [])[-8:]
     for turn in source[-8:]:
         role = turn.get("role") if turn.get("role") in ("user", "assistant") else "user"
         messages.append({"role": role, "content": turn.get("content") or ""})
-    messages.append({"role": "user", "content": body.message.strip()})
-
+    messages.append({"role": "user", "content": message})
     try:
         content = await nemotron_chat(messages, max_tokens=400)
     except Exception as e:
-        raw = str(e)
-        low = raw.lower()
-        if "unauthorized" in low or "authentication" in low or "401" in low or "invalid api key" in low:
-            raise HTTPException(
-                status_code=502,
-                detail="AI chat is unavailable: the NVIDIA API key is invalid or expired. Update NVIDIA_API_KEY.",
-            )
-        if "forbidden" in low or "403" in low or "not found for account" in low:
-            raise HTTPException(
-                status_code=502,
-                detail="AI chat is unavailable: your NVIDIA key can't access the configured models. Set NVIDIA_MODEL to a model you have access to (e.g. nvidia/nemotron-mini-4b-instruct).",
-            )
-        raise HTTPException(status_code=502, detail=raw[:300])
+        raise _nvidia_http_error(e)
     if not content:
         raise HTTPException(status_code=502, detail="AI provider error")
-    append_chat(user["id"], "user", body.message.strip())
-    append_chat(user["id"], "assistant", content)
+    append_chat(user_id, "user", message)
+    append_chat(user_id, "assistant", content)
+    return content
+
+
+@router.get("/chat/history")
+async def chat_history(user: dict[str, Any] = Depends(require_roles("patient"))):
+    return {"status": "success", "messages": list_chat(user["id"])}
+
+
+@router.post("/chat")
+async def chat(body: ChatBody, user: dict[str, Any] = Depends(require_roles("patient"))):
+    if not settings.NVIDIA_API_KEY:
+        raise HTTPException(status_code=500, detail="NVIDIA_API_KEY not configured in .env")
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="Message required")
+    content = await _complete_patient_chat(user["id"], body.message.strip(), body.history)
     return {"status": "success", "reply": content}
+
+
+@router.post("/chat/voice")
+async def chat_voice(
+    audio: UploadFile = File(...),
+    language: str = Form("en"),
+    user: dict[str, Any] = Depends(require_roles("patient")),
+):
+    if not settings.NVIDIA_API_KEY:
+        raise HTTPException(status_code=500, detail="NVIDIA_API_KEY not configured in .env")
+    raw = await audio.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Audio required")
+    if len(raw) > 6 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Audio is too long. Speak for under 45 seconds.")
+    try:
+        transcript = await nvidia_transcribe(raw, audio.content_type or "audio/wav", language)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _nvidia_http_error(e, asr=True)
+    if not transcript:
+        raise HTTPException(status_code=400, detail="No speech detected")
+    content = await _complete_patient_chat(user["id"], transcript)
+    return {"status": "success", "transcript": transcript, "reply": content}
 
 
 @router.post("/tavus/start")

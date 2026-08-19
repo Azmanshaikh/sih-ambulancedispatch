@@ -4,6 +4,7 @@
   import { apiFetch } from '$lib/auth.svelte';
   import { postToMarker } from '$lib/officers';
   import { t } from '$lib/i18n.svelte';
+  import { bandForAmbulance } from '$lib/priority';
 
   const BMSIT: [number, number] = [13.1344, 77.5693];
 
@@ -45,6 +46,7 @@
       id: a.id,
       ambulanceId: a.id,
       hasMission: assignedIds.has(a.id),
+      priorityBand: bandForAmbulance(a.id, activeMissions),
     }));
     const hospMarks = hospitals.map((h: any) => ({
       position: [h.lat, h.lng] as [number, number],

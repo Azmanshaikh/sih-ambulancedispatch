@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { t } from '$lib/i18n.svelte';
+  import { configureLeaflet } from '$lib/leaflet';
 
   interface MapMarker {
     position: [number, number];
@@ -10,6 +11,7 @@
     id?: string;
     ambulanceId?: string;
     hasMission?: boolean;
+    priorityBand?: 'critical' | 'urgent' | 'stable';
     officerName?: string;
     phone?: string;
     postId?: string;
@@ -113,6 +115,20 @@
         <rect x="8.5" y="15.4" width="11" height="3.6" fill="#fff"/>
       </svg>
     </div>`;
+
+  function ambulanceIcon(selected: boolean, band?: string) {
+    const size = selected ? 32 : 28;
+    const ring =
+      band === 'critical' ? '#FF2D2D' : band === 'urgent' ? '#FFD23F' : band === 'stable' ? '#22C55E' : '';
+    const ringHtml = ring
+      ? `<span class="amb-ring" style="border-color:${ring};background:${ring}"></span>`
+      : '';
+    return makeIcon(
+      `${ringHtml}<span class="amb-icon" style="font-size:${selected ? 26 : 22}px;line-height:1">🚑</span>`,
+      size,
+      `amb-marker${selected ? ' amb-selected' : ''}${ring ? ' amb-priority' : ''}`
+    );
+  }
 
   function makeIcon(html: string, size = 28, className = '') {
     return L.divIcon({
@@ -440,9 +456,12 @@
       if (navMode && marker.type === 'ambulance') return;
       const ambId = markerAmbulanceId(marker);
       const selectedAmb = marker.type === 'ambulance' && ambId && ambId === selectedAmbulanceId;
-      const iconKey = selectedAmb ? 'ambulance_selected' : marker.type || 'default';
+      const icon =
+        marker.type === 'ambulance'
+          ? ambulanceIcon(Boolean(selectedAmb), marker.priorityBand)
+          : ICONS[selectedAmb ? 'ambulance_selected' : marker.type || 'default'] || ICONS.default;
       const m = L.marker(marker.position, {
-        icon: ICONS[iconKey] || ICONS.default,
+        icon,
         zIndexOffset:
           selectedAmb
             ? 900
@@ -572,6 +591,7 @@
     if (!browser) return;
     L = (await import('leaflet')).default;
     await import('leaflet/dist/leaflet.css');
+    configureLeaflet(L);
 
     map = L.map(mapElement, { zoomControl: false }).setView(center, zoom);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -685,6 +705,9 @@
       <p><span style="color:#38bdf8">━</span> {t('map.otherCorridor')}</p>
       <p><span style="color:#f59e0b">━</span> {t('map.shared')}</p>
       <p><span style="color:#a855f7">━</span> {t('map.rerouted')}</p>
+      <p><span style="color:#FF2D2D">●</span> {t('map.critical')}</p>
+      <p><span style="color:#FFD23F">●</span> {t('map.urgent')}</p>
+      <p><span style="color:#22C55E">●</span> {t('map.stable')}</p>
     </div>
   {/if}
 
@@ -933,6 +956,23 @@
   }
   :global(.amb-marker) {
     cursor: pointer;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: relative;
+  }
+  :global(.amb-ring) {
+    position: absolute;
+    left: 50%;
+    bottom: 2px;
+    width: 28px;
+    height: 28px;
+    margin-left: -14px;
+    border-radius: 999px;
+    border: 4px solid;
+    box-shadow: 0 0 0 2px #111;
+    opacity: 0.95;
+    pointer-events: none;
   }
   :global(.officer-marker) {
     cursor: pointer;

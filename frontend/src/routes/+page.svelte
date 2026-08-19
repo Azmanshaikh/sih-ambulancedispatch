@@ -4,6 +4,7 @@
   import { apiFetch } from '$lib/auth.svelte';
   import { postToMarker } from '$lib/officers';
   import { t } from '$lib/i18n.svelte';
+  import { bandForAmbulance } from '$lib/priority';
 
   const BMSIT = {
     name: 'BMSIT College, Avalahalli, Yelahanka',
@@ -113,6 +114,12 @@
     const hospitalId = selectedHospital?.id;
     const assigned = new Set(activeMissions.map((m) => m.ambulance_id).filter(Boolean));
     if (assignedUnit) assigned.add(assignedUnit);
+    const allMissions = [
+      ...activeMissions,
+      ...(monitor?.mission && !activeMissions.some((m) => m.ambulance_id === monitor.mission.ambulance_id)
+        ? [monitor.mission]
+        : []),
+    ];
     const fleetMarks = fleet.map((a: any) => ({
       position: [a.lat, a.lng] as [number, number],
       popup: `🚑 ${a.id} · ${a.label}<br/><span style="font-weight:600;color:#6B6B6B">${a.status}${assigned.has(a.id) ? ' · assigned' : ''}</span>`,
@@ -120,6 +127,7 @@
       id: a.id,
       ambulanceId: a.id,
       hasMission: assigned.has(a.id),
+      priorityBand: bandForAmbulance(a.id, allMissions),
     }));
     const hospMarks = hosp.map((h: any) => ({
       position: [h.lat, h.lng] as [number, number],

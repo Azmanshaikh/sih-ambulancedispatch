@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     NVIDIA_MODEL_FALLBACKS: str = "meta/llama-3.1-8b-instruct,nvidia/nemotron-3-nano-30b-a3b"
     NVIDIA_VISION_MODEL: str = "microsoft/phi-3-vision-128k-instruct"
     NVIDIA_VISION_MODEL_FALLBACKS: str = ""
+    # Text chat models such as nemotron-mini-4b-instruct cannot transcribe audio.
+    # Nemotron 3 Nano Omni includes a Parakeet speech encoder and accepts audio_url.
+    NVIDIA_ASR_MODEL: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    NVIDIA_ASR_MODEL_FALLBACKS: str = ""
     NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
     GEMINI_API_KEY: str | None = None
     GOOGLE_API_KEY: str | None = None

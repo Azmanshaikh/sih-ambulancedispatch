@@ -51,7 +51,7 @@
     selectedName = name;
   }
 
-  async function choose(role: 'patient' | 'driver' | 'staff') {
+  async function choose(role: 'patient' | 'driver' | 'staff' | 'doctor') {
     error = '';
     if (role === 'staff') {
       pickHospital = true;
@@ -63,7 +63,7 @@
     await submitRole(role);
   }
 
-  async function submitRole(role: 'patient' | 'driver' | 'staff') {
+  async function submitRole(role: 'patient' | 'driver' | 'staff' | 'doctor') {
     picking = true;
     error = '';
     try {
@@ -153,6 +153,9 @@
         </button>
         <button class="btn btn-secondary" style="width:100%;padding:16px;" disabled={picking} onclick={() => choose('driver')}>
           {t('choose.driver')}
+        </button>
+        <button class="btn btn-ghost" style="width:100%;padding:16px;background:#22C55E;color:#111;" disabled={picking} onclick={() => choose('doctor')}>
+          {t('choose.doctor')}
         </button>
         <button class="btn btn-blue" style="width:100%;padding:16px;" disabled={picking} onclick={() => choose('staff')}>
           {t('choose.staff')}

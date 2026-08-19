@@ -15,6 +15,7 @@ ALERT_WINDOW_S = 180.0
 DELAY_THRESHOLD_S = 90.0
 SHARE_SPEED_KMH = 20.0
 PRIORITY_LABELS = {5: "cardiac", 4: "pregnant", 3: "epilepsy", 2: "diabetes", 1: "standard"}
+PRIORITY_BAND_COLORS = {"critical": "#FF2D2D", "urgent": "#FFD23F", "stable": "#22C55E"}
 
 _POSTS: list[dict[str, Any]] = [
     {"id": "TP-01", "name": "Yelahanka Traffic Police Station", "lat": 13.1006, "lng": 77.5960, "phone": "+919845010001", "kind": "traffic_police"},
@@ -93,6 +94,49 @@ def mission_priority(flags: dict[str, Any] | None, override: int | None = None) 
 
 def priority_label(value: int) -> str:
     return PRIORITY_LABELS.get(int(value or 1), "standard")
+
+
+def condition_from_score(score: int) -> dict[str, Any]:
+    n = max(1, min(10, int(score)))
+    if n >= 8:
+        band = "critical"
+        priority = 5
+    elif n >= 4:
+        band = "urgent"
+        priority = 3
+    else:
+        band = "stable"
+        priority = 1
+    return {
+        "condition_score": n,
+        "priority_band": band,
+        "priority_color": PRIORITY_BAND_COLORS[band],
+        "priority": priority,
+        "priority_label": band,
+    }
+
+
+def apply_condition_score(mission: dict[str, Any], score: int) -> dict[str, Any]:
+    info = condition_from_score(score)
+    mission.update(info)
+    return mission
+
+
+def display_priority_label(mission: dict[str, Any] | None) -> str:
+    if not mission:
+        return "standard"
+    if mission.get("condition_score"):
+        return str(mission.get("priority_label") or condition_from_score(int(mission["condition_score"]))["priority_label"])
+    return priority_label(int(mission.get("priority") or 1))
+
+
+def priority_band_of(mission: dict[str, Any] | None) -> str | None:
+    if not mission:
+        return None
+    band = mission.get("priority_band")
+    if band in ("critical", "urgent", "stable"):
+        return band
+    return None
 
 
 def _haversine_m(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -594,7 +638,10 @@ def corridor_snapshot() -> dict[str, Any]:
                 "hospital_name": m.get("hospital_name"),
                 "phase": m.get("phase"),
                 "priority": m.get("priority"),
-                "priority_label": priority_label(int(m.get("priority") or 1)),
+                "priority_label": display_priority_label(m),
+                "condition_score": m.get("condition_score"),
+                "priority_band": priority_band_of(m),
+                "priority_color": m.get("priority_color") or PRIORITY_BAND_COLORS.get(priority_band_of(m) or ""),
                 "conflict": m.get("conflict") or {"status": "none"},
                 "eta_minutes": m.get("eta_minutes"),
                 "patient_name": m.get("patient_name"),

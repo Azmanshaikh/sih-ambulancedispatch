@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { apiFetch } from '$lib/auth.svelte';
   import LocationPicker from '$lib/components/LocationPicker.svelte';
+  import { lookupAddress, lookupCoords } from '$lib/geocode';
   import { t } from '$lib/i18n.svelte';
 
   const BMSIT = {
@@ -47,19 +48,14 @@
     locating = true;
     locationError = '';
     try {
-      const res = await apiFetch('/tracking/geocode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        locationError = data.detail || 'Address not found. Pin it on the map instead.';
+      const hit = await lookupAddress(q);
+      if (!hit) {
+        locationError = 'Address not found. Pin it on the map instead.';
         return;
       }
-      pinLat = data.lat;
-      pinLng = data.lng;
-      if (data.address) address = data.address;
+      pinLat = hit.lat;
+      pinLng = hit.lng;
+      if (hit.address) address = hit.address;
     } catch {
       locationError = 'Could not look up that address. Pin it on the map instead.';
     } finally {
@@ -72,14 +68,8 @@
     pinLng = lng;
     locationError = '';
     try {
-      const res = await apiFetch('/tracking/geocode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng }),
-      });
-      const data = await res.json();
-      if (res.ok && data.address) address = data.address;
-      else address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      const hit = await lookupCoords(lat, lng);
+      address = hit.address;
     } catch {
       address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     }

@@ -23,12 +23,14 @@
   const STAFF_PATHS = ['/', '/request', '/navigation', '/hospitals', '/notifications', '/staff/approvals'];
   const PATIENT_PATHS = ['/patient', '/ai-guide', '/ai-call'];
   const DRIVER_PATHS = ['/driver', '/hospitals'];
+  const DOCTOR_PATHS = ['/doctor'];
 
   function allowed(pathname: string, role?: string | null) {
     if (PUBLIC.includes(pathname)) return true;
     if (needsOnboarding()) return pathname === '/choose-role';
     if (role === 'staff') return STAFF_PATHS.includes(pathname) || pathname.startsWith('/staff/');
     if (role === 'driver') return DRIVER_PATHS.includes(pathname);
+    if (role === 'doctor') return DOCTOR_PATHS.includes(pathname);
     return PATIENT_PATHS.includes(pathname);
   }
 

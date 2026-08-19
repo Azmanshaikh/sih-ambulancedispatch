@@ -114,6 +114,11 @@ def _persist_case(mission: dict[str, Any]) -> None:
                 "notes": medical.get("notes") or mission.get("notes"),
                 "analysis": mission.get("analysis") or "",
                 "history": medical.get("history") or [],
+                "condition_score": mission.get("condition_score"),
+                "priority": mission.get("priority"),
+                "priority_band": mission.get("priority_band"),
+                "priority_color": mission.get("priority_color"),
+                "priority_label": mission.get("priority_label"),
             },
         },
     )
@@ -259,6 +264,11 @@ def get_latest_mission() -> dict[str, Any] | None:
             "phase": row.get("phase") or "pickup",
             "created_at": row.get("created_at"),
             "report": row.get("report") or (row.get("medical") or {}).get("report"),
+            "condition_score": (row.get("medical") or {}).get("condition_score"),
+            "priority": (row.get("medical") or {}).get("priority"),
+            "priority_band": (row.get("medical") or {}).get("priority_band"),
+            "priority_color": (row.get("medical") or {}).get("priority_color"),
+            "priority_label": (row.get("medical") or {}).get("priority_label"),
         }
         if not is_live_mission(mission):
             continue
@@ -397,8 +407,9 @@ def push_alert(
 
 
 def list_alerts(role: str, ambulance_id: str | None = None, unread_only: bool = False) -> list[dict[str, Any]]:
-    params: dict[str, str] = {"role": f"eq.{role}", "select": "*", "order": "created_at.desc"}
-    if role == "driver" and ambulance_id:
+    query_role = "driver" if role == "doctor" else role
+    params: dict[str, str] = {"role": f"eq.{query_role}", "select": "*", "order": "created_at.desc"}
+    if query_role == "driver" and ambulance_id:
         params["ambulance_id"] = f"eq.{ambulance_id}"
     db_rows = rest_select("dispatch_alerts", params)
     merged: dict[str, dict[str, Any]] = {}
@@ -406,9 +417,9 @@ def list_alerts(role: str, ambulance_id: str | None = None, unread_only: bool = 
         payload = row.get("payload") or {}
         merged[str(row.get("id"))] = {**payload, **row}
     for alert in _alerts:
-        if alert.get("role") != role:
+        if alert.get("role") != query_role:
             continue
-        if role == "driver" and ambulance_id and alert.get("ambulance_id") != ambulance_id:
+        if query_role == "driver" and ambulance_id and alert.get("ambulance_id") != ambulance_id:
             continue
         merged[str(alert.get("id"))] = alert
     rows = sorted(merged.values(), key=lambda a: a.get("created_at") or "", reverse=True)
@@ -460,6 +471,10 @@ def list_dispatch_cases(limit: int = 40) -> list[dict[str, Any]]:
                 "medical": get_medical_record(mission.get("patient_id") or "") if mission.get("patient_id") else {},
                 "created_at": mission.get("created_at") or _now(),
                 "priority": mission.get("priority"),
+                "priority_label": mission.get("priority_label"),
+                "condition_score": mission.get("condition_score"),
+                "priority_band": mission.get("priority_band"),
+                "priority_color": mission.get("priority_color"),
                 "conflict": mission.get("conflict"),
             }
         )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import uuid
 from datetime import datetime, timezone
@@ -198,6 +199,98 @@ def _nvidia_models() -> list[str]:
         if name and name not in models:
             models.append(name)
     return models
+
+
+def _nvidia_asr_models() -> list[str]:
+    models: list[str] = []
+    for name in (settings.NVIDIA_ASR_MODEL, *(settings.NVIDIA_ASR_MODEL_FALLBACKS or "").split(",")):
+        name = (name or "").strip()
+        if name and name not in models:
+            models.append(name)
+    return models
+
+
+def _transcript_text(raw: str) -> str:
+    text = (raw or "").strip()
+    if text.startswith("```") and text.endswith("```"):
+        text = text.strip("`").strip()
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        text = text[1:-1].strip()
+    low = text.lower().strip(" .")
+    if low in {"empty", "n/a", "na", "silence", "[silence]", "no speech", "none"}:
+        return ""
+    return text
+
+
+async def nvidia_transcribe(audio_bytes: bytes, mime_type: str = "audio/wav", language: str = "en") -> str:
+    if not settings.NVIDIA_API_KEY:
+        raise RuntimeError("NVIDIA_API_KEY not configured")
+    models = _nvidia_asr_models()
+    if not models:
+        raise RuntimeError("NVIDIA_ASR_MODEL is not set to a speech-capable model")
+    lang_name = {"en": "English", "hi": "Hindi", "kn": "Kannada"}.get((language or "en")[:2], "English")
+    mime = (mime_type or "audio/wav").split(";")[0].strip() or "audio/wav"
+    if mime not in ("audio/wav", "audio/x-wav", "audio/wave", "audio/mpeg", "audio/mp3"):
+        mime = "audio/wav"
+    data_url = f"data:{mime};base64,{base64.b64encode(audio_bytes).decode('ascii')}"
+    prompt = (
+        f"Transcribe this spoken audio into {lang_name} text. "
+        "Reply with only the spoken words, no quotes, labels, or commentary. "
+        "If there is no speech, reply with EMPTY."
+    )
+    headers = {
+        "Authorization": f"Bearer {settings.NVIDIA_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    last_error = ""
+    async with httpx.AsyncClient() as client:
+        for model in models:
+            payload = {
+                "model": model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "audio_url", "audio_url": {"url": data_url}},
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
+                "max_tokens": 400,
+                "temperature": 0.1,
+                "top_k": 1,
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
+            try:
+                response = await client.post(
+                    f"{settings.NVIDIA_BASE_URL}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=45.0,
+                )
+            except httpx.TimeoutException:
+                last_error = f"timeout talking to {model}"
+                continue
+            except httpx.HTTPError as e:
+                last_error = str(e)[:400]
+                continue
+            if response.status_code == 200:
+                result = response.json()
+                message = (result.get("choices") or [{}])[0].get("message") or {}
+                content = message.get("content") or ""
+                if isinstance(content, list):
+                    content = " ".join(
+                        part.get("text") or "" for part in content if isinstance(part, dict)
+                    )
+                text = _transcript_text(str(content))
+                if text:
+                    return text
+                last_error = "empty transcript"
+                continue
+            last_error = response.text[:400]
+            if response.status_code == 401:
+                break
+    raise RuntimeError(last_error or "NVIDIA speech-to-text failed")
 
 
 async def nemotron_chat(messages: list[dict[str, str]], max_tokens: int = 500) -> str:

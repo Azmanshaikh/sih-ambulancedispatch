@@ -41,7 +41,7 @@ class GeocodeBody(BaseModel):
 
 
 @router.post("/geocode")
-async def lookup_place(body: GeocodeBody, _user: dict[str, Any] = Depends(require_roles("staff", "driver", "patient"))):
+async def lookup_place(body: GeocodeBody, _user: dict[str, Any] = Depends(require_roles("staff", "driver", "doctor", "patient"))):
     if body.query.strip():
         hit = geocode_query(body.query)
         if not hit:
@@ -64,7 +64,7 @@ async def live_fleet(_user: dict[str, Any] = Depends(require_roles("staff"))):
 
 
 @router.get("/corridor")
-async def corridor_status(_user: dict[str, Any] = Depends(require_roles("staff", "driver"))):
+async def corridor_status(_user: dict[str, Any] = Depends(require_roles("staff", "driver", "doctor"))):
     snap = corridor_snapshot()
     return {"status": "success", **snap}
 

@@ -21,6 +21,7 @@
     { to: '/ai-guide',          icon: 'psychology',          labelKey: 'nav.aiChat' as const,        roles: ['patient'] },
     { to: '/ai-call',           icon: 'videocam',            labelKey: 'nav.aiCall' as const,        roles: ['patient'] },
     { to: '/driver',            icon: 'map',                 labelKey: 'nav.map' as const,           roles: ['driver'] },
+    { to: '/doctor',            icon: 'stethoscope',         labelKey: 'nav.doctor' as const,        roles: ['doctor'] },
     { to: '/hospitals',         icon: 'local_hospital',      labelKey: 'nav.hospitals' as const,     roles: ['staff', 'driver'] },
   ];
 
