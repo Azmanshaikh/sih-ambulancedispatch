@@ -17,6 +17,53 @@
   let requesting = $state(false);
   let requestMsg = $state('');
   let saveMsg = $state('');
+  let whatsHappening = $state('');
+  let emergencyCategory = $state('general_medical');
+  type QuickPreset = 'cardiac_arrest' | 'road_accident' | 'unconsciousness';
+  let selectedPreset = $state<QuickPreset | null>(null);
+  const QUICK_PRESETS: {
+    id: QuickPreset;
+    label: string;
+    icon: string;
+    category: string;
+    summary: string;
+    cardiac?: boolean;
+  }[] = [
+    {
+      id: 'cardiac_arrest',
+      label: 'Cardiac arrest',
+      icon: 'favorite',
+      category: 'cardiac',
+      summary: 'Suspected cardiac arrest — patient unresponsive, CPR may be in progress.',
+      cardiac: true,
+    },
+    {
+      id: 'road_accident',
+      label: 'Road accident',
+      icon: 'car_crash',
+      category: 'trauma',
+      summary: 'Road traffic accident — trauma injuries reported at scene.',
+    },
+    {
+      id: 'unconsciousness',
+      label: 'Unconsciousness',
+      icon: 'bedtime',
+      category: 'neurological',
+      summary: 'Patient is unconscious or not responding — cause unknown.',
+    },
+  ];
+
+  function applyPreset(id: QuickPreset) {
+    selectedPreset = selectedPreset === id ? null : id;
+    if (!selectedPreset) {
+      emergencyCategory = 'general_medical';
+      return;
+    }
+    const preset = QUICK_PRESETS.find((p) => p.id === selectedPreset);
+    if (!preset) return;
+    emergencyCategory = preset.category;
+    if (!whatsHappening.trim()) whatsHappening = preset.summary;
+  }
   let markers = $state<any[]>([
     { position: [BMSIT.lat, BMSIT.lng] as [number, number], popup: `📍 ${BMSIT.name}`, type: 'incident' },
   ]);
@@ -116,6 +163,7 @@
     requesting = true;
     requestMsg = '';
     try {
+      const preset = QUICK_PRESETS.find((p) => p.id === selectedPreset);
       const res = await apiFetch('/tracking/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,6 +173,12 @@
           address: BMSIT.name,
           patient_name: auth.profile?.full_name || auth.profile?.email,
           patient_email: auth.profile?.email,
+          notes: whatsHappening.trim(),
+          emergency_category: emergencyCategory,
+          cardiac: health.cardiac || Boolean(preset?.cardiac),
+          diabetes: health.diabetes,
+          epilepsy: health.epilepsy,
+          pregnant: health.pregnant,
         }),
       });
       const data = await res.json();
@@ -160,6 +214,31 @@
 
 <div class="h-full overflow-hidden p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
   <div class="lg:col-span-4 flex flex-col gap-4 overflow-y-auto no-sb pb-3">
+    <section class="nb-card p-4">
+      <h2 class="text-sm font-black uppercase tracking-tight mb-1">{t('request.whatsHappening')}</h2>
+      <p class="text-[11px] text-[#4B4B4B] font-semibold mb-2">{t('request.whatsHappeningHint')}</p>
+      <textarea
+        class="nb-input text-sm"
+        rows="3"
+        placeholder={t('request.whatsHappeningPlaceholder')}
+        bind:value={whatsHappening}
+      ></textarea>
+      <p class="text-[10px] font-black uppercase tracking-widest mt-3 mb-2">{t('request.quickEmergency')}</p>
+      <div class="preset-grid">
+        {#each QUICK_PRESETS as preset}
+          <button
+            type="button"
+            class="preset-card"
+            class:preset-card--active={selectedPreset === preset.id}
+            onclick={() => applyPreset(preset.id)}
+          >
+            <span class="material-symbols-outlined" style="font-size:22px;">{preset.icon}</span>
+            <span>{preset.label}</span>
+          </button>
+        {/each}
+      </div>
+    </section>
+
     <button
       class="btn btn-primary"
       style="width:100%;padding:24px;font-size:20px;letter-spacing:0.2em;box-shadow:6px 6px 0 #111;"
@@ -265,3 +344,34 @@
     <MapWidget id="patient-map" {markers} {pickupRoute} {dropRoute} {etaLabel} showLegend center={[BMSIT.lat, BMSIT.lng]} />
   </div>
 </div>
+
+<style>
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .preset-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 6px;
+    background: #fff;
+    border: 3px solid #111;
+    box-shadow: 3px 3px 0 #111;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+  }
+  .preset-card:hover {
+    background: #FFD23F;
+  }
+  .preset-card--active {
+    background: #FF2D2D;
+    color: #fff;
+  }
+</style>
