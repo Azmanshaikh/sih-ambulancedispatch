@@ -245,6 +245,17 @@ def get_ambulance(ambulance_id: str) -> dict[str, Any] | None:
     return None
 
 
+def place_ambulance(ambulance_id: str, lat: float, lng: float) -> None:
+    if not _fleet:
+        init_fleet()
+    for unit in _fleet:
+        if unit["id"] != ambulance_id:
+            continue
+        unit["lat"] = float(lat)
+        unit["lng"] = float(lng)
+        break
+
+
 def assign_ambulance(
     ambulance_id: str,
     pickup_path: list[tuple[float, float]] | None = None,

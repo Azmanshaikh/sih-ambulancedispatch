@@ -314,20 +314,28 @@ def activate_verified_role(
     return _save_profile(profile)
 
 
-def mark_otp_pending(user_id: str, requested_role: str, hospital_id: int | None = None) -> dict[str, Any]:
+def mark_otp_pending(
+    user_id: str,
+    requested_role: str,
+    hospital_id: int | None = None,
+    ambulance_id: str | None = None,
+) -> dict[str, Any]:
     profile = get_profile(user_id)
     if not profile:
         raise ValueError("profile missing")
     profile["status"] = "pending"
     profile["requested_role"] = requested_role
-    if requested_role not in ("driver", "doctor"):
+    if requested_role in ("driver", "doctor"):
+        profile["ambulance_id"] = ambulance_id
+        profile["hospital_id"] = None
+    else:
         profile["ambulance_id"] = None
     if requested_role == "staff":
         try:
             profile["hospital_id"] = int(hospital_id) if hospital_id is not None else None
         except (TypeError, ValueError):
             profile["hospital_id"] = None
-    elif requested_role in ("driver", "doctor"):
+    elif requested_role not in ("driver", "doctor"):
         profile["hospital_id"] = None
     return _save_profile(profile)
 

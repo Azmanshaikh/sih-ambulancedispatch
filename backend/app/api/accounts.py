@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.core.security import get_current_user, require_roles
 from app.services.corridor import apply_condition_score, display_priority_label, priority_band_of, resolve_conflict
-from app.services.fleet import BMSIT, get_ambulances, get_hospital
+from app.services.fleet import BMSIT, get_ambulance, get_ambulances, get_hospital
 from app.services.otp import issue_otp, list_active_otps, verify_otp
 from app.services.profiles import (
     activate_patient,
@@ -58,10 +58,12 @@ class RoleRequestBody(BaseModel):
 class ChooseRoleBody(BaseModel):
     role: Literal["patient", "driver", "staff", "doctor"]
     hospital_id: int | None = None
+    ambulance_id: str | None = None
 
 
 class VerifyOtpBody(BaseModel):
     code: str
+    ambulance_id: str | None = None
 
 
 class DecideBody(BaseModel):
@@ -129,6 +131,28 @@ async def me(user: dict[str, Any] = Depends(get_current_user)):
     }
 
 
+@router.get("/fleet-units")
+async def fleet_units(_user: dict[str, Any] = Depends(get_current_user)):
+    """Signed-in users (including pending onboarding) can pick a fleet unit."""
+    return {
+        "status": "success",
+        "ambulances": get_ambulances(),
+    }
+
+
+class OwnAmbulanceBody(BaseModel):
+    ambulance_id: str
+
+
+@router.post("/me/ambulance")
+async def bind_own_ambulance(body: OwnAmbulanceBody, user: dict[str, Any] = Depends(require_roles("driver", "doctor"))):
+    unit = get_ambulance((body.ambulance_id or "").strip())
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unknown ambulance")
+    profile = set_driver_ambulance(user["id"], unit["id"])
+    return {"status": "success", "profile": profile, "ambulance": unit}
+
+
 @router.post("/choose-role")
 async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_current_user)):
     profile = user.get("profile") or {}
@@ -141,14 +165,26 @@ async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_c
         return {"status": "success", "user": _with_hospital(row), "otp_sent": False}
 
     hospital = None
+    ambulance = None
     if body.role == "staff":
         if not body.hospital_id:
             raise HTTPException(status_code=400, detail="Select the hospital you work at")
         hospital = get_hospital(body.hospital_id)
         if not hospital:
             raise HTTPException(status_code=400, detail="Unknown hospital")
+    if body.role in ("driver", "doctor"):
+        if not (body.ambulance_id or "").strip():
+            raise HTTPException(status_code=400, detail="Select an ambulance from the fleet")
+        ambulance = get_ambulance(body.ambulance_id.strip())
+        if not ambulance:
+            raise HTTPException(status_code=400, detail="Unknown ambulance")
 
-    pending = mark_otp_pending(user["id"], body.role, hospital_id=body.hospital_id if body.role == "staff" else None)
+    pending = mark_otp_pending(
+        user["id"],
+        body.role,
+        hospital_id=body.hospital_id if body.role == "staff" else None,
+        ambulance_id=(ambulance or {}).get("id") if body.role in ("driver", "doctor") else None,
+    )
     issued = issue_otp(
         user["id"],
         user["email"],
@@ -159,10 +195,12 @@ async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_c
     )
     pending["onboarded"] = False
     hospital_bit = f" at {hospital['name']}" if hospital else ""
+    unit_bit = f" You selected {(ambulance or {}).get('id')}." if ambulance else ""
     message = (
         "OTP sent to the admin. Ask them for the 6-digit code "
         "(Staff → OTP codes in the JEEVAN dashboard)."
         + (f" You selected{hospital_bit}." if hospital_bit else "")
+        + unit_bit
     )
     return {
         "status": "success",
@@ -171,6 +209,7 @@ async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_c
         "otp_email_sent": False,
         "otp_emailed_to": issued.get("emailed_to") or [],
         "hospital_name": (hospital or {}).get("name"),
+        "ambulance_id": (ambulance or {}).get("id"),
         "message": message,
     }
 
@@ -184,8 +223,11 @@ async def confirm_otp(body: VerifyOtpBody, user: dict[str, Any] = Depends(get_cu
     ambulance_id = None
     hospital_id = None
     if row["requested_role"] in ("driver", "doctor"):
-        units = [a for a in get_ambulances() if a.get("status") == "available"]
-        ambulance_id = (units[0]["id"] if units else None) or (get_ambulances()[0]["id"] if get_ambulances() else None)
+        wanted = (body.ambulance_id or "").strip() or (user.get("profile") or {}).get("ambulance_id")
+        if wanted and get_ambulance(str(wanted)):
+            ambulance_id = str(wanted)
+        else:
+            raise HTTPException(status_code=400, detail="Select an ambulance from the fleet before verifying OTP")
     if row["requested_role"] == "staff":
         hospital_id = row.get("hospital_id") or (user.get("profile") or {}).get("hospital_id")
         if not get_hospital(hospital_id):

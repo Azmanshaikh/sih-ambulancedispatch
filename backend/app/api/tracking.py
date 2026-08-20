@@ -16,6 +16,7 @@ from app.services.fleet import (
     get_ambulance,
     get_ambulances,
     get_hospitals,
+    place_ambulance,
 )
 from app.services.geocode import geocode_query, reverse_geocode
 from app.services.runtime_state import push_alert, save_mission, set_medical_record
@@ -62,6 +63,7 @@ class AdminSimulateRequest(BaseModel):
     ambulance_address: str = ""
     is_raining: bool = False
     prefer: str = "fastest"
+    push_to_driver: bool = True
 
 
 @router.post("/geocode")
@@ -290,12 +292,61 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
         "lat": req.pickup_lat,
         "lng": req.pickup_lng,
         "address": req.pickup_address or f"{req.pickup_lat:.5f}, {req.pickup_lng:.5f}",
+        "name": req.pickup_address or f"{req.pickup_lat:.5f}, {req.pickup_lng:.5f}",
     }
     result["destination"] = {
         "lat": req.dest_lat,
         "lng": req.dest_lng,
         "address": req.dest_address or f"{req.dest_lat:.5f}, {req.dest_lng:.5f}",
     }
+    if req.push_to_driver:
+        pickup_path = [(float(p[0]), float(p[1])) for p in (result.get("pickup_route") or []) if p]
+        drop_path = [(float(p[0]), float(p[1])) for p in (result.get("route") or []) if p]
+        if req.ambulance_lat is not None and req.ambulance_lng is not None:
+            place_ambulance(req.ambulance_id, req.ambulance_lat, req.ambulance_lng)
+        assign_ambulance(req.ambulance_id, pickup_path, drop_path)
+        dest_name = req.dest_address or "simulated destination"
+        pickup_name = req.pickup_address or "simulated pickup"
+        mission = save_mission(
+            {
+                **result,
+                "patient_id": None,
+                "patient_name": "Admin simulation",
+                "patient_email": "",
+                "pickup": {
+                    "name": pickup_name,
+                    "lat": req.pickup_lat,
+                    "lng": req.pickup_lng,
+                },
+                "ambulance_id": req.ambulance_id,
+                "hospital_name": dest_name,
+                "hospital": {
+                    "name": dest_name,
+                    "lat": req.dest_lat,
+                    "lng": req.dest_lng,
+                },
+                "route": result.get("route") or [],
+                "pickup_route": result.get("pickup_route") or [],
+                "eta_minutes": result.get("eta_minutes"),
+                "pickup_minutes": result.get("pickup_minutes"),
+                "transport_minutes": result.get("transport_minutes"),
+                "phase": "pickup",
+                "priority": 1,
+                "priority_label": "simulation",
+                "notes": "Pushed from admin route simulation",
+            }
+        )
+        push_alert(
+            "driver",
+            "SIMULATION JOB",
+            f"Admin simulation: pick up at {pickup_name}, then drop at {dest_name}.",
+            ambulance_id=req.ambulance_id,
+            mission_id=mission.get("id"),
+            extra={"pickup": pickup_name, "drop": dest_name, "patient_name": "Admin simulation"},
+        )
+        arm_corridor(mission)
+        result["pushed"] = True
+        result["mission_id"] = mission.get("id")
     return {"status": "success", "data": result}
 
 

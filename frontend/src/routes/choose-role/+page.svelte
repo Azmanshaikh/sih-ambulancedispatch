@@ -6,26 +6,47 @@
   import LanguageSettings from '$lib/components/LanguageSettings.svelte';
 
   type HospitalOption = { id: number; name: string };
+  type AmbulanceOption = { id: string; label?: string; status?: string; type_label?: string };
 
   let picking = $state(false);
   let verifying = $state(false);
   let error = $state('');
-  let otpSent = $state(
-    Boolean(auth.profile?.requested_role && auth.profile?.status === 'pending' && (auth.profile?.requested_role !== 'staff' || auth.profile?.hospital_id))
-  );
   let wanted = $state(auth.profile?.requested_role || '');
   let code = $state('');
   let otpHint = $state('');
   let pickHospital = $state(false);
+  let pickAmbulance = $state(false);
   let hospitals = $state<HospitalOption[]>([]);
+  let ambulances = $state<AmbulanceOption[]>([]);
   let selectedHospital = $state<number | null>(auth.profile?.hospital_id ?? null);
   let selectedName = $state(auth.profile?.hospital_name || '');
+  let selectedAmbulance = $state(auth.profile?.ambulance_id || '');
   let loadingHospitals = $state(false);
+  let loadingFleet = $state(false);
+  let otpSent = $state(false);
+
+  function pendingReady() {
+    const p = auth.profile;
+    if (!p?.requested_role || p.status !== 'pending') return false;
+    if (p.requested_role === 'staff') return Boolean(p.hospital_id);
+    if (p.requested_role === 'driver' || p.requested_role === 'doctor') return Boolean(p.ambulance_id);
+    return true;
+  }
 
   onMount(async () => {
-    await loadHospitals();
+    otpSent = pendingReady();
     if (auth.profile?.requested_role === 'staff' && auth.profile?.status === 'pending' && !otpSent) {
       pickHospital = true;
+      await loadHospitals();
+    }
+    if (
+      (auth.profile?.requested_role === 'driver' || auth.profile?.requested_role === 'doctor') &&
+      auth.profile?.status === 'pending' &&
+      !otpSent
+    ) {
+      pickAmbulance = true;
+      wanted = auth.profile.requested_role;
+      await loadFleet();
     }
   });
 
@@ -38,6 +59,21 @@
       hospitals = [];
     } finally {
       loadingHospitals = false;
+    }
+  }
+
+  async function loadFleet() {
+    loadingFleet = true;
+    try {
+      const res = await apiFetch('/accounts/fleet-units');
+      if (res.ok) {
+        const data = await res.json();
+        ambulances = data.ambulances || [];
+      }
+    } catch {
+      ambulances = [];
+    } finally {
+      loadingFleet = false;
     }
   }
 
@@ -55,9 +91,18 @@
     error = '';
     if (role === 'staff') {
       pickHospital = true;
+      pickAmbulance = false;
       otpSent = false;
       wanted = 'staff';
       await loadHospitals();
+      return;
+    }
+    if (role === 'driver' || role === 'doctor') {
+      pickAmbulance = true;
+      pickHospital = false;
+      otpSent = false;
+      wanted = role;
+      await loadFleet();
       return;
     }
     await submitRole(role);
@@ -73,6 +118,7 @@
         body: JSON.stringify({
           role,
           hospital_id: role === 'staff' ? selectedHospital : null,
+          ambulance_id: role === 'driver' || role === 'doctor' ? selectedAmbulance : null,
         }),
       });
       const data = await res.json();
@@ -81,8 +127,10 @@
       if (data.otp_sent) {
         otpSent = true;
         pickHospital = false;
+        pickAmbulance = false;
         wanted = role;
         selectedName = data.hospital_name || selectedName;
+        if (data.ambulance_id) selectedAmbulance = data.ambulance_id;
         otpHint = data.message || t('choose.otpSent');
         return;
       }
@@ -102,6 +150,14 @@
     await submitRole('staff');
   }
 
+  async function requestAmbulanceOtp() {
+    if (!selectedAmbulance) {
+      error = t('choose.tickAmbulance');
+      return;
+    }
+    await submitRole(wanted === 'doctor' ? 'doctor' : 'driver');
+  }
+
   async function verify() {
     verifying = true;
     error = '';
@@ -109,7 +165,7 @@
       const res = await apiFetch('/accounts/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, ambulance_id: selectedAmbulance || null }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Invalid OTP');
@@ -125,6 +181,7 @@
   function resetRole() {
     otpSent = false;
     pickHospital = false;
+    pickAmbulance = false;
     code = '';
     wanted = '';
     error = '';
@@ -146,7 +203,7 @@
       {t('choose.body', { email: auth.profile?.email || '' })}
     </p>
 
-    {#if !otpSent && !pickHospital}
+    {#if !otpSent && !pickHospital && !pickAmbulance}
       <div style="display:flex;flex-direction:column;gap:12px;">
         <button class="btn btn-primary" style="width:100%;padding:16px;" disabled={picking} onclick={() => choose('patient')}>
           {t('choose.patient')}
@@ -199,10 +256,52 @@
       <button class="btn btn-ghost" style="width:100%;margin-top:10px;" disabled={picking} onclick={resetRole}>
         {t('choose.differentRole')}
       </button>
+    {:else if pickAmbulance}
+      <p style="font-size:13px;color:#111;margin:0 0 12px;font-weight:600;">
+        {t('choose.pickAmbulance')}
+      </p>
+      {#if loadingFleet}
+        <p class="nb-card p-2" style="font-size:12px;font-weight:700;">{t('choose.loadingFleet')}</p>
+      {:else}
+        <div style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;margin-bottom:14px;">
+          {#each ambulances as a}
+            <label
+              class="nb-card"
+              style="
+                display:flex;align-items:center;gap:10px;padding:12px;cursor:pointer;
+                background:{selectedAmbulance === a.id ? '#FFD23F' : '#fff'};
+              "
+            >
+              <input
+                type="checkbox"
+                checked={selectedAmbulance === a.id}
+                onchange={() => (selectedAmbulance = selectedAmbulance === a.id ? '' : a.id)}
+                style="width:18px;height:18px;accent-color:#111;flex-shrink:0;"
+              />
+              <span style="font-size:13px;font-weight:800;">
+                {a.id}
+                <span style="font-weight:600;color:#4B4B4B;"> · {a.label || a.type_label || a.status}</span>
+              </span>
+            </label>
+          {/each}
+        </div>
+      {/if}
+      <button
+        class="btn btn-primary"
+        style="width:100%;padding:14px;"
+        disabled={picking || !selectedAmbulance}
+        onclick={requestAmbulanceOtp}
+      >
+        {picking ? t('choose.requestingOtp') : t('choose.requestOtp')}
+      </button>
+      <button class="btn btn-ghost" style="width:100%;margin-top:10px;" disabled={picking} onclick={resetRole}>
+        {t('choose.differentRole')}
+      </button>
     {:else}
       <p style="font-size:13px;color:#111;margin:0 0 12px;font-weight:600;">
         {t('choose.otpFor', { role: wanted })}
-        {#if selectedName}{t('choose.atHospital', { name: selectedName })}{/if}.
+        {#if selectedName}{t('choose.atHospital', { name: selectedName })}{/if}
+        {#if selectedAmbulance}{t('choose.atAmbulance', { id: selectedAmbulance })}{/if}.
         {otpHint || t('choose.otpSent')}
       </p>
       <input

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
-  import { apiFetch } from '$lib/auth.svelte';
+  import { apiFetch, auth, refreshProfile } from '$lib/auth.svelte';
   import { postToMarker } from '$lib/officers';
   import { t } from '$lib/i18n.svelte';
 
@@ -13,6 +13,37 @@
   let alertBanner = $state<any>(null);
   let lastAlertId = $state('');
   let posts = $state<any[]>([]);
+  let fleet = $state<any[]>([]);
+  let switching = $state(false);
+  let unitId = $derived(auth.profile?.ambulance_id || '');
+
+  async function loadFleet() {
+    try {
+      const res = await apiFetch('/accounts/fleet-units');
+      if (!res.ok) return;
+      const data = await res.json();
+      fleet = data.ambulances || [];
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function switchUnit(id: string) {
+    if (!id || id === unitId || switching) return;
+    switching = true;
+    try {
+      const res = await apiFetch('/accounts/me/ambulance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ambulance_id: id }),
+      });
+      if (!res.ok) return;
+      await refreshProfile();
+      await loadMission();
+    } finally {
+      switching = false;
+    }
+  }
 
   function applyMission(m: any) {
     if (!m || m.phase === 'complete') {
@@ -106,6 +137,7 @@
     loadMission();
     loadAlerts();
     loadPosts();
+    loadFleet();
     const t = setInterval(() => {
       loadMission();
       loadAlerts();
@@ -154,7 +186,23 @@
         {#if !mission}
           <p class="nb-chip nb-red mb-2" style="color:#fff;">{t('driver.standby')}</p>
           <h2 class="text-xl font-black mb-2 uppercase">{t('driver.noAssignment')}</h2>
-          <p class="text-xs text-[#4B4B4B] font-semibold">{t('driver.alertHint')}</p>
+          <p class="text-xs text-[#4B4B4B] font-semibold mb-3">{t('driver.alertHint')}</p>
+          {#if unitId}
+            <p class="text-xs font-black uppercase tracking-widest mb-2">{t('driver.yourUnit', { id: unitId })}</p>
+          {/if}
+          {#if fleet.length}
+            <label class="text-[10px] font-black uppercase tracking-widest">{t('driver.pickUnit')}</label>
+            <select
+              class="nb-input w-full mt-1"
+              disabled={switching}
+              value={unitId}
+              onchange={(e) => switchUnit((e.currentTarget as HTMLSelectElement).value)}
+            >
+              {#each fleet as a}
+                <option value={a.id}>{a.id} · {a.label || a.type_label || a.status}</option>
+              {/each}
+            </select>
+          {/if}
         {:else}
           <p class="nb-chip nb-red mb-2" style="color:#fff;">
             {mission.phase === 'complete' ? t('driver.tripComplete') : mission.phase === 'drop' ? t('driver.toDrop') : t('driver.toPickup')}

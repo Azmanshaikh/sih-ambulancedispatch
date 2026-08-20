@@ -234,6 +234,7 @@
           ambulance_lat: ambLat,
           ambulance_lng: ambLng,
           ambulance_address: ambAddress,
+          push_to_driver: true,
         }),
       });
       const data = await res.json();
@@ -256,7 +257,7 @@
   <aside class="sim-panel no-sb">
     <div class="sim-banner">
       <span class="material-symbols-outlined">science</span>
-      <span><strong>Admin Simulation</strong> — test routes only. No real dispatch.</span>
+      <span><strong>Admin Simulation</strong> — calculating also sends the job to the driver of this unit.</span>
     </div>
 
     <section class="sim-section">
