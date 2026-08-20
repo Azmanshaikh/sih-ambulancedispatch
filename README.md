@@ -29,7 +29,11 @@
 - **Signal Preemption Simulator:** Automatically overrides traffic signals ahead of high-priority ambulances.
 - **Multi-Mission Conflict Resolution:** Dynamically arbitrates right-of-way when multiple ambulances approach intersecting paths based on clinical trauma levels.
 
-### 4. 👥 Role-Based Portals (RBAC)
+### 4. 👥 Role-Based Portals (RBAC) & JWT Security
+- **JWT access control:** FastAPI verifies the Supabase access token on every protected route (signature, expiry, issuer, audience, user id). JEEVAN **role and account status** are loaded from the server-side `profiles` table — never from the request body or JWT custom claims.
+- **Reusable auth dependencies:** `require_authenticated_user()`, `require_roles(...)` / `require_role(...)`, and `require_main_admin()`. Missing/invalid tokens return **401**; authenticated but forbidden roles return **403**.
+- **Main Admin only:** Custom pickup/drop **route simulation** (`POST /tracking/admin/simulate-route`) is enforced on the backend, not just by hiding the UI.
+- **Privilege escalation blocked:** Users cannot self-update `profiles.role` / `status` via RLS. Passwords stay in Supabase Auth (bcrypt). JWT secrets live in environment variables only.
 - **🚑 Ambulance Driver Portal:** Turn-by-turn navigation, patient medical summary, live telemetry broadcasting, and one-tap trip status updates (`En Route` ➔ `On Scene` ➔ `Transporting` ➔ `Complete`).
 - **🏥 Hospital / Doctor Portal:** Pre-arrival telemetry alerts, incoming patient vitals, AI report summaries, and dynamic bed/ICU reservations.
 - **🚨 Dispatch Command Staff Portal:** City-wide live radar map, active incident queue, manual override controls, and green corridor health diagnostics.
@@ -93,7 +97,9 @@ sih-ambulancedispatch/
 │   │   │   ├── ai.py         # AI Chat, Voice, Vision OCR & Tavus WebRTC
 │   │   │   ├── hospitals.py  # Hospital Capacity & Specializations
 │   │   │   └── tracking.py   # Dispatching, Fleet & Corridor Telemetry
-│   │   ├── core/             # Configuration, DB & Security Middleware
+│   │   ├── core/             # Config, JWT verification & RBAC dependencies
+│   │   │   ├── security.py   # require_authenticated_user, require_roles, require_main_admin
+│   │   │   └── jwt_tokens.py # Local Supabase JWT decode (sig, exp, iss, aud)
 │   │   ├── models/           # SQLAlchemy & Pydantic Data Models
 │   │   ├── services/         # Core Domain Logic
 │   │   │   ├── corridor.py   # Green Corridor & Signal Synchronization
@@ -142,7 +148,7 @@ sih-ambulancedispatch/
 | **Frontend Framework** | [SvelteKit 2](https://kit.svelte.dev/) (Svelte 5 runes), [Vite 8](https://vitejs.dev/) |
 | **Styling & UI** | [Tailwind CSS v4](https://tailwindcss.com/), [Lucide Svelte](https://lucide.dev/) |
 | **Mapping & Telemetry** | [Leaflet.js](https://leafletjs.com/), HTML5 Geolocation, WebSockets |
-| **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL + RLS + Storage) with in-memory resilient fallback |
+| **Database & Auth** | [Supabase](https://supabase.com/) Auth (Google + email/password, bcrypt) + FastAPI local JWT verification + PostgreSQL RLS |
 | **Communications** | [Twilio](https://www.twilio.com/) (SMS & WhatsApp), [MSG91](https://msg91.com/), SMTP, [Daily.co](https://www.daily.co/) (WebRTC) |
 
 ---
@@ -176,7 +182,7 @@ Key environment variables:
 ```env
 # Server Configuration
 PROJECT_NAME="JEEVAN"
-CORS_ORIGINS="http://localhost:5173,http://localhost:3000"
+CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
 
 # AI Services (NVIDIA NIM)
 NVIDIA_API_KEY="nvapi-..."
@@ -196,6 +202,8 @@ TAVUS_REPLICA_ID="your_replica_id"
 VITE_SUPABASE_URL="https://your-project.supabase.co"
 VITE_SUPABASE_ANON_KEY="your-anon-key"
 SUPABASE_SERVICE_KEY="your-service-role-key"
+# Dashboard → Project Settings → API → JWT Secret (never commit this)
+SUPABASE_JWT_SECRET="your-supabase-jwt-secret"
 
 # External Mapping & Weather
 TOMTOM_API_KEY="your_tomtom_key"
@@ -212,9 +220,9 @@ MSG91_AUTH_KEY="your_msg91_key"
 
 ### Step 3: Database Setup (Supabase / Postgres)
 If using Supabase, execute the SQL scripts in the **Supabase SQL Editor** in the following order:
-1. `supabase_sql/profiles.sql` — RBAC schema and role enforcement.
+1. `supabase_sql/profiles.sql` — RBAC schema, role enforcement, and a trigger that blocks self-updates of `role` / `status`.
 2. `supabase_sql/dispatches.sql` — Active and archived fleet dispatch missions.
-3. `supabase_sql/dispatch_cases.sql` — Emergency intake logs and triage histories.
+3. `supabase_sql/dispatch_cases.sql` — Emergency intake logs, triage histories, and staff/main-admin RLS.
 4. `supabase_sql/medical_reports.sql` — OCR analysis records for patient health cards.
 
 ---
@@ -252,13 +260,16 @@ The backend automatically hosts interactive Swagger documentation at **`http://l
 | **Tracking** | `POST` | `/tracking/dispatch` | Triggers multi-objective dispatch & green corridor calculation |
 | **Tracking** | `GET` | `/tracking/fleet` | Returns real-time coordinates of all active ambulances |
 | **Tracking** | `GET` | `/tracking/corridor` | Returns active green corridors and traffic signal states |
-| **Tracking** | `WS` | `/tracking/ws/fleet` | WebSocket channel for real-time fleet GPS broadcasting |
+| **Tracking** | `POST` | `/tracking/admin/simulate-route` | Main Admin custom pickup/drop simulation (backend-enforced; non-admins get **403**) |
+| **Tracking** | `WS` | `/tracking/ws` | Authenticated WebSocket (`?token=` JWT); staff / driver / doctor / main_admin |
 | **AI** | `POST` | `/ai/chat` | Patient triage & first-aid consultation |
 | **AI** | `POST` | `/ai/chat/voice` | Voice-based triage audio upload (NVIDIA ASR) |
 | **AI** | `POST` | `/ai/analyze-report` | Multimodal medical report OCR & summary (NVIDIA Vision) |
 | **AI** | `POST` | `/ai/tavus/start` | Initiates real-time conversational WebRTC video avatar intake |
 | **Hospitals**| `GET` | `/hospitals/` | Real-time directory with bed, ICU, and specialty capacity |
-| **Accounts** | `GET` | `/accounts/me` | Returns the signed-in user. FastAPI verifies the Supabase JWT (signature, expiry, issuer, audience) then loads role from `profiles`. |
+| **Accounts** | `GET` | `/accounts/me` | Signed-in user after JWT verification; role loaded from `profiles` |
+
+Protected routes require `Authorization: Bearer <supabase_access_token>`. Invalid or expired JWTs return **401**. Wrong role returns **403**. The frontend refreshes the session on 401, then redirects to login.
 
 ---
 
