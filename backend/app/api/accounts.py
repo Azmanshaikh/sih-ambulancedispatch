@@ -158,25 +158,20 @@ async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_c
         hospital_name=(hospital or {}).get("name"),
     )
     pending["onboarded"] = False
-    emailed_to = issued.get("emailed_to") or ([user["email"]] if user.get("email") else [])
-    emailed = bool(issued.get("email_sent"))
-    dest = ", ".join(emailed_to) if emailed_to else user.get("email") or "your Gmail"
     hospital_bit = f" at {hospital['name']}" if hospital else ""
-    smtp_error = issued.get("email_error") or ""
-    if emailed:
-        message = f"OTP emailed to {dest}."
-    elif smtp_error:
-        message = f"Could not email {dest}: {smtp_error}"
-    else:
-        message = f"Could not email {dest}. Check SMTP settings in .env, or read the code on Staff → OTP codes."
+    message = (
+        "OTP sent to the admin. Ask them for the 6-digit code "
+        "(Staff → OTP codes in the JEEVAN dashboard)."
+        + (f" You selected{hospital_bit}." if hospital_bit else "")
+    )
     return {
         "status": "success",
         "user": _with_hospital(pending),
         "otp_sent": True,
-        "otp_email_sent": emailed,
-        "otp_emailed_to": emailed_to,
+        "otp_email_sent": False,
+        "otp_emailed_to": issued.get("emailed_to") or [],
         "hospital_name": (hospital or {}).get("name"),
-        "message": message + (f" You selected{hospital_bit}." if hospital_bit else ""),
+        "message": message,
     }
 
 

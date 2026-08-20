@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, tick } from 'svelte';
-  import { apiFetch } from '$lib/auth.svelte';
+  import { apiFetch, auth } from '$lib/auth.svelte';
   import { t } from '$lib/i18n.svelte';
 
   type Intake = {
@@ -24,6 +24,7 @@
   let verifyLive = $state(false);
   let intake = $state<Intake>({ name: '', date_of_birth: '', issue: '', recap: '' });
   let lastConversationId = $state('');
+  let ownedBy = $state('');
 
   let expectNext: 'name' | 'dob' | 'issue' | null = null;
   let canvasTool: { id: string; component: string } | null = null;
@@ -218,6 +219,20 @@
       /* ignore */
     }
   }
+
+  $effect(() => {
+    const userId = auth.session?.user?.id || '';
+    if (userId === ownedBy) return;
+    ownedBy = userId;
+    conversationUrl = '';
+    conversationId = '';
+    lastConversationId = '';
+    verifyOpen = false;
+    savedNote = '';
+    error = '';
+    intake = emptyIntake();
+    void destroyCall();
+  });
 
   async function waitForStage() {
     for (let i = 0; i < 20; i++) {

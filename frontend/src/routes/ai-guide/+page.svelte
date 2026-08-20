@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onDestroy, onMount, tick } from 'svelte';
-  import { apiFetch } from '$lib/auth.svelte';
+  import { onDestroy, tick } from 'svelte';
+  import { apiFetch, auth } from '$lib/auth.svelte';
   import { i18n, t } from '$lib/i18n.svelte';
 
   let messages = $state<{ role: string; content: string }[]>([]);
@@ -10,6 +10,7 @@
   let recording = $state(false);
   let transcribing = $state(false);
   let threadEl: HTMLDivElement | undefined;
+  let loadedFor = $state('');
 
   let mediaRecorder: MediaRecorder | null = null;
   let mediaStream: MediaStream | null = null;
@@ -19,12 +20,29 @@
   const MAX_SECONDS = 45;
 
   async function loadHistory() {
+    const userId = auth.session?.user?.id || '';
+    if (!userId) {
+      messages = [];
+      return;
+    }
     const res = await apiFetch('/ai/chat/history');
-    if (!res.ok) return;
+    if (!res.ok) {
+      messages = [];
+      return;
+    }
     const data = await res.json();
     messages = (data.messages || []).map((m: any) => ({ role: m.role, content: m.content }));
     await scrollToEnd();
   }
+
+  $effect(() => {
+    const userId = auth.session?.user?.id || '';
+    if (userId === loadedFor) return;
+    loadedFor = userId;
+    messages = [];
+    error = '';
+    if (userId) void loadHistory();
+  });
 
   async function scrollToEnd() {
     await tick();
@@ -194,7 +212,6 @@
     }, MAX_SECONDS * 1000);
   }
 
-  onMount(loadHistory);
   onDestroy(() => {
     if (stopTimer) clearTimeout(stopTimer);
     if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();

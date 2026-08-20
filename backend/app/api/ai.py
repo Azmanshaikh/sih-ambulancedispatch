@@ -49,12 +49,16 @@ def _nvidia_http_error(exc: Exception, *, asr: bool = False) -> HTTPException:
             )
         return HTTPException(
             status_code=502,
-            detail="AI chat is unavailable: your NVIDIA key can't access the configured models. Set NVIDIA_MODEL to a model you have access to (e.g. nvidia/nemotron-mini-4b-instruct).",
+            detail=(
+                "AI chat is unavailable: your NVIDIA key can't access the configured models. "
+                "Set NVIDIA_MODEL=meta/llama-3.1-8b-instruct (or meta/llama-3.2-3b-instruct) "
+                "in .env and on the deployed API, or set GEMINI_API_KEY as a fallback."
+            ),
         )
     return HTTPException(status_code=502, detail=raw[:300])
 
 
-async def _complete_patient_chat(user_id: str, message: str, history: list[dict[str, str]] | None = None) -> str:
+async def _complete_patient_chat(user_id: str, message: str, _history: list[dict[str, str]] | None = None) -> str:
     stored = list_chat(user_id, limit=16)
     messages = [
         {
@@ -67,8 +71,8 @@ async def _complete_patient_chat(user_id: str, message: str, history: list[dict[
             ),
         }
     ]
-    source = stored or (history or [])[-8:]
-    for turn in source[-8:]:
+    source = stored[-8:]
+    for turn in source:
         role = turn.get("role") if turn.get("role") in ("user", "assistant") else "user"
         messages.append({"role": role, "content": turn.get("content") or ""})
     messages.append({"role": "user", "content": message})
@@ -88,10 +92,14 @@ async def chat_history(user: dict[str, Any] = Depends(require_roles("patient")))
     return {"status": "success", "messages": list_chat(user["id"])}
 
 
+def _ai_configured() -> bool:
+    return bool(settings.NVIDIA_API_KEY or settings.GEMINI_API_KEY or settings.GOOGLE_API_KEY)
+
+
 @router.post("/chat")
 async def chat(body: ChatBody, user: dict[str, Any] = Depends(require_roles("patient"))):
-    if not settings.NVIDIA_API_KEY:
-        raise HTTPException(status_code=500, detail="NVIDIA_API_KEY not configured in .env")
+    if not _ai_configured():
+        raise HTTPException(status_code=500, detail="NVIDIA_API_KEY or GEMINI_API_KEY not configured in .env")
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="Message required")
     content = await _complete_patient_chat(user["id"], body.message.strip(), body.history)
@@ -136,8 +144,11 @@ async def tavus_start(user: dict[str, Any] = Depends(require_roles("patient"))):
 
 
 @router.post("/tavus/{conversation_id}/end")
-async def tavus_end(conversation_id: str, _user: dict[str, Any] = Depends(require_roles("patient"))):
-    result = await end_tavus_conversation(conversation_id)
+async def tavus_end(conversation_id: str, user: dict[str, Any] = Depends(require_roles("patient"))):
+    try:
+        result = await end_tavus_conversation(conversation_id, user["id"])
+    except RuntimeError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     return {"status": "success", **result}
 
 
@@ -145,9 +156,12 @@ async def tavus_end(conversation_id: str, _user: dict[str, Any] = Depends(requir
 async def tavus_confirm(
     conversation_id: str,
     body: IntakeConfirmBody,
-    _user: dict[str, Any] = Depends(require_roles("patient")),
+    user: dict[str, Any] = Depends(require_roles("patient")),
 ):
-    intake = confirm_call_intake(conversation_id, body.model_dump())
+    try:
+        intake = confirm_call_intake(conversation_id, body.model_dump(), user["id"])
+    except RuntimeError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     return {"status": "success", "intake": intake}
 
 
@@ -175,8 +189,10 @@ async def analyze_report(
     image: Optional[UploadFile] = File(None),
     user: dict[str, Any] = Depends(get_current_user),
 ):
-    if not settings.NVIDIA_API_KEY:
+    if image and not settings.NVIDIA_API_KEY:
         raise HTTPException(status_code=500, detail="NVIDIA_API_KEY not configured in .env")
+    if not image and not _ai_configured():
+        raise HTTPException(status_code=500, detail="NVIDIA_API_KEY or GEMINI_API_KEY not configured in .env")
 
     if not text and not image:
         raise HTTPException(status_code=400, detail="Must provide either text or image")
@@ -214,13 +230,27 @@ async def analyze_report(
                     "max_tokens": 1024,
                 }
             else:
-                prompt_text = f"Analyze this medical report and provide a concise assessment including: severity (Low, Medium, High, Critical), summary of findings, recommended action, and any vitals detected. Format as structured text.\n\nReport:\n{text}"
-                payload = {
-                    "model": settings.NVIDIA_MODEL,
-                    "messages": [
-                        {"role": "user", "content": prompt_text}
-                    ],
-                    "max_tokens": 1024,
+                prompt_text = (
+                    "Analyze this medical report and provide a concise assessment including: "
+                    "severity (Low, Medium, High, Critical), summary of findings, recommended action, "
+                    f"and any vitals detected. Format as structured text.\n\nReport:\n{text}"
+                )
+                content = await nemotron_chat(
+                    [{"role": "user", "content": prompt_text}],
+                    max_tokens=1024,
+                )
+                saved = save_medical_analysis(
+                    user["id"],
+                    user.get("email") or (user.get("profile") or {}).get("email"),
+                    (text or "").strip(),
+                    content,
+                    "",
+                )
+                return {
+                    "status": "success",
+                    "analysis": content,
+                    "saved": True,
+                    "report_id": saved.get("id"),
                 }
 
             response = await client.post(

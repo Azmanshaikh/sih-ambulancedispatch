@@ -56,7 +56,7 @@
               <p class="text-xs text-[#4B4B4B] font-semibold">{o.email} · {t('otp.wants')} <strong>{o.requested_role}</strong>{o.hospital_name ? ` · ${o.hospital_name}` : ''}</p>
               {#if o.emailed_to?.length}
                 <p class="text-[10px] uppercase tracking-widest text-black font-bold mt-1">
-                  {o.email_sent ? t('otp.emailed') : t('otp.for')} {o.emailed_to.join(', ')}
+                  {t('otp.adminOnly')}
                 </p>
               {/if}
             </div>

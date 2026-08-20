@@ -115,3 +115,38 @@ alter table public.trip_reports enable row level security;
 
 create index if not exists patient_chat_user_idx on public.patient_chat_messages (user_id, created_at);
 create index if not exists trip_reports_patient_idx on public.trip_reports (patient_id, created_at desc);
+
+drop policy if exists "patient_chat_own_select" on public.patient_chat_messages;
+create policy "patient_chat_own_select"
+  on public.patient_chat_messages for select
+  using (user_id = auth.uid());
+
+drop policy if exists "patient_chat_own_insert" on public.patient_chat_messages;
+create policy "patient_chat_own_insert"
+  on public.patient_chat_messages for insert
+  with check (user_id = auth.uid());
+
+drop policy if exists "patient_health_own_select" on public.patient_health_profiles;
+create policy "patient_health_own_select"
+  on public.patient_health_profiles for select
+  using (id = auth.uid() or user_id = auth.uid());
+
+drop policy if exists "trip_reports_own_select" on public.trip_reports;
+create policy "trip_reports_own_select"
+  on public.trip_reports for select
+  using (patient_id = auth.uid());
+
+create table if not exists public.tavus_conversations (
+  conversation_id text primary key,
+  user_id uuid not null,
+  created_at timestamptz default now()
+);
+
+alter table public.tavus_conversations enable row level security;
+
+drop policy if exists "tavus_conversations_own_select" on public.tavus_conversations;
+create policy "tavus_conversations_own_select"
+  on public.tavus_conversations for select
+  using (user_id = auth.uid());
+
+create index if not exists tavus_conversations_user_idx on public.tavus_conversations (user_id, created_at desc);

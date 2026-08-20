@@ -91,6 +91,35 @@ def _uuid_or_none(value: str | None) -> str | None:
         return None
 
 
+def _remember_tavus_owner(conversation_id: str, user_id: str) -> None:
+    cid = (conversation_id or "").strip()
+    uid = _uuid_or_none(user_id)
+    if not cid or not uid:
+        return
+    _tavus_owners[cid] = uid
+    rest_insert(
+        "tavus_conversations",
+        {"conversation_id": cid, "user_id": uid, "created_at": _now()},
+    )
+
+
+def _tavus_owner(conversation_id: str) -> str | None:
+    cid = (conversation_id or "").strip()
+    if not cid:
+        return None
+    owner = _tavus_owners.get(cid)
+    if owner:
+        return owner
+    rows = rest_select(
+        "tavus_conversations",
+        {"conversation_id": f"eq.{cid}", "select": "user_id", "limit": "1"},
+    )
+    uid = _uuid_or_none((rows or [{}])[0].get("user_id") if rows else None)
+    if uid:
+        _tavus_owners[cid] = uid
+    return uid
+
+
 def save_medical_analysis(
     user_id: str,
     email: str | None,
@@ -153,37 +182,53 @@ def list_medical_analyses(user_id: str, limit: int = 20) -> list[dict[str, Any]]
 
 
 def list_chat(user_id: str, limit: int = 80) -> list[dict[str, Any]]:
-    mem = list(_chats.get(user_id) or [])
+    uid = _uuid_or_none(user_id)
+    if not uid:
+        return []
+    mem = [t for t in (_chats.get(uid) or []) if str(t.get("user_id") or "") == uid]
     rows = rest_select(
         "patient_chat_messages",
-        {"user_id": f"eq.{user_id}", "select": "*", "order": "created_at.asc"},
+        {
+            "user_id": f"eq.{uid}",
+            "select": "id,user_id,role,content,created_at",
+            "order": "created_at.asc",
+            "limit": str(max(limit, 80)),
+        },
     )
-    if rows:
-        merged = [{
+    owned = [
+        {
             "id": r.get("id"),
+            "user_id": uid,
             "role": r.get("role"),
             "content": r.get("content"),
             "created_at": r.get("created_at"),
-        } for r in rows]
-        return merged[-limit:]
+        }
+        for r in (rows or [])
+        if str(r.get("user_id") or "") == uid
+    ]
+    if owned:
+        return owned[-limit:]
     return mem[-limit:]
 
 
 def append_chat(user_id: str, role: str, content: str) -> dict[str, Any]:
+    uid = _uuid_or_none(user_id)
+    if not uid:
+        raise RuntimeError("Signed-in account required to save chat")
     turn = {
         "id": str(uuid.uuid4()),
-        "user_id": user_id,
+        "user_id": uid,
         "role": role,
         "content": content,
         "created_at": _now(),
     }
-    _chats.setdefault(user_id, []).append(turn)
-    _chats[user_id] = _chats[user_id][-120:]
+    _chats.setdefault(uid, []).append(turn)
+    _chats[uid] = [t for t in _chats[uid] if str(t.get("user_id") or "") == uid][-120:]
     rest_insert(
         "patient_chat_messages",
         {
             "id": turn["id"],
-            "user_id": user_id,
+            "user_id": uid,
             "role": role,
             "content": content,
             "created_at": turn["created_at"],
@@ -332,7 +377,13 @@ async def nemotron_chat(messages: list[dict[str, str]], max_tokens: int = 500) -
                 # A 401 means the key itself is bad; other models will not help.
                 if response.status_code == 401:
                     break
-                # 403/404: this model is not enabled for the account — try the next.
+                # 403 = this key cannot use that model. If Gemini is configured,
+                # skip the remaining NVIDIA IDs instead of failing the whole chat.
+                if response.status_code == 403 and (settings.GEMINI_API_KEY or settings.GOOGLE_API_KEY):
+                    break
+    if last_error:
+        tried = ", ".join(_nvidia_models())
+        last_error = f"NVIDIA models unavailable ({tried}): {last_error}"
     if settings.GEMINI_API_KEY or settings.GOOGLE_API_KEY:
         try:
             return await _gemini_complete(messages, max_tokens=max_tokens)
@@ -375,7 +426,12 @@ async def _gemini_complete(messages: list[dict[str, str]], max_tokens: int = 500
     }
     if system_parts:
         payload["system_instruction"] = {"parts": [{"text": "\n".join(system_parts)}]}
-    models = [settings.GEMINI_MODEL or "gemini-2.0-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    models = [
+        settings.GEMINI_MODEL or "gemini-2.0-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
     seen: set[str] = set()
     last_error = ""
     async with httpx.AsyncClient() as client:
@@ -396,7 +452,7 @@ async def _gemini_complete(messages: list[dict[str, str]], max_tokens: int = 500
                 if text:
                     return text
             last_error = response.text[:400]
-            if response.status_code not in (404, 400):
+            if response.status_code not in (404, 400, 403, 429):
                 break
     raise RuntimeError(last_error or "Gemini chat failed")
 
@@ -417,7 +473,7 @@ async def gemini_chat(user_id: str, message: str) -> str:
         "contents": contents,
         "generationConfig": {"temperature": 0.4, "maxOutputTokens": 280},
     }
-    models = [model, "gemini-2.0-flash", "gemini-1.5-flash"]
+    models = [model, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
     seen: set[str] = set()
     last_error = ""
     async with httpx.AsyncClient() as client:
@@ -438,7 +494,7 @@ async def gemini_chat(user_id: str, message: str) -> str:
                 if text:
                     return text
             last_error = response.text[:400]
-            if response.status_code not in (404, 400):
+            if response.status_code not in (404, 400, 403, 429):
                 break
     raise RuntimeError(last_error or "Gemini voice failed")
 
@@ -470,11 +526,13 @@ def _tavus_context_for_user(user_id: str, patient_name: str | None) -> str:
     known = f"App already has display name {patient_name}." if patient_name else "Name is not on file."
     return (
         f"{TAVUS_CONTEXT}\n"
-        f"{known} Still ask them to SAY their full name and date of birth out loud.\n"
+        "PRIVACY: This call is private to one signed-in patient. "
+        "Do not recall, mention, or assume any other person's name, history, or previous call.\n"
+        f"Patient record id: {user_id}. {known} Still ask them to SAY their full name and date of birth out loud.\n"
         f"Known allergies: {profile.get('allergies') or 'none noted'}.\n"
         f"Medicines: {profile.get('medicines') or 'none noted'}.\n"
         f"Conditions: {profile.get('conditions') or 'none noted'}.\n"
-        f"Prior notes from app chat (use if relevant):\n{chat_bits or '(none yet)'}"
+        f"Prior notes from THIS patient's app chat only:\n{chat_bits or '(none yet)'}"
     )
 
 
@@ -538,14 +596,17 @@ async def start_tavus_conversation(user_id: str, patient_name: str | None = None
     await _ensure_voice_canvas(pal or persona or "")
 
     payload: dict[str, Any] = {
-        "conversation_name": f"JEEVAN health call · {patient_name or 'patient'}",
+        "conversation_name": f"JEEVAN {user_id[:8]} {uuid.uuid4().hex[:8]}",
         "conversational_context": _tavus_context_for_user(user_id, patient_name),
         "custom_greeting": (
             f"Hello{(' ' + patient_name) if patient_name else ''}. I am Jeevan. "
-            "I can hear you, so please speak your answers. First say your full name, "
-            "then your date of birth, then the small health issue. "
+            "This call is private and only about you. I can hear you, so please speak your answers. "
+            "First say your full name, then your date of birth, then the small health issue. "
             "If it feels serious, use Emergency SOS in the app."
         ),
+        # One memory bucket per signed-in patient. Omitting this (or sharing one tag)
+        # makes Tavus recall other people's previous calls.
+        "memory_stores": [f"jeevan-patient-{user_id}"],
     }
     if pal:
         payload["pal_id"] = pal
@@ -563,21 +624,31 @@ async def start_tavus_conversation(user_id: str, patient_name: str | None = None
     callback = (settings.TAVUS_CALLBACK_URL or "").strip()
     if callback:
         payload["callback_url"] = callback
+    last_error = ""
+    data: dict[str, Any] = {}
+    attempts = (payload, {k: v for k, v in payload.items() if k != "memory_stores"})
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://tavusapi.com/v2/conversations",
-            headers={"x-api-key": settings.TAVUS_API_KEY, "Content-Type": "application/json"},
-            json=payload,
-            timeout=30.0,
-        )
-    data = response.json() if response.content else {}
-    if response.status_code >= 400:
-        raise RuntimeError(str(data.get("message") or data.get("error") or data)[:400])
+        for body in attempts:
+            response = await client.post(
+                "https://tavusapi.com/v2/conversations",
+                headers={"x-api-key": settings.TAVUS_API_KEY, "Content-Type": "application/json"},
+                json=body,
+                timeout=30.0,
+            )
+            data = response.json() if response.content else {}
+            if response.status_code < 400:
+                last_error = ""
+                break
+            last_error = str(data.get("message") or data.get("error") or data)[:400]
+            if "memory" not in last_error.lower():
+                break
+        else:
+            raise RuntimeError(last_error or "Tavus conversation failed")
     url = data.get("conversation_url")
     cid = str(data.get("conversation_id") or "")
     if not url or not cid:
-        raise RuntimeError("Tavus did not return a conversation_url")
-    _tavus_owners[cid] = user_id
+        raise RuntimeError(last_error or "Tavus did not return a conversation_url")
+    _remember_tavus_owner(cid, user_id)
     return {
         "conversation_id": cid,
         "conversation_url": url,
@@ -586,8 +657,14 @@ async def start_tavus_conversation(user_id: str, patient_name: str | None = None
 
 
 def ingest_tavus_transcript(conversation_id: str, transcript: list[Any], user_id: str | None = None) -> int:
-    uid = user_id or _tavus_owners.get(conversation_id)
+    owner = _tavus_owner(conversation_id)
+    uid = _uuid_or_none(user_id) or owner
     if not uid or not transcript:
+        return 0
+    if owner and uid != owner:
+        return 0
+    if not owner:
+        # Unknown call — do not attach someone else's transcript to this account.
         return 0
     saved = 0
     for turn in transcript:
@@ -724,8 +801,18 @@ def get_call_intake(conversation_id: str) -> dict[str, Any]:
     return dict(_call_intakes.get(conversation_id) or empty_intake(conversation_id))
 
 
-def confirm_call_intake(conversation_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-    uid = _tavus_owners.get(conversation_id)
+def confirm_call_intake(
+    conversation_id: str,
+    payload: dict[str, Any] | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    owner = _tavus_owner(conversation_id)
+    uid = _uuid_or_none(user_id)
+    if owner and uid and owner != uid:
+        raise RuntimeError("This video call belongs to another account")
+    uid = owner or uid
+    if not uid:
+        raise RuntimeError("This video call is not linked to your account")
     current = get_call_intake(conversation_id)
     body = payload or {}
     for key in ("name", "date_of_birth", "issue", "recap"):
@@ -754,8 +841,14 @@ def confirm_call_intake(conversation_id: str, payload: dict[str, Any] | None = N
     return current
 
 
-async def end_tavus_conversation(conversation_id: str) -> dict[str, Any]:
+async def end_tavus_conversation(conversation_id: str, user_id: str | None = None) -> dict[str, Any]:
     if not settings.TAVUS_API_KEY or not conversation_id:
+        return {"saved": 0, "intake": empty_intake(conversation_id)}
+    owner = _tavus_owner(conversation_id)
+    uid = _uuid_or_none(user_id)
+    if owner and uid and owner != uid:
+        raise RuntimeError("This video call belongs to another account")
+    if not owner:
         return {"saved": 0, "intake": empty_intake(conversation_id)}
     async with httpx.AsyncClient() as client:
         await client.post(
@@ -768,7 +861,7 @@ async def end_tavus_conversation(conversation_id: str) -> dict[str, Any]:
     for delay in (2.0, 3.0, 5.0):
         await asyncio.sleep(delay)
         turns = await fetch_tavus_transcript(conversation_id)
-        saved = ingest_tavus_transcript(conversation_id, turns)
+        saved = ingest_tavus_transcript(conversation_id, turns, user_id=owner)
         if saved or turns:
             break
     intake = await summarize_call_intake(conversation_id, turns)

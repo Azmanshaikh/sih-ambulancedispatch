@@ -83,7 +83,7 @@
         pickHospital = false;
         wanted = role;
         selectedName = data.hospital_name || selectedName;
-        otpHint = data.message || `OTP emailed to ${auth.profile?.email || 'your Gmail'}.`;
+        otpHint = data.message || t('choose.otpSent');
         return;
       }
       goto(homeFor(auth.profile?.role), { replaceState: true });
@@ -202,9 +202,8 @@
     {:else}
       <p style="font-size:13px;color:#111;margin:0 0 12px;font-weight:600;">
         {t('choose.otpFor', { role: wanted })}
-        {#if selectedName}{t('choose.atHospital', { name: selectedName })}{/if}
-        {t('choose.otpSent', { email: auth.profile?.email || '' })}
-        {otpHint}
+        {#if selectedName}{t('choose.atHospital', { name: selectedName })}{/if}.
+        {otpHint || t('choose.otpSent')}
       </p>
       <input
         class="nb-input"

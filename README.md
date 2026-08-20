@@ -180,7 +180,7 @@ CORS_ORIGINS="http://localhost:5173,http://localhost:3000"
 
 # AI Services (NVIDIA NIM)
 NVIDIA_API_KEY="nvapi-..."
-NVIDIA_MODEL="nvidia/nemotron-mini-4b-instruct"
+NVIDIA_MODEL="meta/llama-3.1-8b-instruct"
 NVIDIA_VISION_MODEL="microsoft/phi-3-vision-128k-instruct"
 NVIDIA_ASR_MODEL="nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
 

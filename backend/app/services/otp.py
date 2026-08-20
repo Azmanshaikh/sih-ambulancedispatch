@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.core.supabase import rest_select, rest_update
-from app.services.mail import send_staff_otp_email
+from app.services.mail import head_staff_emails
 from app.services.runtime_state import push_alert
 
 _otps: dict[str, dict[str, Any]] = {}
@@ -112,7 +112,7 @@ def issue_otp(
 ) -> dict[str, Any]:
     code = f"{secrets.randbelow(1_000_000):06d}"
     expires_at = (_now() + timedelta(minutes=15)).isoformat()
-    mail = send_staff_otp_email(email, full_name, requested_role, code, hospital_name)
+    admin_emails = head_staff_emails()
     row = {
         "user_id": user_id,
         "email": email,
@@ -125,20 +125,19 @@ def issue_otp(
         "created_at": _now().isoformat(),
         "expires_at": expires_at,
         "used": False,
-        "emailed_to": mail.get("to") or ([email] if email else []),
-        "email_sent": bool(mail.get("sent")),
-        "email_error": mail.get("error"),
+        "emailed_to": admin_emails,
+        "email_sent": False,
+        "email_error": None,
     }
     _otps[user_id] = row
-    print(f"[JEEVAN OTP] {requested_role} for {email}: {code}")
+    print(f"[JEEVAN OTP] {requested_role} for {email}: {code} (admin-only)")
     who = full_name or email
-    dest = ", ".join(row["emailed_to"]) or email or "applicant"
     alert = push_alert(
         "staff",
         _OTP_TITLE,
         f"{who} ({email}) wants to join as {requested_role}"
         + (f" at {hospital_name}" if hospital_name else "")
-        + f". OTP issued and emailed to {dest}.",
+        + f". OTP: {code} — share this code with the applicant. Also visible on Staff → OTP codes.",
         extra={
             "kind": "access_otp",
             "otp": code,
@@ -149,8 +148,8 @@ def issue_otp(
             "otp_hospital": hospital_name or "",
             "otp_user_id": user_id,
             "otp_expires_at": expires_at,
-            "otp_emailed_to": row["emailed_to"],
-            "otp_email_sent": row["email_sent"],
+            "otp_emailed_to": admin_emails,
+            "otp_email_sent": False,
             "otp_used": False,
         },
     )
@@ -188,7 +187,7 @@ def verify_otp(user_id: str, code: str) -> dict[str, Any]:
     entered = "".join(ch for ch in (code or "") if ch.isdigit())
     if entered != str(row.get("code") or ""):
         _otps[user_id] = row
-        raise ValueError("Wrong OTP. Check your email for the current code.")
+        raise ValueError("Wrong OTP. Ask the admin for the current code.")
     row["used"] = True
     _otps[user_id] = row
     _mark_used(row)

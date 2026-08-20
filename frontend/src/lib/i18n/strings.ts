@@ -27,7 +27,7 @@ const en = {
 
   'login.title': 'Sign in with Gmail',
   'login.body':
-    'After Google sign-in you choose Patient, Driver, or Staff. Patients enter immediately. Drivers need an OTP. Hospital staff tick their hospital, then enter an OTP from main staff.',
+    'After Google sign-in you choose Patient, Driver, or Staff. Patients enter immediately. Drivers and staff need a one-time code from the admin.',
   'login.continue': 'Continue with Google',
   'login.redirecting': 'Redirecting…',
   'login.googleFailed': 'Google sign-in failed. Enable the Google provider in Supabase.',
@@ -35,11 +35,11 @@ const en = {
 
   'choose.title': 'Who are you?',
   'choose.body':
-    'Signed in as {email}. Patients enter immediately. Drivers, doctors, and hospital staff get a 6-digit OTP in their Gmail.',
+    'Signed in as {email}. Patients enter immediately. Drivers, doctors, and hospital staff get a 6-digit OTP from the admin (Staff → OTP codes).',
   'choose.patient': 'Patient — no OTP',
-  'choose.driver': 'Driver — OTP to your Gmail',
-  'choose.doctor': 'Doctor — OTP to your Gmail',
-  'choose.staff': 'Staff — hospital + OTP to your Gmail',
+  'choose.driver': 'Driver — OTP from admin',
+  'choose.doctor': 'Doctor — OTP from admin',
+  'choose.staff': 'Staff — hospital + OTP from admin',
   'choose.pickHospital': 'Tick the hospital you work at. You will only be able to update bed counts for that hospital.',
   'choose.loadingHospitals': 'Loading hospitals…',
   'choose.requestOtp': 'Request OTP',
@@ -47,7 +47,7 @@ const en = {
   'choose.differentRole': 'Choose a different role',
   'choose.otpFor': 'OTP for {role}',
   'choose.atHospital': ' at {name}',
-  'choose.otpSent': ' was emailed to {email}. Check your inbox for the 6-digit code.',
+  'choose.otpSent': ' Ask the admin for the 6-digit code (Staff → OTP codes).',
   'choose.otpPlaceholder': '6-digit OTP',
   'choose.verify': 'Verify OTP',
   'choose.checking': 'Checking…',
@@ -259,11 +259,10 @@ const en = {
 
   'otp.pageTitle': 'JEEVAN — Access OTPs',
   'otp.title': 'Access OTPs',
-  'otp.subtitle': 'Codes are emailed to the applicant’s Gmail. This list is a backup if email fails.',
+  'otp.subtitle': 'Share these codes with applicants. OTPs are admin-only — nothing is emailed to users.',
   'otp.none': 'No pending OTPs.',
   'otp.wants': 'wants',
-  'otp.emailed': 'Emailed to',
-  'otp.for': 'For',
+  'otp.adminOnly': 'Admin only — share this code with the applicant',
   'otp.fresh': 'ask them to tap Driver/Staff again to mint a fresh code',
   'otp.directory': 'Directory',
   'otp.pending': 'pending OTP',
