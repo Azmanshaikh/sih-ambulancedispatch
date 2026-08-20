@@ -24,17 +24,30 @@ def send_staff_otp_email(
         return {"sent": False, "to": [], "error": "applicant email is empty"}
 
     host = (settings.SMTP_HOST or "").strip()
-    password = (settings.SMTP_PASSWORD or "").strip()
+    password = (settings.SMTP_PASSWORD or "").strip().replace(" ", "")
     user = (settings.SMTP_USER or "").strip()
     from_addr = (settings.SMTP_FROM or "").strip() or user
     port = int(settings.SMTP_PORT or 587)
 
     if not host or not password or not user or not from_addr:
+        missing = []
+        if not host:
+            missing.append("SMTP_HOST")
+        if not user:
+            missing.append("SMTP_USER")
+        if not password:
+            missing.append("SMTP_PASSWORD")
+        if not from_addr:
+            missing.append("SMTP_FROM")
         print(
-            f"[JEEVAN OTP EMAIL] skipped (set SMTP_HOST / SMTP_USER / SMTP_PASSWORD). "
+            f"[JEEVAN OTP EMAIL] skipped (missing {', '.join(missing)}). "
             f"Would send {code} to {recipient}"
         )
-        return {"sent": False, "to": [recipient], "error": "smtp not configured"}
+        return {
+            "sent": False,
+            "to": [recipient],
+            "error": f"smtp not configured (set {', '.join(missing)} in .env)",
+        }
 
     who = applicant_name or applicant_email
     hospital_line = f" Hospital: {hospital_name}." if hospital_name else ""

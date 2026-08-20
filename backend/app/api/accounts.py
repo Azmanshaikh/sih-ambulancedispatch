@@ -162,11 +162,13 @@ async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_c
     emailed = bool(issued.get("email_sent"))
     dest = ", ".join(emailed_to) if emailed_to else user.get("email") or "your Gmail"
     hospital_bit = f" at {hospital['name']}" if hospital else ""
-    message = (
-        f"OTP emailed to {dest}."
-        if emailed
-        else f"Could not email {dest}. Ask staff to read the code from OTP codes, or check SMTP settings."
-    )
+    smtp_error = issued.get("email_error") or ""
+    if emailed:
+        message = f"OTP emailed to {dest}."
+    elif smtp_error:
+        message = f"Could not email {dest}: {smtp_error}"
+    else:
+        message = f"Could not email {dest}. Check SMTP settings in .env, or read the code on Staff → OTP codes."
     return {
         "status": "success",
         "user": _with_hospital(pending),
