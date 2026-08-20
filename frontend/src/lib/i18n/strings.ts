@@ -12,6 +12,7 @@ const en = {
   'nav.map': 'Map',
   'nav.doctor': 'Cabin',
   'nav.hospitals': 'Hospitals',
+  'nav.simulation': 'Route Simulation',
   'nav.tagline': 'Precision EMS · AI Dispatch',
   'nav.logout': 'Logout',
   'nav.settings': 'Settings',
@@ -22,6 +23,7 @@ const en = {
   'role.driver': 'Driver',
   'role.doctor': 'Doctor',
   'role.staff': 'Staff',
+  'role.mainAdmin': 'Main Admin',
 
   'login.title': 'Sign in with Gmail',
   'login.body':
@@ -337,6 +339,7 @@ export const messages: Record<Lang, Record<MessageKey, string>> = {
     'nav.map': 'नक्शा',
     'nav.doctor': 'केबिन',
     'nav.hospitals': 'अस्पताल',
+    'nav.simulation': 'रूट सिमुलेशन',
     'nav.tagline': 'सटीक ईएमएस · एआई डिस्पैच',
     'nav.logout': 'लॉग आउट',
     'nav.settings': 'सेटिंग्स',
@@ -347,6 +350,7 @@ export const messages: Record<Lang, Record<MessageKey, string>> = {
     'role.driver': 'ड्राइवर',
     'role.doctor': 'डॉक्टर',
     'role.staff': 'स्टाफ',
+    'role.mainAdmin': 'मुख्य एडमिन',
 
     'login.title': 'जीमेल से साइन इन करें',
     'login.body':
@@ -657,6 +661,7 @@ export const messages: Record<Lang, Record<MessageKey, string>> = {
     'nav.map': 'ನಕ್ಷೆ',
     'nav.doctor': 'ಕ್ಯಾಬಿನ್',
     'nav.hospitals': 'ಆಸ್ಪತ್ರೆಗಳು',
+    'nav.simulation': 'ಮಾರ್ಗ ಸಿಮ್ಯುಲೇಶನ್',
     'nav.tagline': 'ನಿಖರ ಇಎಂಎಸ್ · ಎಐ ಡಿಸ್ಪ್ಯಾಚ್',
     'nav.logout': 'ಲಾಗ್ ಔಟ್',
     'nav.settings': 'ಸೆಟ್ಟಿಂಗ್‌ಗಳು',
@@ -667,6 +672,7 @@ export const messages: Record<Lang, Record<MessageKey, string>> = {
     'role.driver': 'ಚಾಲಕ',
     'role.doctor': 'ವೈದ್ಯರು',
     'role.staff': 'ಸಿಬ್ಬಂದಿ',
+    'role.mainAdmin': 'ಮುಖ್ಯ ನಿರ್ವಾಹಕ',
 
     'login.title': 'ಜಿಮೇಲ್‌ನಿಂದ ಸೈನ್ ಇನ್',
     'login.body':

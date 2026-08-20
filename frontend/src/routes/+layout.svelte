@@ -21,6 +21,7 @@
   const NO_NAV = ['/login', '/auth/callback', '/choose-role'];
 
   const STAFF_PATHS = ['/', '/request', '/navigation', '/hospitals', '/notifications', '/staff/approvals'];
+  const MAIN_ADMIN_PATHS = ['/admin/simulation'];
   const PATIENT_PATHS = ['/patient', '/ai-guide', '/ai-call'];
   const DRIVER_PATHS = ['/driver', '/hospitals'];
   const DOCTOR_PATHS = ['/doctor'];
@@ -28,6 +29,9 @@
   function allowed(pathname: string, role?: string | null) {
     if (PUBLIC.includes(pathname)) return true;
     if (needsOnboarding()) return pathname === '/choose-role';
+    if (role === 'main_admin') {
+      return STAFF_PATHS.includes(pathname) || pathname.startsWith('/staff/') || MAIN_ADMIN_PATHS.includes(pathname) || pathname.startsWith('/admin/');
+    }
     if (role === 'staff') return STAFF_PATHS.includes(pathname) || pathname.startsWith('/staff/');
     if (role === 'driver') return DRIVER_PATHS.includes(pathname);
     if (role === 'doctor') return DOCTOR_PATHS.includes(pathname);
@@ -96,7 +100,7 @@
 </main>
 
 {#if !NO_NAV.includes(page.url.pathname)}
-  <FloatingActions role={auth.profile?.role} />
+  <FloatingActions role={auth.profile?.role === 'main_admin' ? 'staff' : auth.profile?.role} />
 {/if}
 
 <InstallApp />

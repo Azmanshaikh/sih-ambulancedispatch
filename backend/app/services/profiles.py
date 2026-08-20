@@ -14,27 +14,43 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def ensure_profile(user_id: str, email: str, full_name: str | None, bootstrap_staff: bool = False) -> dict[str, Any]:
+def ensure_profile(
+    user_id: str,
+    email: str,
+    full_name: str | None,
+    bootstrap_staff: bool = False,
+    bootstrap_main_admin: bool = False,
+) -> dict[str, Any]:
     existing = get_profile(user_id)
     if existing:
-        if bootstrap_staff and (existing.get("role") != "staff" or existing.get("status") != "active"):
+        if bootstrap_main_admin and (existing.get("role") != "main_admin" or existing.get("status") != "active"):
+            existing["role"] = "main_admin"
+            existing["status"] = "active"
+            existing["requested_role"] = None
+            _save_profile(existing)
+        elif bootstrap_staff and (existing.get("role") != "staff" or existing.get("status") != "active"):
             existing["role"] = "staff"
             existing["status"] = "active"
             existing["requested_role"] = None
             _save_profile(existing)
         return existing
 
-    role = "staff" if bootstrap_staff else "patient"
+    if bootstrap_main_admin:
+        role = "main_admin"
+    elif bootstrap_staff:
+        role = "staff"
+    else:
+        role = "patient"
     row = {
         "id": user_id,
         "email": email,
         "full_name": full_name or email.split("@")[0],
         "role": role,
-        "status": "active" if bootstrap_staff else "pending",
+        "status": "active" if (bootstrap_staff or bootstrap_main_admin) else "pending",
         "requested_role": None,
         "ambulance_id": None,
         "hospital_id": None,
-        "onboarded": True if bootstrap_staff else False,
+        "onboarded": True if (bootstrap_staff or bootstrap_main_admin) else False,
         "updated_at": _now(),
     }
     _save_profile(row)

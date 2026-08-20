@@ -283,59 +283,58 @@
   <div class="p-4 grid grid-cols-12 gap-4 h-full overflow-hidden">
 
     <div class="col-span-3 flex flex-col gap-4 overflow-y-auto no-sb pb-3">
-      <section class="nb-card nb-yellow p-4 flex-shrink-0">
+      <section class="nb-card p-4 flex-shrink-0 dash-panel">
         <div class="flex justify-between items-center mb-3">
-          <h3 class="text-[11px] font-black uppercase tracking-widest text-black">System Performance</h3>
-          <span class="w-2.5 h-2.5 bg-[#22C55E] blink" style="border:2px solid #111;"></span>
+          <h3 class="dash-heading">System Performance</h3>
+          <span class="status-dot status-dot--live blink"></span>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <div class="bg-white p-3" style="border:3px solid #111;">
-            <div class="text-3xl font-black text-black leading-none">{etaLabel ? etaLabel.split(' ')[0] : '—'}<span class="text-xs text-[#4B4B4B] ml-1">min</span></div>
-            <div class="text-[9px] uppercase tracking-widest text-[#4B4B4B] mt-1 font-bold">Hospital ETA</div>
+          <div class="med-stat">
+            <div class="text-3xl font-bold text-[var(--clr-ink)] leading-none">{etaLabel ? etaLabel.split(' ')[0] : '—'}<span class="text-xs text-[var(--clr-muted)] ml-1">min</span></div>
+            <div class="text-[10px] uppercase tracking-wide text-[var(--clr-muted)] mt-1 font-semibold">Hospital ETA</div>
           </div>
-          <div class="bg-white p-3" style="border:3px solid #111;">
-            <div class="text-3xl font-black text-black leading-none">{availableCount}<span class="text-xs text-[#4B4B4B] ml-1">u</span></div>
-            <div class="text-[9px] uppercase tracking-widest text-[#4B4B4B] mt-1 font-bold">Available</div>
+          <div class="med-stat">
+            <div class="text-3xl font-bold text-[var(--clr-ink)] leading-none">{availableCount}<span class="text-xs text-[var(--clr-muted)] ml-1">u</span></div>
+            <div class="text-[10px] uppercase tracking-wide text-[var(--clr-muted)] mt-1 font-semibold">Available</div>
           </div>
         </div>
       </section>
 
       <section class="flex flex-col gap-3 flex-1 min-h-0">
         <div class="flex justify-between items-center flex-wrap gap-1">
-          <h3 class="text-[11px] font-black uppercase tracking-widest text-black">{t('dash.fleet')}</h3>
-          <span class="nb-chip nb-red" style="color:#fff;">{dispatchStatus || t('dash.waitingSos')}</span>
+          <h3 class="dash-heading">{t('dash.fleet')}</h3>
+          <span class="nb-chip chip-danger">{dispatchStatus || t('dash.waitingSos')}</span>
         </div>
 
-        <p class="text-[10px] text-[#4B4B4B] font-semibold">{t('dash.tapHint')}</p>
+        <p class="text-[11px] text-[var(--clr-muted)] font-medium">{t('dash.tapHint')}</p>
 
         <div class="space-y-2 overflow-y-auto no-sb flex-1 pr-1">
           {#each ambulances as a}
             <button
               type="button"
               onclick={() => selectAmbulance(a.id)}
-              class="flex items-center justify-between bg-white px-3 py-2 w-full text-left {assignedIds.has(a.id) ? 'nb-red' : ''} {selectedAmbulanceId === a.id ? 'ring-2 ring-black' : ''}"
-              style="border:3px solid #111;box-shadow:3px 3px 0 #111;cursor:pointer;"
+              class="fleet-row flex items-center justify-between px-3 py-2 w-full text-left {assignedIds.has(a.id) ? 'fleet-row--assigned' : ''} {selectedAmbulanceId === a.id ? 'fleet-row--selected' : ''}"
             >
               <div>
-                <p class="text-[12px] font-black {assignedIds.has(a.id) ? 'text-white' : 'text-black'}">{a.id}</p>
-                <p class="text-[9px] {assignedIds.has(a.id) ? 'text-white/80' : 'text-[#4B4B4B]'} uppercase tracking-wide font-bold">{a.label}</p>
-                <p class="text-[9px] {assignedIds.has(a.id) ? 'text-white/80' : 'text-[#DC2626]'} uppercase tracking-wide font-black">{a.type_label || a.ambulance_type || 'BLS'}</p>
+                <p class="text-[12px] font-bold">{a.id}</p>
+                <p class="text-[10px] text-[var(--clr-muted)] uppercase tracking-wide font-semibold">{a.label}</p>
+                <p class="text-[10px] text-[var(--clr-primary)] uppercase tracking-wide font-semibold">{a.type_label || a.ambulance_type || 'BLS'}</p>
               </div>
-              <span class="nb-chip {a.status === 'available' ? 'nb-green' : a.status === 'dispatched' ? 'nb-red' : ''}" style="color:{a.status === 'idle' ? '#111' : '#fff'};">{a.status}</span>
+              <span class="nb-chip {a.status === 'available' ? 'chip-success' : a.status === 'dispatched' ? 'chip-danger' : ''}">{a.status}</span>
             </button>
           {/each}
         </div>
       </section>
     </div>
 
-    <div class="col-span-6 relative overflow-hidden nb-card-lg" style="border:4px solid #111;">
+    <div class="col-span-6 relative overflow-hidden nb-card-lg map-panel">
       <MapWidget id="dash-map" {markers} {etaLabel} {pickupRoute} {dropRoute} {extraRoutes} {selectedAmbulanceId} officerCallEnabled showLegend center={[BMSIT.lat, BMSIT.lng]} onSelectAmbulance={selectAmbulance} />
       <div class="absolute inset-0 pointer-events-none z-10" style="padding: 0.9rem;">
         <div class="flex justify-between items-start pointer-events-auto gap-2">
           <div class="glass px-3 py-2">
             <div class="flex items-center gap-2">
-              <span class="flex h-2.5 w-2.5 bg-[#FF2D2D] blink" style="border:2px solid #111;"></span>
-              <span class="text-[11px] font-black tracking-widest uppercase text-black">{t('dash.liveFeed')}</span>
+              <span class="status-dot status-dot--alert blink"></span>
+              <span class="text-[11px] font-bold tracking-wide uppercase text-[var(--clr-ink)]">{t('dash.liveFeed')}</span>
             </div>
           </div>
           <div class="flex flex-col items-end gap-2">
@@ -351,7 +350,7 @@
                 {t('dash.endTrip')}
               </button>
             {/if}
-            <div class="glass px-3 py-1.5 text-[10px] text-black font-bold uppercase tracking-widest max-w-[220px] text-right nb-yellow">
+            <div class="glass px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide max-w-[220px] text-right">
               📍 {BMSIT.name}
             </div>
           </div>
@@ -361,14 +360,14 @@
     </div>
 
     <div class="col-span-3 flex flex-col gap-4 overflow-y-auto no-sb pb-3">
-      <section class="nb-card nb-blue p-4 flex-shrink-0" style="color:#fff;">
+      <section class="nb-card nb-blue p-4 flex-shrink-0 ai-panel">
         <div class="flex items-center gap-2 mb-3">
           <span class="material-symbols-outlined">psychology</span>
           <h3 class="text-[11px] font-black uppercase tracking-widest">{t('dash.aiRec')}</h3>
         </div>
         {#if selectedHospital}
           <div class="flex gap-3 mb-3">
-            <div class="h-11 w-11 shrink-0 bg-white text-black flex items-center justify-center font-black text-xs" style="border:3px solid #111;">{confidence ?? '—'}%</div>
+            <div class="h-11 w-11 shrink-0 bg-white text-[var(--clr-ink)] flex items-center justify-center font-bold text-xs rounded-lg border border-[var(--clr-border)]">{confidence ?? '—'}%</div>
             <div>
               <p class="text-sm font-black">{selectedHospital.name}</p>
               <p class="text-[10px] text-white/85 mt-1">{reason}</p>
@@ -389,16 +388,16 @@
             {/if}
           {/if}
           {#if conflictReason}
-            <p class="text-[10px] mt-2 font-black" style="background:#FFD23F;color:#111;padding:6px;border:2px solid #111;">{conflictReason}</p>
+            <p class="text-[10px] mt-2 font-semibold alert-banner">{conflictReason}</p>
           {/if}
           {#if assignedUnit}
-            <p class="nb-chip mt-2" style="background:#FFD23F;color:#111;">{t('dash.assigned', { unit: assignedUnit })}{assignedAmbulanceType ? ` · ${assignedAmbulanceType}` : ''}</p>
+            <p class="nb-chip chip-warning mt-2">{t('dash.assigned', { unit: assignedUnit })}{assignedAmbulanceType ? ` · ${assignedAmbulanceType}` : ''}</p>
           {/if}
           {#if fallbackReason}
-            <p class="text-[10px] mt-2 font-black" style="background:#FFD23F;color:#111;padding:6px;border:2px solid #111;">Capability fallback: {fallbackReason}</p>
+            <p class="text-[10px] mt-2 font-semibold alert-banner">Capability fallback: {fallbackReason}</p>
           {/if}
           {#if candidates.length}
-            <div class="mt-3 space-y-1 bg-white text-black p-2" style="border:3px solid #111;">
+            <div class="mt-3 space-y-1 nb-card p-2">
               <p class="text-[9px] font-black uppercase tracking-widest text-[#4B4B4B]">{t('dash.ranked')}</p>
               {#each candidates as c, i}
                 <div class="flex justify-between gap-2 text-[10px] {i === 0 ? 'font-black' : 'text-[#4B4B4B]'}">
@@ -410,7 +409,7 @@
           {/if}
         {:else}
           <div class="flex gap-3">
-            <div class="h-11 w-11 shrink-0 bg-white text-black flex items-center justify-center font-black text-xs" style="border:3px solid #111;">—</div>
+            <div class="h-11 w-11 shrink-0 bg-white text-[var(--clr-ink)] flex items-center justify-center font-bold text-xs rounded-lg border border-[var(--clr-border)]">—</div>
             <div>
               <p class="text-sm font-black">{t('dash.waitingPatient')}</p>
               <p class="text-[10px] text-white/85 mt-1">{t('dash.waitingPatientHint')}</p>
@@ -420,9 +419,9 @@
       </section>
 
       <section class="flex-1 flex flex-col gap-3 min-h-0">
-        <h3 class="text-[11px] font-black uppercase tracking-widest text-black">{t('dash.telemetry')}</h3>
+        <h3 class="dash-heading">{t('dash.telemetry')}</h3>
         <div class="space-y-3 overflow-y-auto no-sb flex-1 pr-1">
-          <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+          <div class="telemetry-card">
             <div class="flex justify-between items-center mb-1">
               <span class="nb-chip nb-blue" style="color:#fff;">{t('dash.fleet')}</span>
               <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">{t('dash.live')}</span>
@@ -430,7 +429,7 @@
             <p class="text-xs text-black font-semibold mt-1">{t('dash.fleetTracked', { count: ambulances.length })}</p>
           </div>
           {#if monitor?.patient}
-            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+            <div class="telemetry-card">
               <div class="flex justify-between items-center mb-1">
                 <span class="nb-chip nb-green" style="color:#fff;">{t('dash.patient')}</span>
                 <span class="text-[9px] text-[#4B4B4B] font-bold">{monitor.patient.vitals?.heart_rate ?? '—'} bpm</span>
@@ -447,7 +446,7 @@
             </div>
           {/if}
           {#if activeMissions.length}
-            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+            <div class="telemetry-card">
               <div class="flex justify-between items-center mb-1">
                 <span class="nb-chip nb-red" style="color:#fff;">{t('dash.liveCorridors')}</span>
                 <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">{activeMissions.length === 1 ? t('dash.unit', { count: activeMissions.length }) : t('dash.units', { count: activeMissions.length })}</span>
@@ -465,14 +464,14 @@
             </div>
           {/if}
           {#if corridor?.sms?.length}
-            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+            <div class="telemetry-card">
               <span class="nb-chip nb-yellow">Corridor SMS</span>
               <p class="text-[10px] text-black font-semibold mt-2">{corridor.sms[0].post_name}: {corridor.sms[0].status}</p>
               <p class="text-[10px] text-[#4B4B4B] mt-1">{corridor.sms[0].body}</p>
             </div>
           {/if}
           {#if selectedHospital}
-            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+            <div class="telemetry-card">
               <div class="flex justify-between items-center mb-1">
                 <span class="nb-chip nb-red" style="color:#fff;">Route</span>
                 <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">Now</span>
@@ -481,7 +480,7 @@
             </div>
           {/if}
           {#if monitor?.mission?.report?.body}
-            <div class="bg-white p-3" style="border:3px solid #111;box-shadow:3px 3px 0 #111;">
+            <div class="telemetry-card">
               <span class="nb-chip nb-red" style="color:#fff;">Trip report</span>
               <pre class="text-[10px] text-black whitespace-pre-wrap font-sans mt-2">{monitor.mission.report.body}</pre>
             </div>
@@ -492,3 +491,72 @@
 
   </div>
 </div>
+
+<style>
+  .dash-heading {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--clr-muted);
+    margin: 0;
+  }
+  .dash-panel {
+    background: var(--clr-surface);
+  }
+  .map-panel {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .ai-panel {
+    color: #fff;
+    background: linear-gradient(135deg, var(--clr-primary) 0%, #1E40AF 100%);
+    border: none;
+  }
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+  .status-dot--live {
+    background: var(--clr-success);
+    box-shadow: 0 0 0 2px #BBF7D0;
+  }
+  .status-dot--alert {
+    background: var(--clr-danger);
+    box-shadow: 0 0 0 2px #FECACA;
+  }
+  .fleet-row {
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color 0.12s, box-shadow 0.12s;
+  }
+  .fleet-row:hover {
+    border-color: var(--clr-primary);
+  }
+  .fleet-row--selected {
+    border-color: var(--clr-primary);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  }
+  .fleet-row--assigned {
+    background: var(--clr-danger-bg);
+    border-color: #FECACA;
+  }
+  .alert-banner {
+    background: var(--clr-warning-bg);
+    color: var(--clr-warning);
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid #FDE68A;
+  }
+  .telemetry-card {
+    background: var(--clr-surface);
+    padding: 12px;
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--sh-sm);
+  }
+</style>

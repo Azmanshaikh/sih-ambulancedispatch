@@ -24,19 +24,65 @@
   <div style="position:absolute;top:16px;right:16px;z-index:20;">
     <LanguageSettings />
   </div>
-  <div class="nb-card-lg" style="width:100%;max-width:420px;background:#fff;border:4px solid #111;padding:32px;">
-    <div style="display:inline-flex;background:#FF2D2D;border:3px solid #111;box-shadow:4px 4px 0 #111;padding:10px 14px;margin-bottom:18px;">
-      <img src="/logo.png" alt="JEEVAN" style="height:64px;width:auto;max-width:100%;object-fit:contain;display:block;" />
+  <div class="nb-card-lg login-card">
+    <div class="login-logo-wrap">
+      <img src="/logo.png" alt="JEEVAN" class="login-logo" />
     </div>
-    <h1 style="margin:0 0 8px;font-size:26px;font-weight:900;text-transform:uppercase;letter-spacing:-0.01em;">{t('login.title')}</h1>
-    <p style="margin:0 0 20px;font-size:13px;color:#4B4B4B;line-height:1.5;font-weight:500;">
-      {t('login.body')}
-    </p>
-    <button class="btn btn-primary" style="width:100%;padding:14px;" disabled={loading} onclick={handleGoogle}>
+    <h1 class="login-title">{t('login.title')}</h1>
+    <p class="login-body">{t('login.body')}</p>
+    <button class="btn btn-primary login-btn" disabled={loading} onclick={handleGoogle}>
       {loading ? t('login.redirecting') : t('login.continue')}
     </button>
     {#if error}
-      <p class="nb-card p-2" style="color:#111;font-size:12px;margin:14px 0 0;font-weight:700;">{error}</p>
+      <p class="login-error">{error}</p>
     {/if}
   </div>
 </div>
+
+<style>
+  .login-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 32px;
+  }
+  .login-logo-wrap {
+    display: inline-flex;
+    background: var(--clr-primary);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-bottom: 18px;
+  }
+  .login-logo {
+    height: 56px;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    display: block;
+    filter: brightness(0) invert(1);
+  }
+  .login-title {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--clr-ink);
+  }
+  .login-body {
+    margin: 0 0 20px;
+    font-size: 14px;
+    color: var(--clr-muted);
+    line-height: 1.55;
+  }
+  .login-btn {
+    width: 100%;
+    padding: 14px;
+  }
+  .login-error {
+    color: var(--clr-danger);
+    font-size: 13px;
+    margin: 14px 0 0;
+    font-weight: 600;
+    padding: 10px 12px;
+    background: var(--clr-danger-bg);
+    border-radius: var(--radius-sm);
+  }
+</style>

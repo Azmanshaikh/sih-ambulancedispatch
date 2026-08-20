@@ -115,7 +115,7 @@ class ConditionBody(BaseModel):
 async def me(user: dict[str, Any] = Depends(get_current_user)):
     profile = user.get("profile") or {}
     needs_onboarding = profile.get("status") != "active" or not profile.get("onboarded")
-    if profile.get("role") in ("driver", "staff", "doctor") and profile.get("status") == "active":
+    if profile.get("role") in ("driver", "staff", "doctor", "main_admin") and profile.get("status") == "active":
         needs_onboarding = False
     if profile.get("onboarded") is True and profile.get("status") == "active":
         needs_onboarding = False

@@ -582,3 +582,108 @@ def get_optimal_hospital_dispatch(
         (incident_lat, incident_lng), hospitals, ambulances, is_raining,
         dispatch_requirement(emergency_category, flags, age_group, accessibility_need),
     )
+
+
+def _path_km(coords: list[tuple[float, float]] | None) -> float:
+    if not coords or len(coords) < 2:
+        return 0.0
+    km = 0.0
+    for i in range(len(coords) - 1):
+        km += optimizer._haversine_km(coords[i], coords[i + 1])
+    return round(km, 2)
+
+
+def simulate_custom_route(
+    ambulance: dict[str, Any],
+    pickup: tuple[float, float],
+    destination: tuple[float, float],
+    *,
+    is_raining: bool = False,
+    prefer: str = "fastest",
+) -> dict[str, Any]:
+    """Dry-run route calculation for admin simulation — does not mutate fleet or missions."""
+    amb_loc = (float(ambulance["lat"]), float(ambulance["lng"]))
+    pickup_res = optimizer.compute_route(
+        amb_loc, pickup, emergency=True, is_raining=is_raining, prefer=prefer, enrich=True
+    )
+    drop_res = optimizer.compute_route(
+        pickup, destination, emergency=True, is_raining=is_raining, prefer=prefer, enrich=True
+    )
+
+    pickup_sec = float(pickup_res.get("duration") or 0)
+    drop_sec = float(drop_res.get("duration") or 0)
+    if pickup_sec == float("inf"):
+        pickup_sec = 0.0
+    if drop_sec == float("inf"):
+        drop_sec = 0.0
+    total_sec = pickup_sec + drop_sec
+
+    pickup_coords = pickup_res.get("coords") or []
+    drop_coords = drop_res.get("coords") or []
+    pickup_km = _path_km(pickup_coords)
+    drop_km = _path_km(drop_coords)
+    peak = optimizer._peak_traffic_factor()
+
+    engine = drop_res.get("engine") or pickup_res.get("engine") or "direct"
+    provider = drop_res.get("source") or pickup_res.get("source") or "unknown"
+    shortest_km = drop_res.get("shortest_km")
+    fastest_min = drop_res.get("fastest_min")
+
+    weather_note = "Rain detected — ETA adjusted (+8%)" if is_raining else "Clear weather at pickup"
+    if 8 <= datetime.now().hour <= 11 or 17 <= datetime.now().hour <= 21:
+        traffic_note = "Peak traffic window — emergency corridor bypasses delays"
+    elif 12 <= datetime.now().hour <= 16:
+        traffic_note = "Moderate traffic — emergency corridor active"
+    else:
+        traffic_note = "Light traffic conditions"
+
+    metric_note = ""
+    if shortest_km is not None and fastest_min is not None:
+        metric_note = f" Graph compared shortest {shortest_km} km vs fastest {fastest_min} min."
+
+    pickup_min = round(pickup_sec / 60, 1)
+    transport_min = round(drop_sec / 60, 1)
+    eta_min = round(total_sec / 60, 1)
+
+    reason = (
+        f"Admin simulation ({engine} via {provider}): "
+        f"{ambulance.get('label') or ambulance.get('id')} → pickup {pickup_min} min ({pickup_km} km), "
+        f"then transport {transport_min} min ({drop_km} km). "
+        f"{weather_note}. {traffic_note}.{metric_note}"
+    )
+
+    return {
+        "simulation": True,
+        "label": "Admin Simulation",
+        "ambulance_id": ambulance.get("id"),
+        "ambulance": ambulance,
+        "pickup_route": pickup_coords,
+        "route": drop_coords,
+        "pickup_minutes": pickup_min,
+        "transport_minutes": transport_min,
+        "eta_minutes": eta_min,
+        "eta_seconds": int(round(total_sec)),
+        "pickup_seconds": int(round(pickup_sec)),
+        "transport_seconds": int(round(drop_sec)),
+        "pickup_distance_km": pickup_km,
+        "transport_distance_km": drop_km,
+        "total_distance_km": round(pickup_km + drop_km, 2),
+        "is_raining": is_raining,
+        "reason": reason,
+        "confidence": 100,
+        "constraints": {
+            "routing": "emergency-shortest",
+            "traffic": "waived",
+            "provider": provider,
+            "engine": engine,
+            "shortest_km": shortest_km,
+            "fastest_min": fastest_min,
+            "peak_traffic_factor": peak,
+            "rain_adjustment": is_raining,
+            "weather": weather_note,
+            "road_conditions": traffic_note,
+            "prefer": prefer,
+            "graph_nodes": drop_res.get("graph_nodes"),
+            "occupied_hits": (pickup_res.get("occupied_hits") or 0) + (drop_res.get("occupied_hits") or 0),
+        },
+    }

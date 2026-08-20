@@ -12,20 +12,23 @@
   let { gpsStatus = 'Acquiring GPS…' }: Props = $props();
 
   const ALL_ITEMS = [
-    { to: '/',                  icon: 'emergency_recording', labelKey: 'nav.dispatch' as const,      roles: ['staff'] },
-    { to: '/request',           icon: 'add_call',            labelKey: 'nav.request' as const,       roles: ['staff'] },
-    { to: '/navigation',        icon: 'map',                 labelKey: 'nav.navigation' as const,    roles: ['staff'] },
-    { to: '/notifications',     icon: 'notifications',       labelKey: 'nav.notifications' as const, roles: ['staff'] },
-    { to: '/staff/approvals',   icon: 'verified_user',       labelKey: 'nav.otpCodes' as const,      roles: ['staff'] },
+    { to: '/',                  icon: 'emergency_recording', labelKey: 'nav.dispatch' as const,      roles: ['staff', 'main_admin'] },
+    { to: '/request',           icon: 'add_call',            labelKey: 'nav.request' as const,       roles: ['staff', 'main_admin'] },
+    { to: '/admin/simulation',  icon: 'science',             labelKey: 'nav.simulation' as const,    roles: ['main_admin'] },
+    { to: '/navigation',        icon: 'map',                 labelKey: 'nav.navigation' as const,    roles: ['staff', 'main_admin'] },
+    { to: '/notifications',     icon: 'notifications',       labelKey: 'nav.notifications' as const, roles: ['staff', 'main_admin'] },
+    { to: '/staff/approvals',   icon: 'verified_user',       labelKey: 'nav.otpCodes' as const,      roles: ['staff', 'main_admin'] },
     { to: '/patient',           icon: 'sos',                 labelKey: 'nav.sos' as const,           roles: ['patient'] },
     { to: '/ai-guide',          icon: 'psychology',          labelKey: 'nav.aiChat' as const,        roles: ['patient'] },
     { to: '/ai-call',           icon: 'videocam',            labelKey: 'nav.aiCall' as const,        roles: ['patient'] },
     { to: '/driver',            icon: 'map',                 labelKey: 'nav.map' as const,           roles: ['driver'] },
     { to: '/doctor',            icon: 'stethoscope',         labelKey: 'nav.doctor' as const,        roles: ['doctor'] },
-    { to: '/hospitals',         icon: 'local_hospital',      labelKey: 'nav.hospitals' as const,     roles: ['staff', 'driver'] },
+    { to: '/hospitals',         icon: 'local_hospital',      labelKey: 'nav.hospitals' as const,     roles: ['staff', 'main_admin', 'driver'] },
   ];
 
-  let navItems = $derived(ALL_ITEMS.filter((i) => i.roles.includes(auth.profile?.role || 'patient')));
+  let navItems = $derived(
+    ALL_ITEMS.filter((i) => i.roles.includes(auth.profile?.role || 'patient'))
+  );
 
   async function handleLogout() {
     await signOut();
@@ -33,77 +36,170 @@
   }
 </script>
 
-<header
-  id="top-nav"
-  style="
-    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-    background: #FFFFFF;
-    border-bottom: 4px solid #111111;
-    padding-top: env(safe-area-inset-top);
-  "
->
-  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 14px; height: 50px;">
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <div style="border: 3px solid #111; box-shadow: 3px 3px 0 #111; background:#FF2D2D; padding: 3px 6px; display:flex; align-items:center;">
-        <img
-          src="/logo.png"
-          alt="JEEVAN logo"
-          style="height: 30px; width: auto; max-width: 78px; object-fit: contain; display: block;"
-        />
+<header id="top-nav" class="top-nav">
+  <div class="top-row">
+    <div class="brand">
+      <div class="brand-logo">
+        <img src="/logo.png" alt="JEEVAN logo" class="logo-img" />
       </div>
-      <div style="display: flex; flex-direction: column; line-height: 1.05;">
-        <span style="font-family: 'Orbitron', sans-serif; font-size: 17px; font-weight: 900; color: #111; letter-spacing: 0.22em; text-transform: uppercase;">JEEVAN</span>
-        <span style="font-family: 'Share Tech Mono', monospace; font-size: 7px; font-weight: 400; color: #4B4B4B; letter-spacing: 0.12em; text-transform: uppercase;">{t('nav.tagline')}</span>
+      <div class="brand-text">
+        <span class="brand-name">JEEVAN</span>
+        <span class="brand-tagline">{t('nav.tagline')}</span>
       </div>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <div style="
-        display: flex; align-items: center; gap: 5px;
-        padding: 3px 9px;
-        border: 3px solid #111;
-        box-shadow: 3px 3px 0 #111;
-        background: #FFD23F;
-      ">
-        <span class="material-symbols-outlined spin" style="font-size: 12px; color: #111;">my_location</span>
-        <span style="font-size: 9px; font-weight: 700; color: #111; letter-spacing: 0.05em; font-family: 'Share Tech Mono', monospace;">{gpsStatus}</span>
+    <div class="top-actions">
+      <div class="gps-chip">
+        <span class="material-symbols-outlined spin gps-icon">my_location</span>
+        <span class="gps-label">{gpsStatus}</span>
       </div>
 
       {#if auth.profile}
-        <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #111;" class="hidden sm:inline">
+        <span class="user-meta hidden sm:inline">
           {auth.profile.full_name || auth.profile.email} · {roleLabel(auth.profile.role)}{auth.profile.hospital_name ? ` · ${auth.profile.hospital_name}` : ''}
         </span>
         <LanguageSettings compact />
-        <button class="btn btn-ghost" style="padding: 6px 10px; font-size: 10px; box-shadow: 3px 3px 0 #111;" onclick={handleLogout}>{t('nav.logout')}</button>
+        <button class="btn btn-ghost nav-logout" onclick={handleLogout}>{t('nav.logout')}</button>
       {/if}
     </div>
   </div>
 
-  <nav style="display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; background: #FFE8D6; border-top: 3px solid #111; padding: 7px 8px;">
+  <nav class="nav-tabs no-sb">
     {#each navItems as item}
       {@const isActive = page.url.pathname === item.to}
-      <a
-        href={item.to}
-        style="
-          display: flex; align-items: center; gap: 6px;
-          padding: 6px 12px; white-space: nowrap; flex-shrink: 0; text-decoration: none;
-          border: 3px solid #111;
-          box-shadow: {isActive ? '3px 3px 0 #111' : '2px 2px 0 #111'};
-          color: {isActive ? '#FFFFFF' : '#111'};
-          background: {isActive ? '#FF2D2D' : '#FFFFFF'};
-          transition: transform 0.08s, box-shadow 0.08s;
-        "
-      >
-        <span class="material-symbols-outlined" style="font-size: 17px;">{item.icon}</span>
-        <span style="
-          font-family: 'Rajdhani', sans-serif;
-          font-weight: 700;
-          font-size: 10px;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          line-height: 1.2;
-        ">{t(item.labelKey)}</span>
+      <a href={item.to} class="nav-tab" class:active={isActive}>
+        <span class="material-symbols-outlined nav-tab-icon">{item.icon}</span>
+        <span class="nav-label">{t(item.labelKey)}</span>
       </a>
     {/each}
   </nav>
 </header>
+
+<style>
+  .top-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: var(--clr-surface);
+    border-bottom: 1px solid var(--clr-border);
+    padding-top: env(safe-area-inset-top);
+    box-shadow: var(--sh-sm);
+  }
+  .top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 52px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .brand-logo {
+    background: var(--clr-primary);
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+  }
+  .logo-img {
+    height: 28px;
+    width: auto;
+    max-width: 72px;
+    object-fit: contain;
+    display: block;
+    filter: brightness(0) invert(1);
+  }
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+  }
+  .brand-name {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--clr-ink);
+    letter-spacing: 0.06em;
+  }
+  .brand-tagline {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--clr-muted);
+    letter-spacing: 0.02em;
+  }
+  .top-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .gps-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border: 1px solid var(--clr-border);
+    border-radius: 999px;
+    background: var(--clr-surface2);
+  }
+  .gps-icon {
+    font-size: 12px;
+    color: var(--clr-success);
+  }
+  .gps-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--clr-muted);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .user-meta {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--clr-muted);
+  }
+  .nav-logout {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+  .nav-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    background: var(--clr-surface2);
+    border-top: 1px solid var(--clr-border);
+    padding: 8px 10px;
+  }
+  .nav-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-decoration: none;
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    color: var(--clr-muted);
+    background: var(--clr-surface);
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .nav-tab:hover {
+    border-color: var(--clr-primary);
+    color: var(--clr-primary);
+  }
+  .nav-tab.active {
+    background: var(--clr-primary);
+    border-color: var(--clr-primary-h);
+    color: #fff;
+  }
+  .nav-tab-icon {
+    font-size: 17px;
+  }
+</style>

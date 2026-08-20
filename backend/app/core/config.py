@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str | None = None
     VITE_SUPABASE_ANON_KEY: str | None = None
     STAFF_BOOTSTRAP_EMAILS: str = ""
+    MAIN_ADMIN_BOOTSTRAP_EMAILS: str = ""
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""

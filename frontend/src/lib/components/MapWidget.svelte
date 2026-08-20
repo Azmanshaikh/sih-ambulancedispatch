@@ -41,6 +41,7 @@
     selectedAmbulanceId?: string;
     officerCallEnabled?: boolean;
     onSelectAmbulance?: (id: string) => void;
+    onMapClick?: (lat: number, lng: number) => void;
   }
 
   const BMSIT: [number, number] = [13.1344, 77.5693];
@@ -61,6 +62,7 @@
     selectedAmbulanceId = '',
     officerCallEnabled = false,
     onSelectAmbulance,
+    onMapClick,
   }: Props = $props();
 
   let mapElement: HTMLElement;
@@ -404,6 +406,14 @@
         `<span class="user-icon" style="font-size:28px;line-height:1">📍</span>`,
         28
       ),
+      pickup: makeIcon(
+        `<span style="font-size:26px;line-height:1">🟢</span>`,
+        26
+      ),
+      destination: makeIcon(
+        `<span style="font-size:26px;line-height:1">🏥</span>`,
+        26
+      ),
       ambulance: makeIcon(
         `<span class="amb-icon" style="font-size:22px;line-height:1">🚑</span>`,
         22,
@@ -598,6 +608,9 @@
       maxZoom: 19,
       attribution: '',
     }).addTo(map);
+    if (onMapClick) {
+      map.on('click', (e: any) => onMapClick(e.latlng.lat, e.latlng.lng));
+    }
     updateMap();
 
     return () => map?.remove();

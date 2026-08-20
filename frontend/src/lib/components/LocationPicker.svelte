@@ -65,8 +65,10 @@
   .picker {
     position: relative;
     width: 100%;
-    border: 3px solid #111;
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
     background: #fff;
+    overflow: hidden;
   }
   .picker-map {
     width: 100%;
@@ -75,11 +77,10 @@
   .hint {
     margin: 0;
     padding: 8px 10px;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #4B4B4B;
-    border-top: 2px solid #111;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--clr-muted);
+    border-top: 1px solid var(--clr-border);
+    background: var(--clr-surface2);
   }
 </style>

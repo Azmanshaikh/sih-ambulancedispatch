@@ -3,14 +3,18 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from typing import Any, List
 from pydantic import BaseModel
 
-from app.core.security import require_roles
+from app.core.security import require_main_admin, require_roles
 from app.services.corridor import arm_corridor, corridor_snapshot, mission_priority, resolve_conflict
-from app.services.dispatch_optimizer import get_optimal_ambulance, get_optimal_hospital_dispatch
+from app.services.dispatch_optimizer import (
+    get_optimal_ambulance,
+    get_optimal_hospital_dispatch,
+    simulate_custom_route,
+)
 from app.services.fleet import (
     BMSIT,
     assign_ambulance,
+    get_ambulance,
     get_ambulances,
-    get_hospitals,
 )
 from app.services.geocode import geocode_query, reverse_geocode
 from app.services.runtime_state import push_alert, save_mission, set_medical_record
@@ -42,6 +46,18 @@ class GeocodeBody(BaseModel):
     query: str = ""
     lat: float | None = None
     lng: float | None = None
+
+
+class AdminSimulateRequest(BaseModel):
+    pickup_lat: float
+    pickup_lng: float
+    pickup_address: str = ""
+    dest_lat: float
+    dest_lng: float
+    dest_address: str = ""
+    ambulance_id: str
+    is_raining: bool = False
+    prefer: str = "fastest"
 
 
 @router.post("/geocode")
@@ -232,6 +248,39 @@ async def dispatch_nearest_ambulance(req: DispatchRequest, _user: dict[str, Any]
         req.age_group,
         req.accessibility_need,
     )
+    return {"status": "success", "data": result}
+
+
+@router.post("/admin/simulate-route")
+async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] = Depends(require_main_admin())):
+    """Dry-run routing for Main Admin — uses the live dispatch engine without creating a mission."""
+    ambulance = get_ambulance(req.ambulance_id)
+    if not ambulance:
+        raise HTTPException(status_code=404, detail="Ambulance not found")
+
+    if req.is_raining:
+        is_raining = True
+    else:
+        is_raining = await asyncio.to_thread(is_raining_at, req.pickup_lat, req.pickup_lng)
+
+    result = await asyncio.to_thread(
+        simulate_custom_route,
+        ambulance,
+        (req.pickup_lat, req.pickup_lng),
+        (req.dest_lat, req.dest_lng),
+        is_raining=is_raining,
+        prefer=req.prefer or "fastest",
+    )
+    result["pickup"] = {
+        "lat": req.pickup_lat,
+        "lng": req.pickup_lng,
+        "address": req.pickup_address or f"{req.pickup_lat:.5f}, {req.pickup_lng:.5f}",
+    }
+    result["destination"] = {
+        "lat": req.dest_lat,
+        "lng": req.dest_lng,
+        "address": req.dest_address or f"{req.dest_lat:.5f}, {req.dest_lng:.5f}",
+    }
     return {"status": "success", "data": result}
 
 

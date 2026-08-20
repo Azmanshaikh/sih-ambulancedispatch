@@ -1,7 +1,7 @@
 import { supabase } from '$lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
-export type Role = 'patient' | 'driver' | 'staff' | 'doctor';
+export type Role = 'patient' | 'driver' | 'staff' | 'doctor' | 'main_admin';
 
 export type Profile = {
   id: string;
@@ -32,10 +32,15 @@ export function needsOnboarding(profile?: Profile | null) {
   return false;
 }
 
+export function isMainAdmin(profile?: Profile | null) {
+  const p = profile || auth.profile;
+  return p?.role === 'main_admin';
+}
+
 export function homeFor(role?: string | null) {
   if (needsOnboarding()) return '/choose-role';
   const r = role || auth.profile?.role;
-  if (r === 'staff') return '/';
+  if (r === 'staff' || r === 'main_admin') return '/';
   if (r === 'driver') return '/driver';
   if (r === 'doctor') return '/doctor';
   return '/patient';

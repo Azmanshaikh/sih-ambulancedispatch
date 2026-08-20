@@ -52,6 +52,7 @@ export function t(key: MessageKey, vars?: Record<string, string | number>) {
 }
 
 export function roleLabel(role?: string | null) {
+  if (role === 'main_admin') return t('role.mainAdmin');
   if (role === 'staff') return t('role.staff');
   if (role === 'driver') return t('role.driver');
   if (role === 'doctor') return t('role.doctor');

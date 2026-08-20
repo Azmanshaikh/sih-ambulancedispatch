@@ -6,7 +6,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text,
   full_name text,
-  role text not null default 'patient' check (role in ('patient', 'driver', 'staff', 'doctor')),
+  role text not null default 'patient' check (role in ('patient', 'driver', 'staff', 'doctor', 'main_admin')),
   status text not null default 'active' check (status in ('active', 'pending')),
   requested_role text check (requested_role is null or requested_role in ('driver', 'staff', 'doctor')),
   ambulance_id text,
@@ -19,7 +19,7 @@ alter table public.profiles add column if not exists hospital_id integer;
 
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check
-  check (role in ('patient', 'driver', 'staff', 'doctor'));
+  check (role in ('patient', 'driver', 'staff', 'doctor', 'main_admin'));
 alter table public.profiles drop constraint if exists profiles_requested_role_check;
 alter table public.profiles add constraint profiles_requested_role_check
   check (requested_role is null or requested_role in ('driver', 'staff', 'doctor'));
