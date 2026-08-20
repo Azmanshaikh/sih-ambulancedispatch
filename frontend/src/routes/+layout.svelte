@@ -17,8 +17,8 @@
 
   let gpsStatus = $state('BMSIT College, Yelahanka');
 
-  const PUBLIC = ['/login', '/auth/callback'];
-  const NO_NAV = ['/login', '/auth/callback', '/choose-role'];
+  const PUBLIC = ['/login', '/admin/login', '/auth/callback'];
+  const NO_NAV = ['/login', '/admin/login', '/auth/callback', '/choose-role'];
 
   const STAFF_PATHS = ['/', '/request', '/navigation', '/hospitals', '/notifications', '/staff/approvals'];
   const MAIN_ADMIN_PATHS = ['/admin/simulation'];

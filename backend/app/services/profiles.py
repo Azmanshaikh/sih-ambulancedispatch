@@ -57,6 +57,16 @@ def ensure_profile(
     return row
 
 
+def demote_main_admin(user_id: str, *, fallback_staff: bool = False) -> dict[str, Any]:
+    """Remove main_admin from accounts that are not on the Main Admin allow-list."""
+    profile = get_profile(user_id)
+    if not profile or profile.get("role") != "main_admin":
+        return profile or {}
+    profile["role"] = "staff" if fallback_staff else "patient"
+    profile["updated_at"] = _now()
+    return _save_profile(profile)
+
+
 def get_profile(user_id: str) -> dict[str, Any] | None:
     prev = _profiles.get(user_id) or {}
     row = None

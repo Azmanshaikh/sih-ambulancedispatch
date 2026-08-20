@@ -69,6 +69,23 @@
       : ''
   );
 
+  let routeSummary = $derived.by(() => {
+    if (!result) return '';
+    const unit = result.ambulance?.label || result.ambulance_id || 'Selected unit';
+    const engine =
+      result.constraints?.engine === 'networkx'
+        ? 'NetworkX over live road data'
+        : result.constraints?.provider || result.constraints?.engine || 'routing engine';
+    const traffic =
+      result.constraints?.traffic === 'waived'
+        ? 'Emergency corridor active — traffic signals waived for fastest arrival.'
+        : 'Standard traffic considered.';
+    const weather = result.is_raining
+      ? 'Rain detected; ETA includes a small weather adjustment.'
+      : 'Clear weather at pickup.';
+    return `${unit} was chosen for this simulation. Fastest path: ${result.pickup_minutes} min to pickup (${result.pickup_distance_km ?? '—'} km), then ${result.transport_minutes} min to destination (${result.transport_distance_km ?? '—'} km) — ${result.total_distance_km ?? '—'} km total, ~${result.eta_minutes} min ETA. Calculated via ${engine}. ${traffic} ${weather}`;
+  });
+
   function syncAmbulanceFromFleet() {
     const amb = ambulances.find((a) => a.id === selectedAmbulanceId);
     if (!amb) return;
@@ -351,23 +368,37 @@
           <span class="nb-chip">{result.constraints?.road_conditions || 'Traffic assessed'}</span>
           <span class="nb-chip chip-info">{result.constraints?.routing || 'emergency-shortest'}</span>
         </div>
-
-        <p class="reason">{result.reason}</p>
       </section>
     {/if}
   </aside>
 
-  <div class="sim-map">
-    <MapWidget
-      markers={markers}
-      {pickupRoute}
-      dropRoute={dropRoute}
-      {etaLabel}
-      selectedAmbulanceId={selectedAmbulanceId}
-      showLegend={true}
-      fitRoute={true}
-      onMapClick={onMapClick}
-    />
+  <div class="sim-map-col">
+    <div class="sim-map">
+      <MapWidget
+        markers={markers}
+        {pickupRoute}
+        dropRoute={dropRoute}
+        {etaLabel}
+        selectedAmbulanceId={selectedAmbulanceId}
+        showLegend={true}
+        fitRoute={true}
+        onMapClick={onMapClick}
+      />
+    </div>
+    {#if result}
+      <div class="map-reasoning nb-card">
+        <div class="map-reasoning-head">
+          <span class="material-symbols-outlined">route</span>
+          <h3>Why this route?</h3>
+        </div>
+        <p class="map-reasoning-text">{routeSummary}</p>
+      </div>
+    {:else}
+      <div class="map-reasoning map-reasoning--empty nb-card">
+        <span class="material-symbols-outlined">info</span>
+        <p>Set pickup, destination, and ambulance, then calculate to see why JEEVAN picks this route.</p>
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -510,11 +541,66 @@
     border-radius: var(--radius-sm);
     border: 1px solid var(--clr-border);
   }
+  .sim-map-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
   .sim-map {
     position: relative;
+    flex: 1;
     min-height: 0;
-    border-radius: 0;
     overflow: hidden;
+  }
+  .map-reasoning {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 14px 16px;
+    border-top: 1px solid var(--clr-border);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: none;
+  }
+  .map-reasoning-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .map-reasoning-head h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--clr-ink);
+  }
+  .map-reasoning-head .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--clr-primary);
+  }
+  .map-reasoning-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--clr-muted);
+  }
+  .map-reasoning--empty {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--clr-muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .map-reasoning--empty p {
+    margin: 0;
+  }
+  .map-reasoning--empty .material-symbols-outlined {
+    font-size: 22px;
+    color: var(--clr-subtle);
+    flex-shrink: 0;
   }
   @media (max-width: 900px) {
     .sim-page {

@@ -13,6 +13,7 @@
   };
 
   let description = $state('');
+  let whatsHappening = $state('');
   let narrative = $state('');
   let age = $state('adult');
   let reportFile = $state<File | null>(null);
@@ -32,6 +33,53 @@
   let pinLng = $state(BMSIT.lng);
   let locating = $state(false);
   let locationError = $state('');
+
+  type QuickPreset = 'cardiac_arrest' | 'road_accident' | 'unconsciousness';
+  let selectedPreset = $state<QuickPreset | null>(null);
+
+  const QUICK_PRESETS: {
+    id: QuickPreset;
+    label: string;
+    icon: string;
+    category: string;
+    summary: string;
+    cardiac?: boolean;
+    epilepsy?: boolean;
+  }[] = [
+    {
+      id: 'cardiac_arrest',
+      label: 'Cardiac arrest',
+      icon: 'favorite',
+      category: 'cardiac',
+      summary: 'Suspected cardiac arrest — patient unresponsive, CPR may be in progress.',
+      cardiac: true,
+    },
+    {
+      id: 'road_accident',
+      label: 'Road accident',
+      icon: 'car_crash',
+      category: 'trauma',
+      summary: 'Road traffic accident — trauma injuries reported at scene.',
+    },
+    {
+      id: 'unconsciousness',
+      label: 'Unconsciousness',
+      icon: 'bedtime',
+      category: 'neurological',
+      summary: 'Patient is unconscious or not responding — cause unknown.',
+      epilepsy: false,
+    },
+  ];
+
+  function applyPreset(id: QuickPreset) {
+    selectedPreset = id;
+    const preset = QUICK_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    emergencyCategory = preset.category;
+    cardiac = Boolean(preset.cardiac);
+    epilepsy = Boolean(preset.epilepsy);
+    if (!whatsHappening.trim()) whatsHappening = preset.summary;
+  }
 
   async function loadSavedReports() {
     try {
@@ -109,7 +157,7 @@
   async function dispatchNow() {
     dispatching = true;
     try {
-      const notes = [description, narrative, analysisResult ? `AI analysis:\n${analysisResult}` : '']
+      const notes = [whatsHappening, description, narrative, analysisResult ? `AI analysis:\n${analysisResult}` : '']
         .filter(Boolean)
         .join('\n\n');
       const res = await apiFetch('/tracking/dispatch', {
@@ -151,16 +199,41 @@
 <div class="request-page">
   <div class="request-inner">
 
-    <div style="margin-bottom: 32px; padding-bottom: 20px; border-bottom: 4px solid #111;">
+    <div style="margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--clr-border);">
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
-        <div style="width: 10px; height: 40px; background: #FF2D2D; border: 3px solid #111;"></div>
-        <h1 style="margin: 0; font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 900; color: #111; text-transform: uppercase; letter-spacing: 0.05em;">{t('request.title')}</h1>
+        <div style="width: 4px; height: 36px; background: var(--clr-primary); border-radius: 4px;"></div>
+        <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: var(--clr-ink);">{t('request.title')}</h1>
       </div>
-      <p style="margin: 0 0 12px 22px; font-size: 10px; font-weight: 700; color: #4B4B4B; text-transform: uppercase; letter-spacing: 0.3em;">{t('request.subtitle')}</p>
-      <div class="nb-chip nb-yellow" style="margin-left: 22px;">
+      <p style="margin: 0 0 12px 16px; font-size: 11px; font-weight: 600; color: var(--clr-muted); text-transform: uppercase; letter-spacing: 0.08em;">{t('request.subtitle')}</p>
+      <div class="nb-chip chip-info" style="margin-left: 16px;">
         🛰️ 📍 {address}
       </div>
     </div>
+
+    <section class="situation-section nb-card">
+      <h2 class="section-title">{t('request.whatsHappening')}</h2>
+      <p class="section-hint">{t('request.whatsHappeningHint')}</p>
+      <textarea
+        class="nb-input situation-text"
+        placeholder={t('request.whatsHappeningPlaceholder')}
+        bind:value={whatsHappening}
+      ></textarea>
+
+      <p class="preset-label">{t('request.quickEmergency')}</p>
+      <div class="preset-grid">
+        {#each QUICK_PRESETS as preset}
+          <button
+            type="button"
+            class="preset-card"
+            class:preset-card--active={selectedPreset === preset.id}
+            onclick={() => applyPreset(preset.id)}
+          >
+            <span class="material-symbols-outlined preset-icon">{preset.icon}</span>
+            <span class="preset-name">{preset.label}</span>
+          </button>
+        {/each}
+      </div>
+    </section>
 
     <div style="margin-bottom: 28px;">
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
@@ -345,5 +418,84 @@
     margin: 0 auto;
     width: 100%;
     box-sizing: border-box;
+  }
+  .situation-section {
+    padding: 20px;
+    margin-bottom: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .section-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--clr-ink);
+  }
+  .section-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--clr-muted);
+    line-height: 1.45;
+  }
+  .situation-text {
+    min-height: 88px;
+    resize: vertical;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .preset-label {
+    margin: 8px 0 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--clr-muted);
+  }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .preset-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 10px;
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
+    background: var(--clr-surface2);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    text-align: center;
+  }
+  .preset-card:hover {
+    border-color: var(--clr-primary);
+    background: #eff6ff;
+  }
+  .preset-card--active {
+    border-color: var(--clr-primary);
+    background: #eff6ff;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  }
+  .preset-icon {
+    font-size: 28px;
+    color: var(--clr-primary);
+  }
+  .preset-card--active .preset-icon {
+    color: var(--clr-danger);
+  }
+  .preset-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--clr-ink);
+    line-height: 1.3;
+  }
+  @media (max-width: 640px) {
+    .preset-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

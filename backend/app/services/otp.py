@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.core.supabase import rest_select, rest_update
-from app.services.mail import head_staff_emails, send_staff_otp_email
+from app.services.mail import send_staff_otp_email
 from app.services.runtime_state import push_alert
 
 _otps: dict[str, dict[str, Any]] = {}
@@ -125,20 +125,20 @@ def issue_otp(
         "created_at": _now().isoformat(),
         "expires_at": expires_at,
         "used": False,
-        "emailed_to": mail.get("to") or head_staff_emails(),
+        "emailed_to": mail.get("to") or ([email] if email else []),
         "email_sent": bool(mail.get("sent")),
         "email_error": mail.get("error"),
     }
     _otps[user_id] = row
     print(f"[JEEVAN OTP] {requested_role} for {email}: {code}")
     who = full_name or email
-    dest = ", ".join(row["emailed_to"]) or "head staff"
+    dest = ", ".join(row["emailed_to"]) or email or "applicant"
     alert = push_alert(
         "staff",
         _OTP_TITLE,
         f"{who} ({email}) wants to join as {requested_role}"
         + (f" at {hospital_name}" if hospital_name else "")
-        + f". OTP: {code}. Sent to {dest}.",
+        + f". OTP issued and emailed to {dest}.",
         extra={
             "kind": "access_otp",
             "otp": code,
@@ -178,7 +178,7 @@ def verify_otp(user_id: str, code: str) -> dict[str, Any]:
     persisted = _load_persisted()
     row = _otps.get(user_id) or persisted.get(user_id)
     if not row or row.get("used"):
-        raise ValueError("No OTP pending. Choose Driver or Staff again.")
+        raise ValueError("No OTP pending. Choose Driver, Doctor, or Staff again.")
     exp = _parse_dt(row.get("expires_at"))
     if exp and exp < _now():
         raise ValueError("OTP expired. Request a new one.")
@@ -188,7 +188,7 @@ def verify_otp(user_id: str, code: str) -> dict[str, Any]:
     entered = "".join(ch for ch in (code or "") if ch.isdigit())
     if entered != str(row.get("code") or ""):
         _otps[user_id] = row
-        raise ValueError("Wrong OTP. Ask staff for the current code.")
+        raise ValueError("Wrong OTP. Check your email for the current code.")
     row["used"] = True
     _otps[user_id] = row
     _mark_used(row)

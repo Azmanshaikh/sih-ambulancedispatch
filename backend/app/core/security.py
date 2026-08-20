@@ -6,7 +6,9 @@ from fastapi import Depends, Header, HTTPException, status
 
 from app.core.config import settings
 from app.core.supabase import auth_user_from_token
-from app.services.profiles import ensure_profile
+from app.services.profiles import demote_main_admin, ensure_profile
+
+DEFAULT_MAIN_ADMIN_EMAIL = "azmanshaikh01071@gmail.com"
 
 
 def _bootstrap_emails() -> set[str]:
@@ -14,15 +16,13 @@ def _bootstrap_emails() -> set[str]:
 
 
 def _main_admin_emails() -> set[str]:
-    raw = settings.MAIN_ADMIN_BOOTSTRAP_EMAILS or settings.STAFF_BOOTSTRAP_EMAILS or ""
-    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+    raw = (settings.MAIN_ADMIN_BOOTSTRAP_EMAILS or DEFAULT_MAIN_ADMIN_EMAIL).strip()
+    emails = {e.strip().lower() for e in raw.split(",") if e.strip()}
+    return emails or {DEFAULT_MAIN_ADMIN_EMAIL.lower()}
 
 
 def is_main_admin_user(user: dict[str, Any]) -> bool:
-    profile = user.get("profile") or {}
-    if profile.get("role") == "main_admin":
-        return True
-    email = (user.get("email") or profile.get("email") or "").lower()
+    email = (user.get("email") or (user.get("profile") or {}).get("email") or "").lower()
     return email in _main_admin_emails()
 
 
@@ -54,6 +54,9 @@ def _user_from_bearer(authorization: str | None) -> dict[str, Any]:
         bootstrap_staff=bootstrap_staff and not bootstrap_main,
         bootstrap_main_admin=bootstrap_main,
     )
+    if profile.get("role") == "main_admin" and not bootstrap_main:
+        profile = demote_main_admin(str(user_id), fallback_staff=email_lower in _bootstrap_emails())
+
     if bootstrap_main or bootstrap_staff:
         profile["onboarded"] = True
     elif profile.get("role") in ("driver", "staff", "main_admin") and profile.get("status") == "active":

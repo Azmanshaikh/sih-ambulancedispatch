@@ -36,6 +36,7 @@
     {#if error}
       <p class="login-error">{error}</p>
     {/if}
+    <a href="/admin/login" class="admin-link">Main Admin sign in →</a>
   </div>
 </div>
 
@@ -84,5 +85,16 @@
     padding: 10px 12px;
     background: var(--clr-danger-bg);
     border-radius: var(--radius-sm);
+  }
+  .admin-link {
+    display: inline-block;
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--clr-primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .admin-link:hover {
+    text-decoration: underline;
   }
 </style>

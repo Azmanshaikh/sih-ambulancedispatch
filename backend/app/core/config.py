@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str | None = None
     VITE_SUPABASE_ANON_KEY: str | None = None
     STAFF_BOOTSTRAP_EMAILS: str = ""
-    MAIN_ADMIN_BOOTSTRAP_EMAILS: str = ""
+    # Comma-separated Main Admin emails (route simulation). Defaults to the project owner when unset.
+    MAIN_ADMIN_BOOTSTRAP_EMAILS: str = "azmanshaikh01071@gmail.com"
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""

@@ -1,4 +1,4 @@
-"""Best-effort email to head staff. Uses SMTP when configured."""
+"""Best-effort OTP email to the applicant. Uses SMTP when configured."""
 
 from __future__ import annotations
 
@@ -19,31 +19,34 @@ def send_staff_otp_email(
     code: str,
     hospital_name: str | None = None,
 ) -> dict:
-    recipients = head_staff_emails()
-    if not recipients:
-        return {"sent": False, "to": [], "error": "STAFF_BOOTSTRAP_EMAILS is empty"}
+    recipient = (applicant_email or "").strip()
+    if not recipient:
+        return {"sent": False, "to": [], "error": "applicant email is empty"}
 
     host = (settings.SMTP_HOST or "").strip()
     password = (settings.SMTP_PASSWORD or "").strip()
-    user = (settings.SMTP_USER or "").strip() or (recipients[0] if host else "")
-    from_addr = (settings.SMTP_FROM or "").strip() or user or recipients[0]
+    user = (settings.SMTP_USER or "").strip()
+    from_addr = (settings.SMTP_FROM or "").strip() or user
     port = int(settings.SMTP_PORT or 587)
 
-    if not host or not password or not user:
-        print(f"[JEEVAN OTP EMAIL] skipped (set SMTP_HOST / SMTP_USER / SMTP_PASSWORD). Would send {code} to {recipients}")
-        return {"sent": False, "to": recipients, "error": "smtp not configured"}
+    if not host or not password or not user or not from_addr:
+        print(
+            f"[JEEVAN OTP EMAIL] skipped (set SMTP_HOST / SMTP_USER / SMTP_PASSWORD). "
+            f"Would send {code} to {recipient}"
+        )
+        return {"sent": False, "to": [recipient], "error": "smtp not configured"}
 
     who = applicant_name or applicant_email
     hospital_line = f" Hospital: {hospital_name}." if hospital_name else ""
     msg = EmailMessage()
-    msg["Subject"] = f"JEEVAN access OTP · {requested_role}"
+    msg["Subject"] = f"Your JEEVAN OTP · {requested_role}"
     msg["From"] = from_addr
-    msg["To"] = ", ".join(recipients)
+    msg["To"] = recipient
     msg.set_content(
-        f"{who} ({applicant_email}) wants to join JEEVAN as {requested_role}.{hospital_line}\n\n"
-        f"OTP: {code}\n\n"
-        "Give this code only if you know them. It expires in 15 minutes.\n"
-        "You can also see pending codes under Staff → OTP codes."
+        f"Hi {who},\n\n"
+        f"Your JEEVAN OTP to join as {requested_role} is: {code}.{hospital_line}\n\n"
+        "It expires in 15 minutes. Do not share this code.\n"
+        "If you did not request this, you can ignore this email.\n"
     )
 
     try:
@@ -53,8 +56,8 @@ def send_staff_otp_email(
             smtp.ehlo()
             smtp.login(user, password)
             smtp.send_message(msg)
-        print(f"[JEEVAN OTP EMAIL] sent {requested_role} OTP for {applicant_email} to {recipients}")
-        return {"sent": True, "to": recipients, "error": None}
+        print(f"[JEEVAN OTP EMAIL] sent {requested_role} OTP to {recipient}")
+        return {"sent": True, "to": [recipient], "error": None}
     except Exception as exc:
         print(f"[JEEVAN OTP EMAIL] failed: {exc}")
-        return {"sent": False, "to": recipients, "error": str(exc)}
+        return {"sent": False, "to": [recipient], "error": str(exc)}

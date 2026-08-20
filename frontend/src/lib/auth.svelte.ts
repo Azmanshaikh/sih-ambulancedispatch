@@ -1,6 +1,12 @@
 import { supabase } from '$lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
+export const MAIN_ADMIN_EMAIL = (
+  import.meta.env.VITE_MAIN_ADMIN_EMAIL || 'azmanshaikh01071@gmail.com'
+).trim().toLowerCase();
+
+const ADMIN_LOGIN_KEY = 'jeevan-admin-login';
+
 export type Role = 'patient' | 'driver' | 'staff' | 'doctor' | 'main_admin';
 
 export type Profile = {
@@ -34,7 +40,22 @@ export function needsOnboarding(profile?: Profile | null) {
 
 export function isMainAdmin(profile?: Profile | null) {
   const p = profile || auth.profile;
-  return p?.role === 'main_admin';
+  if (!p) return false;
+  const email = (p.email || auth.session?.user?.email || '').trim().toLowerCase();
+  return p.role === 'main_admin' && email === MAIN_ADMIN_EMAIL;
+}
+
+export function markAdminLoginIntent() {
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem(ADMIN_LOGIN_KEY, '1');
+  }
+}
+
+export function consumeAdminLoginIntent() {
+  if (typeof sessionStorage === 'undefined') return false;
+  const intent = sessionStorage.getItem(ADMIN_LOGIN_KEY) === '1';
+  sessionStorage.removeItem(ADMIN_LOGIN_KEY);
+  return intent;
 }
 
 export function homeFor(role?: string | null) {
@@ -100,6 +121,11 @@ export async function signInWithGoogle() {
     options: { redirectTo },
   });
   if (error) throw error;
+}
+
+export async function signInWithGoogleAdmin() {
+  markAdminLoginIntent();
+  await signInWithGoogle();
 }
 
 export async function signOut() {

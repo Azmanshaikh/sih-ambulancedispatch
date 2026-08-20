@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from app.core.security import get_current_user, require_roles
 from app.services.corridor import apply_condition_score, display_priority_label, priority_band_of, resolve_conflict
 from app.services.fleet import BMSIT, get_ambulances, get_hospital
-from app.services.mail import head_staff_emails
 from app.services.otp import issue_otp, list_active_otps, verify_otp
 from app.services.profiles import (
     activate_patient,
@@ -159,14 +158,14 @@ async def choose_role(body: ChooseRoleBody, user: dict[str, Any] = Depends(get_c
         hospital_name=(hospital or {}).get("name"),
     )
     pending["onboarded"] = False
-    emailed_to = issued.get("emailed_to") or head_staff_emails()
+    emailed_to = issued.get("emailed_to") or ([user["email"]] if user.get("email") else [])
     emailed = bool(issued.get("email_sent"))
-    dest = ", ".join(emailed_to) if emailed_to else "head staff"
+    dest = ", ".join(emailed_to) if emailed_to else user.get("email") or "your Gmail"
     hospital_bit = f" at {hospital['name']}" if hospital else ""
     message = (
         f"OTP emailed to {dest}."
         if emailed
-        else f"OTP is waiting for {dest} on the staff OTP codes page."
+        else f"Could not email {dest}. Ask staff to read the code from OTP codes, or check SMTP settings."
     )
     return {
         "status": "success",
