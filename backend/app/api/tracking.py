@@ -56,6 +56,9 @@ class AdminSimulateRequest(BaseModel):
     dest_lng: float
     dest_address: str = ""
     ambulance_id: str
+    ambulance_lat: float | None = None
+    ambulance_lng: float | None = None
+    ambulance_address: str = ""
     is_raining: bool = False
     prefer: str = "fastest"
 
@@ -258,6 +261,11 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
     if not ambulance:
         raise HTTPException(status_code=404, detail="Ambulance not found")
 
+    sim_ambulance = dict(ambulance)
+    if req.ambulance_lat is not None and req.ambulance_lng is not None:
+        sim_ambulance["lat"] = req.ambulance_lat
+        sim_ambulance["lng"] = req.ambulance_lng
+
     if req.is_raining:
         is_raining = True
     else:
@@ -265,12 +273,18 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
 
     result = await asyncio.to_thread(
         simulate_custom_route,
-        ambulance,
+        sim_ambulance,
         (req.pickup_lat, req.pickup_lng),
         (req.dest_lat, req.dest_lng),
         is_raining=is_raining,
         prefer=req.prefer or "fastest",
     )
+    if req.ambulance_lat is not None and req.ambulance_lng is not None:
+        result["ambulance_origin"] = {
+            "lat": req.ambulance_lat,
+            "lng": req.ambulance_lng,
+            "address": req.ambulance_address or f"{req.ambulance_lat:.5f}, {req.ambulance_lng:.5f}",
+        }
     result["pickup"] = {
         "lat": req.pickup_lat,
         "lng": req.pickup_lng,

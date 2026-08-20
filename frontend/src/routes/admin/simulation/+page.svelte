@@ -7,7 +7,7 @@
 
   const BMSIT = { lat: 13.1344, lng: 77.5693, name: 'BMSIT College, Avalahalli, Yelahanka' };
 
-  type PinMode = 'pickup' | 'destination';
+  type PinMode = 'pickup' | 'destination' | 'ambulance';
 
   let ambulances = $state<any[]>([]);
   let selectedAmbulanceId = $state('');
@@ -20,12 +20,18 @@
   let destLng = $state(77.5819);
   let destAddress = $state('Cytecare Hospital, Yelahanka');
 
+  let ambLat = $state<number | null>(null);
+  let ambLng = $state<number | null>(null);
+  let ambAddress = $state('');
+
   let calculating = $state(false);
   let error = $state('');
   let result = $state<any>(null);
 
   let pickupRoute = $derived(result?.pickup_route?.length ? result.pickup_route : null);
   let dropRoute = $derived(result?.route?.length ? result.route : null);
+
+  let selectedAmbulance = $derived(ambulances.find((a) => a.id === selectedAmbulanceId));
 
   let markers = $derived.by(() => {
     const list: any[] = [];
@@ -43,14 +49,15 @@
         popup: `Destination: ${destAddress}`,
       });
     }
-    const amb = ambulances.find((a) => a.id === selectedAmbulanceId);
-    if (amb) {
+    const lat = ambLat ?? selectedAmbulance?.lat;
+    const lng = ambLng ?? selectedAmbulance?.lng;
+    if (lat != null && lng != null && selectedAmbulanceId) {
       list.push({
-        position: [amb.lat, amb.lng] as [number, number],
+        position: [lat, lng] as [number, number],
         type: 'ambulance',
-        id: amb.id,
-        ambulanceId: amb.id,
-        popup: `${amb.label || amb.id} · ${amb.type_label || amb.ambulance_type || 'BLS'}`,
+        id: selectedAmbulanceId,
+        ambulanceId: selectedAmbulanceId,
+        popup: `${selectedAmbulance?.label || selectedAmbulanceId} · ${ambAddress || 'Custom position'}`,
       });
     }
     return list;
@@ -61,6 +68,18 @@
       ? `ETA ${result.eta_minutes} min · ${result.total_distance_km ?? '—'} km`
       : ''
   );
+
+  function syncAmbulanceFromFleet() {
+    const amb = ambulances.find((a) => a.id === selectedAmbulanceId);
+    if (!amb) return;
+    ambLat = amb.lat;
+    ambLng = amb.lng;
+    ambAddress = amb.label ? `${amb.label} (${amb.id})` : amb.id;
+  }
+
+  $effect(() => {
+    if (selectedAmbulanceId && ambulances.length) syncAmbulanceFromFleet();
+  });
 
   onMount(async () => {
     if (!isMainAdmin()) {
@@ -80,6 +99,7 @@
         const available = ambulances.find((a) => a.status === 'available') || ambulances[0];
         selectedAmbulanceId = available.id;
       }
+      syncAmbulanceFromFleet();
     } catch {
       /* ignore */
     }
@@ -113,6 +133,20 @@
     error = '';
   }
 
+  async function geocodeAmbulance() {
+    const q = ambAddress.trim();
+    if (!q) return;
+    const hit = await lookupAddress(q);
+    if (!hit) {
+      error = 'Ambulance address not found.';
+      return;
+    }
+    ambLat = hit.lat;
+    ambLng = hit.lng;
+    if (hit.address) ambAddress = hit.address;
+    error = '';
+  }
+
   async function onMapClick(lat: number, lng: number) {
     error = '';
     if (pinMode === 'pickup') {
@@ -124,7 +158,7 @@
       } catch {
         pickupAddress = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
       }
-    } else {
+    } else if (pinMode === 'destination') {
       destLat = lat;
       destLng = lng;
       try {
@@ -133,12 +167,25 @@
       } catch {
         destAddress = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
       }
+    } else {
+      ambLat = lat;
+      ambLng = lng;
+      try {
+        const hit = await lookupCoords(lat, lng);
+        ambAddress = hit.address;
+      } catch {
+        ambAddress = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      }
     }
   }
 
   async function calculateRoute() {
     if (!selectedAmbulanceId) {
       error = 'Select an ambulance from the fleet.';
+      return;
+    }
+    if (ambLat == null || ambLng == null) {
+      error = 'Set the ambulance location on the map or enter an address.';
       return;
     }
     calculating = true;
@@ -156,6 +203,9 @@
           dest_lng: destLng,
           dest_address: destAddress,
           ambulance_id: selectedAmbulanceId,
+          ambulance_lat: ambLat,
+          ambulance_lng: ambLng,
+          ambulance_address: ambAddress,
         }),
       });
       const data = await res.json();
@@ -190,8 +240,37 @@
         <button class="btn" class:btn-primary={pinMode === 'destination'} onclick={() => (pinMode = 'destination')}>
           Set destination
         </button>
+        <button class="btn" class:btn-primary={pinMode === 'ambulance'} onclick={() => (pinMode = 'ambulance')}>
+          Set ambulance
+        </button>
       </div>
-      <p class="hint">Click the map to place the active pin, or enter addresses below.</p>
+      <p class="hint">
+        {#if pinMode === 'pickup'}
+          Click the map to set pickup, or enter an address below.
+        {:else if pinMode === 'destination'}
+          Click the map to set destination, or enter an address below.
+        {:else}
+          Click the map to place the ambulance, or enter an address below.
+        {/if}
+      </p>
+    </section>
+
+    <section class="sim-section">
+      <p class="med-section-title">Ambulance</p>
+      <select class="nb-input" bind:value={selectedAmbulanceId}>
+        {#each ambulances as amb}
+          <option value={amb.id}>
+            {amb.label || amb.id} · {amb.type_label || amb.ambulance_type} · {amb.status}
+          </option>
+        {/each}
+      </select>
+      <div class="field-row">
+        <input class="nb-input" bind:value={ambAddress} placeholder="Ambulance location address" />
+        <button class="btn btn-secondary" onclick={geocodeAmbulance}>Locate</button>
+      </div>
+      {#if ambLat != null && ambLng != null}
+        <p class="coords-hint">{ambLat.toFixed(5)}, {ambLng.toFixed(5)}</p>
+      {/if}
     </section>
 
     <section class="sim-section">
@@ -208,17 +287,6 @@
         <input class="nb-input" bind:value={destAddress} placeholder="Drop / hospital address" />
         <button class="btn btn-secondary" onclick={geocodeDest}>Locate</button>
       </div>
-    </section>
-
-    <section class="sim-section">
-      <p class="med-section-title">Ambulance</p>
-      <select class="nb-input" bind:value={selectedAmbulanceId}>
-        {#each ambulances as amb}
-          <option value={amb.id}>
-            {amb.label || amb.id} · {amb.type_label || amb.ambulance_type} · {amb.status}
-          </option>
-        {/each}
-      </select>
     </section>
 
     <button class="btn btn-primary calc-btn" disabled={calculating} onclick={calculateRoute}>
@@ -305,18 +373,26 @@
   }
   .mode-toggle {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
   }
   .mode-toggle .btn {
-    flex: 1;
-    font-size: 12px;
-    padding: 8px 10px;
+    flex: 1 1 calc(33% - 8px);
+    min-width: 90px;
+    font-size: 11px;
+    padding: 8px 8px;
   }
   .hint {
     margin: 0;
     font-size: 11px;
     color: var(--clr-muted);
     line-height: 1.4;
+  }
+  .coords-hint {
+    margin: 0;
+    font-size: 10px;
+    color: var(--clr-muted);
+    font-family: var(--font-mono);
   }
   .field-row {
     display: flex;
