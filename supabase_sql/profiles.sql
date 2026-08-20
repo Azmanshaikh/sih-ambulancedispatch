@@ -45,7 +45,7 @@ create policy "profiles_select_own_or_staff"
   on public.profiles for select
   using (
     auth.uid() = id
-    or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'staff')
+    or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('staff', 'main_admin'))
   );
 
 drop policy if exists "profiles_update_own" on public.profiles;
@@ -53,6 +53,32 @@ create policy "profiles_update_own"
   on public.profiles for update
   using (auth.uid() = id)
   with check (auth.uid() = id);
+
+create or replace function public.prevent_profile_privilege_escalation()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() = 'service_role' then
+    return new;
+  end if;
+  if new.role is distinct from old.role
+     or new.status is distinct from old.status
+     or new.requested_role is distinct from old.requested_role
+     or new.ambulance_id is distinct from old.ambulance_id
+     or new.hospital_id is distinct from old.hospital_id then
+    raise exception 'Cannot change privileged profile fields';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_protect_privileges on public.profiles;
+create trigger profiles_protect_privileges
+  before update on public.profiles
+  for each row execute function public.prevent_profile_privilege_escalation();
 
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own"
@@ -64,7 +90,7 @@ create policy "role_requests_select"
   on public.role_requests for select
   using (
     auth.uid() = user_id
-    or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'staff')
+    or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('staff', 'main_admin'))
   );
 
 drop policy if exists "role_requests_insert_own" on public.role_requests;

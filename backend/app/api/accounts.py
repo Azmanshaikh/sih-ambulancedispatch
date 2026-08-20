@@ -132,8 +132,16 @@ async def me(user: dict[str, Any] = Depends(get_current_user)):
 
 
 @router.get("/fleet-units")
-async def fleet_units(_user: dict[str, Any] = Depends(get_current_user)):
-    """Signed-in users (including pending onboarding) can pick a fleet unit."""
+async def fleet_units(user: dict[str, Any] = Depends(get_current_user)):
+    """Drivers, doctors, staff, and pending applicants for those roles can pick a fleet unit."""
+    profile = user.get("profile") or {}
+    role = profile.get("role")
+    requested = profile.get("requested_role")
+    allowed = role in ("driver", "doctor", "staff", "main_admin")
+    if profile.get("status") == "pending" and requested in ("driver", "doctor", "staff"):
+        allowed = True
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
     return {
         "status": "success",
         "ambulances": get_ambulances(),
@@ -275,14 +283,14 @@ async def bind_ambulance(user_id: str, body: DecideBody, user: dict[str, Any] = 
 
 
 @router.get("/mission")
-async def live_mission(user: dict[str, Any] = Depends(get_current_user)):
+async def live_mission(user: dict[str, Any] = Depends(require_roles("driver", "doctor", "patient", "staff"))):
     profile = user.get("profile") or {}
     role = profile.get("role")
     if role in ("driver", "doctor"):
         mission = live_mission_or_none(enrich_mission(get_mission_for_ambulance(profile.get("ambulance_id"))))
     elif role == "patient":
         mission = live_mission_or_none(enrich_mission(get_mission_for_patient(user["id"])))
-    elif role == "staff":
+    elif role in ("staff", "main_admin"):
         mission = live_mission_or_none(enrich_mission(get_latest_mission()))
     else:
         raise HTTPException(status_code=403, detail="Not allowed for this role")
@@ -388,23 +396,23 @@ async def mission_phase(body: PhaseBody, user: dict[str, Any] = Depends(require_
 
 
 @router.get("/alerts")
-async def get_alerts(user: dict[str, Any] = Depends(get_current_user)):
+async def get_alerts(user: dict[str, Any] = Depends(require_roles("driver", "staff", "doctor"))):
     role = (user.get("profile") or {}).get("role")
-    if role not in ("driver", "staff", "doctor"):
-        raise HTTPException(status_code=403, detail="Not allowed for this role")
     amb_id = (user.get("profile") or {}).get("ambulance_id")
     unit = role in ("driver", "doctor")
-    alerts = list_alerts(role, amb_id if unit else None)
-    if unit and amb_id and not alerts:
-        alerts = list_alerts("driver")
-    return {"status": "success", "alerts": alerts, "unread": unread_count(role, amb_id if unit else None)}
+    alerts = list_alerts("staff" if role == "main_admin" else role, amb_id if unit else None)
+    return {"status": "success", "alerts": alerts, "unread": unread_count("staff" if role == "main_admin" else role, amb_id if unit else None)}
 
 
 @router.post("/alerts/{alert_id}/ack")
-async def acknowledge_alert(alert_id: str, user: dict[str, Any] = Depends(get_current_user)):
+async def acknowledge_alert(alert_id: str, user: dict[str, Any] = Depends(require_roles("driver", "staff", "doctor"))):
     role = (user.get("profile") or {}).get("role")
-    if role not in ("driver", "staff", "doctor"):
-        raise HTTPException(status_code=403, detail="Not allowed for this role")
+    query_role = "staff" if role == "main_admin" else role
+    amb_id = (user.get("profile") or {}).get("ambulance_id")
+    unit = role in ("driver", "doctor")
+    visible = {str(a.get("id")) for a in list_alerts(query_role, amb_id if unit else None)}
+    if str(alert_id) not in visible:
+        raise HTTPException(status_code=403, detail="Not allowed")
     alert = ack_alert(alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -412,21 +420,26 @@ async def acknowledge_alert(alert_id: str, user: dict[str, Any] = Depends(get_cu
 
 
 @router.get("/vitals")
-async def my_vitals(user: dict[str, Any] = Depends(get_current_user)):
+async def my_vitals(user: dict[str, Any] = Depends(require_roles("patient"))):
     return {"status": "success", "vitals": tick_vitals(user["id"]), "record": get_medical_record(user["id"])}
 
 
 @router.post("/records")
-async def save_record(body: RecordBody, user: dict[str, Any] = Depends(get_current_user)):
+async def save_record(body: RecordBody, user: dict[str, Any] = Depends(require_roles("patient"))):
     record = set_medical_record(user["id"], body.model_dump())
     return {"status": "success", "record": record}
 
 
 @router.get("/health-profile")
-async def read_health_profile(user: dict[str, Any] = Depends(get_current_user), patient_id: str | None = None):
+async def read_health_profile(user: dict[str, Any] = Depends(require_roles("patient", "staff", "doctor")), patient_id: str | None = None):
     role = (user.get("profile") or {}).get("role")
     target = user["id"]
-    if patient_id and role == "staff":
+    if patient_id and role in ("staff", "main_admin"):
+        target = patient_id
+    elif patient_id and role == "doctor":
+        mission = get_mission_for_ambulance((user.get("profile") or {}).get("ambulance_id"))
+        if not mission or str(mission.get("patient_id") or "") != str(patient_id):
+            raise HTTPException(status_code=403, detail="Not allowed")
         target = patient_id
     elif patient_id and patient_id != user["id"]:
         raise HTTPException(status_code=403, detail="Not allowed")
@@ -451,10 +464,7 @@ async def write_health_profile(body: HealthProfileBody, user: dict[str, Any] = D
 
 
 @router.get("/reports")
-async def trip_reports(user: dict[str, Any] = Depends(get_current_user)):
-    role = (user.get("profile") or {}).get("role")
-    if role not in ("staff", "patient"):
-        raise HTTPException(status_code=403, detail="Not allowed for this role")
+async def trip_reports(user: dict[str, Any] = Depends(require_roles("staff", "patient"))):
     return {"status": "success", "reports": list_reports_for(user)}
 
 

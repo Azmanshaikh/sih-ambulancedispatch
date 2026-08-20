@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -10,6 +11,7 @@ from app.services.runtime_state import push_alert
 
 _otps: dict[str, dict[str, Any]] = {}
 _OTP_TITLE = "ACCESS OTP"
+logger = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -130,7 +132,7 @@ def issue_otp(
         "email_error": None,
     }
     _otps[user_id] = row
-    print(f"[JEEVAN OTP] {requested_role} for {email}: {code} (admin-only)")
+    logger.info("OTP issued for role %s", requested_role)
     who = full_name or email
     alert = push_alert(
         "staff",

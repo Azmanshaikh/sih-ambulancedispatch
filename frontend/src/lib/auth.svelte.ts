@@ -1,5 +1,7 @@
 import { supabase } from '$lib/supabase';
 import type { Session } from '@supabase/supabase-js';
+import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
 
 export const MAIN_ADMIN_EMAIL = (
   import.meta.env.VITE_MAIN_ADMIN_EMAIL || 'azmanshaikh01071@gmail.com'
@@ -87,7 +89,30 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
     ...((init.headers as Record<string, string>) || {}),
     ...(await authHeaders()),
   };
-  return fetch(`${backendUrl}${path}`, { ...init, headers });
+  let res = await fetch(`${backendUrl}${path}`, { ...init, headers });
+  if (res.status === 401 && browser) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (!error && data.session) {
+      auth.session = data.session;
+      const retryHeaders: Record<string, string> = {
+        ...((init.headers as Record<string, string>) || {}),
+        ...(await authHeaders()),
+      };
+      res = await fetch(`${backendUrl}${path}`, { ...init, headers: retryHeaders });
+    }
+    if (res.status === 401) {
+      await signOut();
+      goto('/login', { replaceState: true });
+      return res;
+    }
+  }
+  if (res.status === 403 && browser) {
+    const dest = homeFor(auth.profile?.role);
+    if (window.location.pathname !== dest && window.location.pathname !== '/choose-role') {
+      goto(dest, { replaceState: true });
+    }
+  }
+  return res;
 }
 
 export async function refreshProfile() {
@@ -126,6 +151,21 @@ export async function signInWithGoogle() {
 export async function signInWithGoogleAdmin() {
   markAdminLoginIntent();
   await signInWithGoogle();
+}
+
+export async function signInWithPassword(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  auth.session = data.session;
+  if (auth.session) await refreshProfile();
+}
+
+export async function signUpWithPassword(email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  auth.session = data.session;
+  if (auth.session) await refreshProfile();
+  return data;
 }
 
 export async function signOut() {

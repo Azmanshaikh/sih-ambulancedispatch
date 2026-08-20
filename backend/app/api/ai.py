@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from pydantic import BaseModel
 import httpx
 import base64
 from typing import Any, Optional
+import hmac
+
 from app.core.config import settings
-from app.core.security import get_current_user, require_roles
+from app.core.security import require_roles
 from app.services.patient_care import (
     append_chat,
     confirm_call_intake,
@@ -166,7 +168,17 @@ async def tavus_confirm(
 
 
 @router.post("/tavus/webhook")
-async def tavus_webhook(payload: dict[str, Any]):
+async def tavus_webhook(
+    payload: dict[str, Any],
+    x_jeevan_webhook_secret: str | None = Header(default=None, alias="X-Jeevan-Webhook-Secret"),
+    x_webhook_secret: str | None = Header(default=None, alias="X-Webhook-Secret"),
+):
+    expected = (settings.TAVUS_WEBHOOK_SECRET or "").strip()
+    if not expected:
+        raise HTTPException(status_code=401, detail="Webhook not configured")
+    offered = (x_jeevan_webhook_secret or x_webhook_secret or "").strip()
+    if not offered or not hmac.compare_digest(offered, expected):
+        raise HTTPException(status_code=401, detail="Invalid webhook secret")
     event = payload.get("event_type") or ""
     cid = str(payload.get("conversation_id") or "")
     if event == "application.transcription_ready" and cid:
@@ -178,7 +190,7 @@ async def tavus_webhook(payload: dict[str, Any]):
 
 
 @router.get("/reports")
-async def my_report_analyses(user: dict[str, Any] = Depends(get_current_user)):
+async def my_report_analyses(user: dict[str, Any] = Depends(require_roles("patient", "staff"))):
     rows = list_medical_analyses(user["id"])
     return {"status": "success", "reports": rows}
 
@@ -187,7 +199,7 @@ async def my_report_analyses(user: dict[str, Any] = Depends(get_current_user)):
 async def analyze_report(
     text: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
-    user: dict[str, Any] = Depends(get_current_user),
+    user: dict[str, Any] = Depends(require_roles("patient", "staff")),
 ):
     if image and not settings.NVIDIA_API_KEY:
         raise HTTPException(status_code=500, detail="NVIDIA_API_KEY not configured in .env")
@@ -261,8 +273,7 @@ async def analyze_report(
             )
 
             if response.status_code != 200:
-                print("NVIDIA API Error:", response.text)
-                raise HTTPException(status_code=502, detail=f"AI Provider error: {response.text}")
+                raise HTTPException(status_code=502, detail="AI provider error")
 
             result = response.json()
 
@@ -287,5 +298,4 @@ async def analyze_report(
     except HTTPException:
         raise
     except Exception as e:
-        print("Analyze report exception:", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Analysis failed")

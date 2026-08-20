@@ -23,7 +23,7 @@
     { to: '/ai-call',           icon: 'videocam',            labelKey: 'nav.aiCall' as const,        roles: ['patient'] },
     { to: '/driver',            icon: 'map',                 labelKey: 'nav.map' as const,           roles: ['driver'] },
     { to: '/doctor',            icon: 'stethoscope',         labelKey: 'nav.doctor' as const,        roles: ['doctor'] },
-    { to: '/hospitals',         icon: 'local_hospital',      labelKey: 'nav.hospitals' as const,     roles: ['staff', 'main_admin', 'driver'] },
+    { to: '/hospitals',         icon: 'local_hospital',      labelKey: 'nav.hospitals' as const,     roles: ['staff', 'main_admin', 'driver', 'doctor'] },
   ];
 
   let navItems = $derived(

@@ -51,18 +51,18 @@ alter table public.medical_events enable row level security;
 drop policy if exists "dispatch_cases_staff_select" on public.dispatch_cases;
 create policy "dispatch_cases_staff_select"
   on public.dispatch_cases for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'staff'));
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('staff', 'main_admin')));
 
 drop policy if exists "medical_events_staff_select" on public.medical_events;
 create policy "medical_events_staff_select"
   on public.medical_events for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'staff'));
+  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('staff', 'main_admin')));
 
 drop policy if exists "dispatch_alerts_staff_or_driver" on public.dispatch_alerts;
 create policy "dispatch_alerts_staff_or_driver"
   on public.dispatch_alerts for select
   using (
-    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'staff')
+    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('staff', 'main_admin'))
     or (
       role = 'driver'
       and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'driver')

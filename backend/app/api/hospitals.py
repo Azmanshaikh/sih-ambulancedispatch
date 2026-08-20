@@ -43,7 +43,7 @@ async def list_hospital_options(_user=Depends(get_current_user)) -> list[Hospita
 
 
 @router.get("", response_model=list[Hospital])
-async def list_hospitals(_user=Depends(require_roles("staff", "driver"))) -> list[Hospital]:
+async def list_hospitals(_user=Depends(require_roles("staff", "driver", "doctor"))) -> list[Hospital]:
     return [Hospital(**h) for h in get_hospitals()]
 
 
@@ -51,10 +51,15 @@ async def list_hospitals(_user=Depends(require_roles("staff", "driver"))) -> lis
 async def patch_hospital_beds(
     hospital_id: int,
     body: BedsBody,
-    user: dict = Depends(require_roles("staff")),
+    user: dict = Depends(require_roles("staff", "doctor")),
 ) -> Hospital:
+    role = (user.get("profile") or {}).get("role")
     assigned = _staff_hospital_id(user)
-    if assigned is not None and assigned != hospital_id:
+    if role == "main_admin":
+        pass
+    elif assigned is not None and assigned != hospital_id:
+        raise HTTPException(status_code=403, detail="You can only update beds at your own hospital")
+    elif role == "doctor" and assigned is None:
         raise HTTPException(status_code=403, detail="You can only update beds at your own hospital")
     try:
         row = update_hospital_beds(hospital_id, body.available_beds, body.total_beds)

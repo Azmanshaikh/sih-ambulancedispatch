@@ -1,9 +1,10 @@
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from typing import Any, List
 from pydantic import BaseModel
 
-from app.core.security import require_main_admin, require_roles
+from app.core.ratelimit import enforce_rate_limit
+from app.core.security import require_main_admin, require_roles, user_from_access_token
 from app.services.corridor import arm_corridor, corridor_snapshot, mission_priority, resolve_conflict
 from app.services.dispatch_optimizer import (
     get_optimal_ambulance,
@@ -107,6 +108,22 @@ async def weather_at(
 
 @router.post("/dispatch")
 async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends(require_roles("staff", "patient"))):
+    role = (user.get("profile") or {}).get("role")
+    uid = str(user.get("id") or "")
+    if role == "patient":
+        enforce_rate_limit(
+            f"sos:{uid}",
+            max_hits=2,
+            window_s=180,
+            detail="Emergency SOS rate limit: at most 2 requests every 3 minutes.",
+        )
+    else:
+        enforce_rate_limit(
+            f"dispatch:{uid}",
+            max_hits=8,
+            window_s=60,
+            detail="Dispatch rate limit reached.",
+        )
     ambulances = get_ambulances()
     hospitals = get_hospitals()
     flags = {
@@ -370,7 +387,19 @@ manager = ConnectionManager()
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, token: str | None = Query(default=None)):
+    raw = (token or "").strip() or (websocket.headers.get("authorization") or "")
+    if raw.lower().startswith("bearer "):
+        raw = raw.split(" ", 1)[1].strip()
+    try:
+        user = user_from_access_token(raw)
+    except HTTPException:
+        await websocket.close(code=4401)
+        return
+    profile = user.get("profile") or {}
+    if profile.get("status") != "active" or profile.get("role") not in ("staff", "driver", "doctor", "main_admin"):
+        await websocket.close(code=4403)
+        return
     await manager.connect(websocket)
     try:
         while True:

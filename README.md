@@ -258,7 +258,7 @@ The backend automatically hosts interactive Swagger documentation at **`http://l
 | **AI** | `POST` | `/ai/analyze-report` | Multimodal medical report OCR & summary (NVIDIA Vision) |
 | **AI** | `POST` | `/ai/tavus/start` | Initiates real-time conversational WebRTC video avatar intake |
 | **Hospitals**| `GET` | `/hospitals/` | Real-time directory with bed, ICU, and specialty capacity |
-| **Accounts** | `POST` | `/accounts/auth/login` | Authenticates users and issues role-scoped JWT tokens |
+| **Accounts** | `GET` | `/accounts/me` | Returns the signed-in user. FastAPI verifies the Supabase JWT (signature, expiry, issuer, audience) then loads role from `profiles`. |
 
 ---
 

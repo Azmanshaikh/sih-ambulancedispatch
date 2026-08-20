@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str | None = None
     SUPABASE_ANON_KEY: str | None = None
     VITE_SUPABASE_ANON_KEY: str | None = None
+    SUPABASE_JWT_SECRET: str | None = None
+    SUPABASE_JWT_AUDIENCE: str = "authenticated"
+    SUPABASE_JWT_ISSUER: str = ""
+    TAVUS_WEBHOOK_SECRET: str | None = None
     STAFF_BOOTSTRAP_EMAILS: str = ""
     # Comma-separated Main Admin emails (route simulation). Defaults to the project owner when unset.
     MAIN_ADMIN_BOOTSTRAP_EMAILS: str = "azmanshaikh01071@gmail.com"

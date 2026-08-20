@@ -181,8 +181,11 @@
           pregnant: health.pregnant,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || t('patient.sosFailed'));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = typeof data.detail === 'string' ? data.detail : t('patient.sosFailed');
+        throw new Error(detail);
+      }
       requestMsg = t('patient.sosSent', {
         unit: data.data?.ambulance_id || '',
         hospital: data.data?.hospital_name || '',

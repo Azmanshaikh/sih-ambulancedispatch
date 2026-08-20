@@ -23,7 +23,8 @@ def _main_admin_emails() -> set[str]:
 
 def is_main_admin_user(user: dict[str, Any]) -> bool:
     email = (user.get("email") or (user.get("profile") or {}).get("email") or "").lower()
-    return email in _main_admin_emails()
+    role = (user.get("profile") or {}).get("role")
+    return role == "main_admin" and email in _main_admin_emails()
 
 
 def _user_from_bearer(authorization: str | None) -> dict[str, Any]:
@@ -36,7 +37,7 @@ def _user_from_bearer(authorization: str | None) -> dict[str, Any]:
     payload = auth_user_from_token(token)
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
-    user_id = payload.get("id")
+    user_id = payload.get("id") or payload.get("sub")
     email = payload.get("email")
     meta = payload.get("user_metadata") or {}
     full_name = meta.get("full_name") or meta.get("name")
@@ -44,7 +45,7 @@ def _user_from_bearer(authorization: str | None) -> dict[str, Any]:
     if not user_id or not email:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
 
-    email_lower = email.lower()
+    email_lower = str(email).lower()
     bootstrap_main = email_lower in _main_admin_emails()
     bootstrap_staff = email_lower in _bootstrap_emails()
     profile = ensure_profile(
@@ -63,11 +64,27 @@ def _user_from_bearer(authorization: str | None) -> dict[str, Any]:
         profile["onboarded"] = True
     else:
         profile.setdefault("onboarded", False)
-    return {"id": str(user_id), "email": email, "full_name": full_name, "profile": profile, "token": token}
+    return {"id": str(user_id), "email": email, "full_name": full_name, "profile": profile}
+
+
+def user_from_access_token(token: str | None) -> dict[str, Any]:
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in required")
+    return _user_from_bearer(f"Bearer {token}")
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     return _user_from_bearer(authorization)
+
+
+def require_authenticated_user(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    return user
+
+
+def require_active_user(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    if (user.get("profile") or {}).get("status") != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is not active")
+    return user
 
 
 def require_roles(*roles: str):
@@ -85,10 +102,14 @@ def require_roles(*roles: str):
     return _dep
 
 
+def require_role(*roles: str):
+    return require_roles(*roles)
+
+
 def require_main_admin():
     def _dep(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
         profile = user.get("profile") or {}
-        if profile.get("status") != "active" or not is_main_admin_user(user):
+        if profile.get("status") != "active" or profile.get("role") != "main_admin" or not is_main_admin_user(user):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Main Admin access required")
         return user
 

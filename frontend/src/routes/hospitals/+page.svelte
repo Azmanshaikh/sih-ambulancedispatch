@@ -22,11 +22,13 @@
   let drafts = $state<Record<number, { available_beds: number; total_beds: number }>>({});
 
   let myHospitalId = $derived(auth.profile?.hospital_id ?? null);
-  let isStaff = $derived(auth.profile?.role === 'staff');
-  let canEditAll = $derived(isStaff && myHospitalId == null);
+  let role = $derived(auth.profile?.role);
+  let canEditAll = $derived(role === 'main_admin' || (role === 'staff' && myHospitalId == null));
 
   function canEdit(h: Hospital) {
-    return isStaff && (canEditAll || myHospitalId === h.id);
+    if (canEditAll) return true;
+    if ((role === 'staff' || role === 'doctor') && myHospitalId === h.id) return true;
+    return false;
   }
 
   async function load() {
@@ -85,7 +87,7 @@
       <div>
         <h1 class="text-4xl font-black tracking-tight uppercase text-black">{t('hospitals.title')}</h1>
         <p class="text-[#4B4B4B] text-xs font-bold uppercase tracking-widest mt-1">{t('hospitals.subtitle')}</p>
-        {#if isStaff && auth.profile?.hospital_name}
+        {#if (role === 'staff' || role === 'doctor') && auth.profile?.hospital_name}
           <p class="text-xs font-bold mt-2">{t('hospitals.yourHospital', { name: auth.profile.hospital_name })}</p>
         {:else if canEditAll}
           <p class="text-xs font-bold mt-2">{t('hospitals.headStaff')}</p>

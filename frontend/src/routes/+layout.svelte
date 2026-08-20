@@ -24,7 +24,7 @@
   const MAIN_ADMIN_PATHS = ['/admin/simulation'];
   const PATIENT_PATHS = ['/patient', '/ai-guide', '/ai-call'];
   const DRIVER_PATHS = ['/driver', '/hospitals'];
-  const DOCTOR_PATHS = ['/doctor'];
+  const DOCTOR_PATHS = ['/doctor', '/hospitals'];
 
   function allowed(pathname: string, role?: string | null) {
     if (PUBLIC.includes(pathname)) return true;
@@ -84,6 +84,10 @@
       <code>VITE_BACKEND_URL</code>
       for Production, then Redeploy.
     </p>
+  </div>
+{:else if !auth.ready}
+  <div class="app-shell" style="padding-top:env(safe-area-inset-top);">
+    <div class="flex-1 overflow-hidden relative h-full"></div>
   </div>
 {:else}
 {#if !NO_NAV.includes(page.url.pathname)}

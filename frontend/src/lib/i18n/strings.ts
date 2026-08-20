@@ -25,13 +25,20 @@ const en = {
   'role.staff': 'Staff',
   'role.mainAdmin': 'Main Admin',
 
-  'login.title': 'Sign in with Gmail',
+  'login.title': 'Sign in to JEEVAN',
   'login.body':
-    'After Google sign-in you choose Patient, Driver, or Staff. Patients enter immediately. Drivers and staff need a one-time code from the admin.',
+    'Use Google or your email. Then choose Patient, Driver, Doctor, or Staff. Patients enter immediately. Drivers and staff need a one-time code from the admin.',
   'login.continue': 'Continue with Google',
   'login.redirecting': 'Redirecting…',
   'login.googleFailed': 'Google sign-in failed. Enable the Google provider in Supabase.',
   'login.pageTitle': 'JEEVAN — Sign in',
+  'login.email': 'Email',
+  'login.password': 'Password',
+  'login.signIn': 'Sign in',
+  'login.createAccount': 'Create account',
+  'login.or': 'or',
+  'login.passwordFailed': 'Email sign-in failed. Check your email and password.',
+  'login.checkEmail': 'Check your email to confirm the account, then sign in.',
 
   'choose.title': 'Who are you?',
   'choose.body':
@@ -361,13 +368,20 @@ export const messages: Record<Lang, Record<MessageKey, string>> = {
     'role.staff': 'स्टाफ',
     'role.mainAdmin': 'मुख्य एडमिन',
 
-    'login.title': 'जीमेल से साइन इन करें',
+    'login.title': 'जीवन् में साइन इन करें',
     'login.body':
-      'गूगल साइन-इन के बाद आप मरीज़, ड्राइवर या स्टाफ चुनते हैं। मरीज़ तुरंत अंदर आ जाते हैं। ड्राइवर को ओटीपी चाहिए। अस्पताल स्टाफ अपना अस्पताल चुनते हैं, फिर मुख्य स्टाफ से ओटीपी लेते हैं।',
+      'गूगल या ईमेल से साइन इन करें। फिर मरीज़, ड्राइवर, डॉक्टर या स्टाफ चुनें। मरीज़ तुरंत अंदर आ जाते हैं। ड्राइवर और स्टाफ को ओटीपी चाहिए।',
     'login.continue': 'गूगल से जारी रखें',
     'login.redirecting': 'भेज रहे हैं…',
     'login.googleFailed': 'गूगल साइन-इन विफल। सुपाबेस में गूगल प्रदाता चालू करें।',
     'login.pageTitle': 'जीवन् — साइन इन',
+    'login.email': 'ईमेल',
+    'login.password': 'पासवर्ड',
+    'login.signIn': 'साइन इन',
+    'login.createAccount': 'खाता बनाएँ',
+    'login.or': 'या',
+    'login.passwordFailed': 'ईमेल साइन-इन विफल। ईमेल और पासवर्ड जाँचें।',
+    'login.checkEmail': 'खाता पुष्टि करने के लिए ईमेल देखें, फिर साइन इन करें।',
 
     'choose.title': 'आप कौन हैं?',
     'choose.body':
@@ -689,13 +703,20 @@ export const messages: Record<Lang, Record<MessageKey, string>> = {
     'role.staff': 'ಸಿಬ್ಬಂದಿ',
     'role.mainAdmin': 'ಮುಖ್ಯ ನಿರ್ವಾಹಕ',
 
-    'login.title': 'ಜಿಮೇಲ್‌ನಿಂದ ಸೈನ್ ಇನ್',
+    'login.title': 'ಜೀವನ್‌ಗೆ ಸೈನ್ ಇನ್',
     'login.body':
-      'ಗೂಗಲ್ ಸೈನ್-ಇನ್ ನಂತರ ರೋಗಿ, ಚಾಲಕ ಅಥವಾ ಸಿಬ್ಬಂದಿ ಆಯ್ಕೆಮಾಡಿ. ರೋಗಿಗಳು ತಕ್ಷಣ ಒಳಗೆ ಬರುತ್ತಾರೆ. ಚಾಲಕರಿಗೆ ಓಟಿಪಿ ಬೇಕು. ಆಸ್ಪತ್ರೆ ಸಿಬ್ಬಂದಿ ತಮ್ಮ ಆಸ್ಪತ್ರೆ ಟಿಕ್ ಮಾಡಿ, ನಂತರ ಮುಖ್ಯ ಸಿಬ್ಬಂದಿಯಿಂದ ಓಟಿಪಿ ನಮೂದಿಸಿ.',
+      'ಗೂಗಲ್ ಅಥವಾ ಇಮೇಲ್ ಬಳಸಿ. ನಂತರ ರೋಗಿ, ಚಾಲಕ, ವೈದ್ಯರು ಅಥವಾ ಸಿಬ್ಬಂದಿ ಆಯ್ಕೆಮಾಡಿ. ರೋಗಿಗಳು ತಕ್ಷಣ ಒಳಗೆ ಬರುತ್ತಾರೆ. ಚಾಲಕ ಮತ್ತು ಸಿಬ್ಬಂದಿಗೆ ಓಟಿಪಿ ಬೇಕು.',
     'login.continue': 'ಗೂಗಲ್‌ನೊಂದಿಗೆ ಮುಂದುವರಿಸಿ',
     'login.redirecting': 'ರಿಡೈರೆಕ್ಟ್ ಆಗುತ್ತಿದೆ…',
     'login.googleFailed': 'ಗೂಗಲ್ ಸೈನ್-ಇನ್ ವಿಫಲ. ಸುಪಾಬೇಸ್‌ನಲ್ಲಿ ಗೂಗಲ್ ಪ್ರೊವೈಡರ್ ಆನ್ ಮಾಡಿ.',
     'login.pageTitle': 'ಜೀವನ್ — ಸೈನ್ ಇನ್',
+    'login.email': 'ಇಮೇಲ್',
+    'login.password': 'ಪಾಸ್‌ವರ್ಡ್',
+    'login.signIn': 'ಸೈನ್ ಇನ್',
+    'login.createAccount': 'ಖಾತೆ ರಚಿಸಿ',
+    'login.or': 'ಅಥವಾ',
+    'login.passwordFailed': 'ಇಮೇಲ್ ಸೈನ್-ಇನ್ ವಿಫಲ. ಇಮೇಲ್ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಪರಿಶೀಲಿಸಿ.',
+    'login.checkEmail': 'ಖಾತೆ ದೃಢೀಕರಿಸಲು ಇಮೇಲ್ ನೋಡಿ, ನಂತರ ಸೈನ್ ಇನ್ ಮಾಡಿ.',
 
     'choose.title': 'ನೀವು ಯಾರು?',
     'choose.body':
