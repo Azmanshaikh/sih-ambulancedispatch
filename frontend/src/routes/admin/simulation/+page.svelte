@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { apiFetch, isMainAdmin } from '$lib/auth.svelte';
+  import { apiFetch, auth, isMainAdmin } from '$lib/auth.svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
   import { lookupAddress, lookupCoords } from '$lib/geocode';
 
@@ -77,31 +77,42 @@
     ambAddress = amb.label ? `${amb.label} (${amb.id})` : amb.id;
   }
 
-  $effect(() => {
-    if (selectedAmbulanceId && ambulances.length) syncAmbulanceFromFleet();
+  function selectAmbulance(id: string) {
+    selectedAmbulanceId = id;
+    error = '';
+    syncAmbulanceFromFleet();
+  }
+
+  onMount(() => {
+    void loadFleet();
   });
 
-  onMount(async () => {
-    if (!isMainAdmin()) {
-      goto('/', { replaceState: true });
-      return;
-    }
-    await loadFleet();
+  $effect(() => {
+    if (!auth.ready) return;
+    if (!isMainAdmin()) goto('/', { replaceState: true });
   });
 
   async function loadFleet() {
     try {
       const res = await apiFetch('/tracking/fleet');
-      if (!res.ok) return;
-      const data = await res.json();
-      ambulances = data.ambulances || [];
-      if (!selectedAmbulanceId && ambulances.length) {
-        const available = ambulances.find((a) => a.status === 'available') || ambulances[0];
-        selectedAmbulanceId = available.id;
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        error = typeof data.detail === 'string' ? data.detail : 'Could not load the fleet.';
+        return;
       }
-      syncAmbulanceFromFleet();
+      ambulances = data.ambulances || [];
+      if (!ambulances.length) {
+        error = 'No ambulances in the fleet yet.';
+        return;
+      }
+      if (!selectedAmbulanceId) {
+        const available = ambulances.find((a) => a.status === 'available') || ambulances[0];
+        selectAmbulance(available.id);
+      } else {
+        syncAmbulanceFromFleet();
+      }
     } catch {
-      /* ignore */
+      error = 'Could not load the fleet.';
     }
   }
 
@@ -257,13 +268,24 @@
 
     <section class="sim-section">
       <p class="med-section-title">Ambulance</p>
-      <select class="nb-input" bind:value={selectedAmbulanceId}>
-        {#each ambulances as amb}
-          <option value={amb.id}>
-            {amb.label || amb.id} · {amb.type_label || amb.ambulance_type} · {amb.status}
-          </option>
-        {/each}
-      </select>
+      {#if ambulances.length}
+        <div class="fleet-picker">
+          {#each ambulances as amb}
+            <button
+              type="button"
+              class="fleet-pick"
+              class:active={selectedAmbulanceId === amb.id}
+              onclick={() => selectAmbulance(amb.id)}
+            >
+              <span class="fleet-pick-id">{amb.id}</span>
+              <span class="fleet-pick-meta">{amb.label || amb.type_label || amb.ambulance_type}</span>
+              <span class="fleet-pick-status">{amb.status}</span>
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <p class="hint">Fleet list is empty. Check that you are signed in as Main Admin and the backend is running.</p>
+      {/if}
       <div class="field-row">
         <input class="nb-input" bind:value={ambAddress} placeholder="Ambulance location address" />
         <button class="btn btn-secondary" onclick={geocodeAmbulance}>Locate</button>
@@ -381,6 +403,60 @@
     min-width: 90px;
     font-size: 11px;
     padding: 8px 8px;
+  }
+  .fleet-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding-bottom: 4px;
+  }
+  .fleet-pick {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+    background: #fff;
+    color: var(--clr-ink);
+    border: 2px solid #111;
+    border-radius: 0;
+    box-shadow: 3px 3px 0 #111;
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+  .fleet-pick:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #111;
+  }
+  .fleet-pick:active,
+  .fleet-pick.active {
+    transform: translate(3px, 3px);
+    box-shadow: 0 0 0 #111;
+    background: var(--clr-primary);
+    color: #fff;
+  }
+  .fleet-pick-id {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  .fleet-pick-meta {
+    font-size: 11px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fleet-pick-status {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
   .hint {
     margin: 0;

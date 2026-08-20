@@ -15,6 +15,7 @@ from app.services.fleet import (
     assign_ambulance,
     get_ambulance,
     get_ambulances,
+    get_hospitals,
 )
 from app.services.geocode import geocode_query, reverse_geocode
 from app.services.runtime_state import push_alert, save_mission, set_medical_record

@@ -36,7 +36,7 @@
     L = (await import('leaflet')).default;
     await import('leaflet/dist/leaflet.css');
     configureLeaflet(L);
-    map = L.map(mapElement, { zoomControl: true }).setView([lat, lng], 14);
+    map = L.map(mapElement, { zoomControl: true, scrollWheelZoom: false }).setView([lat, lng], 14);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '' }).addTo(map);
     syncPin(lat, lng);
     map.on('click', (e: any) => {

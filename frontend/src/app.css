@@ -14,9 +14,9 @@
    Clean white surfaces · medical blue/green · semantic color
    ══════════════════════════════════════════════════════════ */
 :root {
-  --clr-bg:        #F0F4F8;
+  --clr-bg:        #E8F4EE;
   --clr-surface:   #FFFFFF;
-  --clr-surface2:  #F8FAFC;
+  --clr-surface2:  #F3FAF6;
   --clr-border:    #E2E8F0;
   --clr-border-strong: #CBD5E1;
   --clr-ink:       #0F172A;
@@ -91,6 +91,7 @@ body {
 /* ── Card + surface helpers ── */
 .nb-card {
   background: var(--clr-surface);
+  color: var(--clr-ink);
   border: 1px solid var(--clr-border);
   border-radius: var(--radius-md);
   box-shadow: var(--sh-sm);
@@ -100,6 +101,7 @@ body {
 }
 .nb-flat {
   background: var(--clr-surface);
+  color: var(--clr-ink);
   border: 1px solid var(--clr-border);
   border-radius: var(--radius-sm);
 }
@@ -252,6 +254,7 @@ body {
 
 .glass {
   background: rgba(255, 255, 255, 0.92);
+  color: var(--clr-ink);
   border: 1px solid var(--clr-border);
   border-radius: var(--radius-md);
   box-shadow: var(--sh-md);
@@ -351,7 +354,7 @@ body {
 
 /* ── Leaflet overrides — medical theme ── */
 .leaflet-container {
-  background: #E8EEF4 !important;
+  background: #DCEFE4 !important;
 }
 .leaflet-control-zoom {
   border: 1px solid var(--clr-border) !important;

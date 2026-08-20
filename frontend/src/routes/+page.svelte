@@ -213,7 +213,11 @@
   async function loadFleet() {
     try {
       const res = await apiFetch('/tracking/fleet');
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('Fleet load failed', data);
+        return;
+      }
       ambulances = data.ambulances || [];
       hospitals = data.hospitals || [];
       markers = buildMarkers();
@@ -294,7 +298,7 @@
             <div class="text-[10px] uppercase tracking-wide text-[var(--clr-muted)] mt-1 font-semibold">Hospital ETA</div>
           </div>
           <div class="med-stat">
-            <div class="text-3xl font-bold text-[var(--clr-ink)] leading-none">{availableCount}<span class="text-xs text-[var(--clr-muted)] ml-1">u</span></div>
+            <div class="text-3xl font-bold text-[var(--clr-success)] leading-none">{availableCount}<span class="text-xs text-[var(--clr-muted)] ml-1">u</span></div>
             <div class="text-[10px] uppercase tracking-wide text-[var(--clr-muted)] mt-1 font-semibold">Available</div>
           </div>
         </div>
@@ -313,7 +317,7 @@
             <button
               type="button"
               onclick={() => selectAmbulance(a.id)}
-              class="fleet-row flex items-center justify-between px-3 py-2 w-full text-left {assignedIds.has(a.id) ? 'fleet-row--assigned' : ''} {selectedAmbulanceId === a.id ? 'fleet-row--selected' : ''}"
+              class="fleet-row flex items-center justify-between px-3 py-2 w-full text-left {assignedIds.has(a.id) ? 'fleet-row--assigned' : a.status === 'available' ? 'fleet-row--available' : ''} {selectedAmbulanceId === a.id ? 'fleet-row--selected' : ''}"
             >
               <div>
                 <p class="text-[12px] font-bold">{a.id}</p>
@@ -398,9 +402,9 @@
           {/if}
           {#if candidates.length}
             <div class="mt-3 space-y-1 nb-card p-2">
-              <p class="text-[9px] font-black uppercase tracking-widest text-[#4B4B4B]">{t('dash.ranked')}</p>
+              <p class="text-[9px] font-black uppercase tracking-widest text-[var(--clr-ink)]">{t('dash.ranked')}</p>
               {#each candidates as c, i}
-                <div class="flex justify-between gap-2 text-[10px] {i === 0 ? 'font-black' : 'text-[#4B4B4B]'}">
+                <div class="flex justify-between gap-2 text-[10px] text-[var(--clr-ink)] {i === 0 ? 'font-black' : 'font-semibold'}">
                   <span>{i + 1}. {c.name}</span>
                   <span class="shrink-0">{c.eta_minutes} min</span>
                 </div>
@@ -423,8 +427,8 @@
         <div class="space-y-3 overflow-y-auto no-sb flex-1 pr-1">
           <div class="telemetry-card">
             <div class="flex justify-between items-center mb-1">
-              <span class="nb-chip nb-blue" style="color:#fff;">{t('dash.fleet')}</span>
-              <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">{t('dash.live')}</span>
+              <span class="nb-chip nb-green" style="color:#fff;">{t('dash.fleet')}</span>
+              <span class="text-[9px] text-[var(--clr-success)] font-bold uppercase">{t('dash.live')}</span>
             </div>
             <p class="text-xs text-black font-semibold mt-1">{t('dash.fleetTracked', { count: ambulances.length })}</p>
           </div>
@@ -510,8 +514,11 @@
   }
   .ai-panel {
     color: #fff;
-    background: linear-gradient(135deg, var(--clr-primary) 0%, #1E40AF 100%);
+    background: linear-gradient(135deg, #0F766E 0%, #166534 100%);
     border: none;
+  }
+  .ai-panel :global(.nb-card) {
+    color: var(--clr-ink);
   }
   .status-dot {
     width: 10px;
@@ -545,6 +552,10 @@
     background: var(--clr-danger-bg);
     border-color: #FECACA;
   }
+  .fleet-row--available {
+    border-color: #86EFAC;
+    background: var(--clr-success-bg);
+  }
   .alert-banner {
     background: var(--clr-warning-bg);
     color: var(--clr-warning);
@@ -554,6 +565,7 @@
   }
   .telemetry-card {
     background: var(--clr-surface);
+    color: var(--clr-ink);
     padding: 12px;
     border: 1px solid var(--clr-border);
     border-radius: var(--radius-sm);

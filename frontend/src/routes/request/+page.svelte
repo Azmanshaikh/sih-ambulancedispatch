@@ -148,8 +148,8 @@
 
 <svelte:head><title>{t('request.pageTitle')}</title></svelte:head>
 
-<div style="flex: 1; overflow-y: auto;">
-  <div style="padding: 32px; max-width: 1100px; margin: 0 auto; width: 100%; box-sizing: border-box;">
+<div class="request-page">
+  <div class="request-inner">
 
     <div style="margin-bottom: 32px; padding-bottom: 20px; border-bottom: 4px solid #111;">
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
@@ -319,8 +319,8 @@
           <button
             disabled={dispatching}
             onclick={dispatchNow}
-            class="btn btn-primary"
-            style="flex: 2; padding: 14px; font-size: 12px; letter-spacing: 0.2em; box-shadow: 0 6px 20px rgba(220,38,38,0.35);"
+            class="btn btn-success"
+            style="flex: 2; padding: 14px; font-size: 12px; letter-spacing: 0.2em;"
           >
             {dispatching ? t('request.assigning') : t('request.assign')}
           </button>
@@ -330,3 +330,20 @@
     </div>
   </div>
 </div>
+
+<style>
+  .request-page {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .request-inner {
+    padding: 32px 32px 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+</style>

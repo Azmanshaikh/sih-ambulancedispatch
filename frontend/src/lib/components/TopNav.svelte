@@ -100,7 +100,7 @@
     gap: 10px;
   }
   .brand-logo {
-    background: var(--clr-primary);
+    background: var(--clr-success);
     border-radius: var(--radius-sm);
     padding: 4px 8px;
     display: flex;
@@ -142,9 +142,9 @@
     align-items: center;
     gap: 5px;
     padding: 4px 10px;
-    border: 1px solid var(--clr-border);
+    border: 1px solid #86EFAC;
     border-radius: 999px;
-    background: var(--clr-surface2);
+    background: var(--clr-success-bg);
   }
   .gps-icon {
     font-size: 12px;
