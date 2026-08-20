@@ -36,13 +36,8 @@ class Settings(BaseSettings):
     TWILIO_FROM: str | None = None
     TWILIO_WHATSAPP_FROM: str | None = None
     NVIDIA_API_KEY: str | None = None
-    NVIDIA_MODEL: str = "meta/llama-3.1-8b-instruct"
-    NVIDIA_MODEL_FALLBACKS: str = (
-        "meta/llama-3.2-3b-instruct,"
-        "nvidia/nemotron-mini-4b-instruct,"
-        "google/gemma-2-9b-it,"
-        "microsoft/phi-3-mini-4k-instruct"
-    )
+    NVIDIA_MODEL: str = "nvidia/nemotron-mini-4b-instruct"
+    NVIDIA_MODEL_FALLBACKS: str = "meta/llama-3.1-8b-instruct,google/gemma-3-4b-it"
     NVIDIA_VISION_MODEL: str = "microsoft/phi-3-vision-128k-instruct"
     NVIDIA_VISION_MODEL_FALLBACKS: str = ""
     # Text chat models such as nemotron-mini-4b-instruct cannot transcribe audio.

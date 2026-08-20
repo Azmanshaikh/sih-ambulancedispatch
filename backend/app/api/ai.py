@@ -51,8 +51,8 @@ def _nvidia_http_error(exc: Exception, *, asr: bool = False) -> HTTPException:
             status_code=502,
             detail=(
                 "AI chat is unavailable: your NVIDIA key can't access the configured models. "
-                "Set NVIDIA_MODEL=meta/llama-3.1-8b-instruct (or meta/llama-3.2-3b-instruct) "
-                "in .env and on the deployed API, or set GEMINI_API_KEY as a fallback."
+                "Set NVIDIA_MODEL=nvidia/nemotron-mini-4b-instruct in .env and on the deployed API, "
+                "or set GEMINI_API_KEY as a fallback."
             ),
         )
     return HTTPException(status_code=502, detail=raw[:300])

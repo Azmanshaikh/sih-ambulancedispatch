@@ -377,10 +377,6 @@ async def nemotron_chat(messages: list[dict[str, str]], max_tokens: int = 500) -
                 # A 401 means the key itself is bad; other models will not help.
                 if response.status_code == 401:
                     break
-                # 403 = this key cannot use that model. If Gemini is configured,
-                # skip the remaining NVIDIA IDs instead of failing the whole chat.
-                if response.status_code == 403 and (settings.GEMINI_API_KEY or settings.GOOGLE_API_KEY):
-                    break
     if last_error:
         tried = ", ".join(_nvidia_models())
         last_error = f"NVIDIA models unavailable ({tried}): {last_error}"
