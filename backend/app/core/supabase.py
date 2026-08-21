@@ -34,14 +34,8 @@ def _rest_headers(prefer: str | None = None) -> dict[str, str]:
 
 
 def auth_user_from_token(access_token: str) -> dict[str, Any] | None:
-    from app.core.jwt_tokens import decode_supabase_access_token
-
-    local = decode_supabase_access_token(access_token)
-    if local:
-        return local
-    if (settings.SUPABASE_JWT_SECRET or "").strip():
-        return None
-    if not settings.SUPABASE_URL:
+    """Resolve the signed-in user via Supabase Auth (Google OAuth / email session)."""
+    if not access_token or not settings.SUPABASE_URL:
         return None
     url = f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/user"
     key = settings.SUPABASE_ANON_KEY or settings.VITE_SUPABASE_ANON_KEY or ""

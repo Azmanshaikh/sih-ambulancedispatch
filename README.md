@@ -29,11 +29,11 @@
 - **Signal Preemption Simulator:** Automatically overrides traffic signals ahead of high-priority ambulances.
 - **Multi-Mission Conflict Resolution:** Dynamically arbitrates right-of-way when multiple ambulances approach intersecting paths based on clinical trauma levels.
 
-### 4. 👥 Role-Based Portals (RBAC) & JWT Security
-- **JWT access control:** FastAPI verifies the Supabase access token on every protected route (signature, expiry, issuer, audience, user id). JEEVAN **role and account status** are loaded from the server-side `profiles` table — never from the request body or JWT custom claims.
+### 4. 👥 Role-Based Portals (RBAC) & OAuth
+- **OAuth session control:** FastAPI checks the Supabase access token on every protected route via Auth `/user` (Google OAuth or email session). JEEVAN **role and account status** are loaded from the server-side `profiles` table — never from the request body.
 - **Reusable auth dependencies:** `require_authenticated_user()`, `require_roles(...)` / `require_role(...)`, and `require_main_admin()`. Missing/invalid tokens return **401**; authenticated but forbidden roles return **403**.
 - **Main Admin only:** Custom pickup/drop **route simulation** (`POST /tracking/admin/simulate-route`) is enforced on the backend, not just by hiding the UI.
-- **Privilege escalation blocked:** Users cannot self-update `profiles.role` / `status` via RLS. Passwords stay in Supabase Auth (bcrypt). JWT secrets live in environment variables only.
+- **Privilege escalation blocked:** Users cannot self-update `profiles.role` / `status` via RLS. Passwords stay in Supabase Auth (bcrypt).
 - **🚑 Ambulance Driver Portal:** Turn-by-turn navigation, patient medical summary, live telemetry broadcasting, and one-tap trip status updates (`En Route` ➔ `On Scene` ➔ `Transporting` ➔ `Complete`).
 - **🏥 Hospital / Doctor Portal:** Pre-arrival telemetry alerts, incoming patient vitals, AI report summaries, and dynamic bed/ICU reservations.
 - **🚨 Dispatch Command Staff Portal:** City-wide live radar map, active incident queue, manual override controls, and green corridor health diagnostics.
@@ -56,7 +56,7 @@ flowchart TB
     end
 
     subgraph Backend["FastAPI Backend Engine"]
-        API_GW["FastAPI Router & Security (JWT / RBAC)"]
+        API_GW["FastAPI Router & Security (OAuth / RBAC)"]
         
         subgraph Services["Core Engine & Services"]
             DISPATCH["Dispatch Optimizer (Nearest Unit + Multi-Criteria)"]
@@ -97,9 +97,9 @@ sih-ambulancedispatch/
 │   │   │   ├── ai.py         # AI Chat, Voice, Vision OCR & Tavus WebRTC
 │   │   │   ├── hospitals.py  # Hospital Capacity & Specializations
 │   │   │   └── tracking.py   # Dispatching, Fleet & Corridor Telemetry
-│   │   ├── core/             # Config, JWT verification & RBAC dependencies
+│   │   ├── core/             # Config, OAuth session check & RBAC dependencies
 │   │   │   ├── security.py   # require_authenticated_user, require_roles, require_main_admin
-│   │   │   └── jwt_tokens.py # Local Supabase JWT decode (sig, exp, iss, aud)
+│   │   │   └── supabase.py   # Auth /user lookup and REST helpers
 │   │   ├── models/           # SQLAlchemy & Pydantic Data Models
 │   │   ├── services/         # Core Domain Logic
 │   │   │   ├── corridor.py   # Green Corridor & Signal Synchronization
@@ -148,7 +148,7 @@ sih-ambulancedispatch/
 | **Frontend Framework** | [SvelteKit 2](https://kit.svelte.dev/) (Svelte 5 runes), [Vite 8](https://vitejs.dev/) |
 | **Styling & UI** | [Tailwind CSS v4](https://tailwindcss.com/), [Lucide Svelte](https://lucide.dev/) |
 | **Mapping & Telemetry** | [Leaflet.js](https://leafletjs.com/), HTML5 Geolocation, WebSockets |
-| **Database & Auth** | [Supabase](https://supabase.com/) Auth (Google + email/password, bcrypt) + FastAPI local JWT verification + PostgreSQL RLS |
+| **Database & Auth** | [Supabase](https://supabase.com/) Auth (Google OAuth + email/password) + FastAPI session check via Auth `/user` + PostgreSQL RLS |
 | **Communications** | [Twilio](https://www.twilio.com/) (SMS & WhatsApp), [MSG91](https://msg91.com/), SMTP, [Daily.co](https://www.daily.co/) (WebRTC) |
 
 ---
@@ -202,8 +202,6 @@ TAVUS_REPLICA_ID="your_replica_id"
 VITE_SUPABASE_URL="https://your-project.supabase.co"
 VITE_SUPABASE_ANON_KEY="your-anon-key"
 SUPABASE_SERVICE_KEY="your-service-role-key"
-# Dashboard → Project Settings → API → JWT Secret (never commit this)
-SUPABASE_JWT_SECRET="your-supabase-jwt-secret"
 
 # External Mapping & Weather
 TOMTOM_API_KEY="your_tomtom_key"
@@ -261,15 +259,15 @@ The backend automatically hosts interactive Swagger documentation at **`http://l
 | **Tracking** | `GET` | `/tracking/fleet` | Returns real-time coordinates of all active ambulances |
 | **Tracking** | `GET` | `/tracking/corridor` | Returns active green corridors and traffic signal states |
 | **Tracking** | `POST` | `/tracking/admin/simulate-route` | Main Admin custom pickup/drop simulation (backend-enforced; non-admins get **403**) |
-| **Tracking** | `WS` | `/tracking/ws` | Authenticated WebSocket (`?token=` JWT); staff / driver / doctor / main_admin |
+| **Tracking** | `WS` | `/tracking/ws` | Authenticated WebSocket (`?token=` Supabase session); staff / driver / doctor / main_admin |
 | **AI** | `POST` | `/ai/chat` | Patient triage & first-aid consultation |
 | **AI** | `POST` | `/ai/chat/voice` | Voice-based triage audio upload (NVIDIA ASR) |
 | **AI** | `POST` | `/ai/analyze-report` | Multimodal medical report OCR & summary (NVIDIA Vision) |
 | **AI** | `POST` | `/ai/tavus/start` | Initiates real-time conversational WebRTC video avatar intake |
 | **Hospitals**| `GET` | `/hospitals/` | Real-time directory with bed, ICU, and specialty capacity |
-| **Accounts** | `GET` | `/accounts/me` | Signed-in user after JWT verification; role loaded from `profiles` |
+| **Accounts** | `GET` | `/accounts/me` | Signed-in user after OAuth session check; role loaded from `profiles` |
 
-Protected routes require `Authorization: Bearer <supabase_access_token>`. Invalid or expired JWTs return **401**. Wrong role returns **403**. The frontend refreshes the session on 401, then redirects to login.
+Protected routes require `Authorization: Bearer <supabase_access_token>`. Invalid or expired sessions return **401**. Wrong role returns **403**. The frontend refreshes the session on 401, then redirects to login.
 
 ---
 
