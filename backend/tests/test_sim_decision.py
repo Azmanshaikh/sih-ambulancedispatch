@@ -91,3 +91,54 @@ def test_danger_rating_8_selects_nearest_eligible(monkeypatch):
     assert mission["hospital_rerouted"] is True
     chosen = nearest_eligible_hospital(origin, get_hospitals(), dispatch_requirement("cardiac"))
     assert chosen["hospital"]["id"] == mission["hospital_id"]
+
+
+def test_sim_danger_7_keeps_assigned_hospital():
+    from app.api.tracking import _critical_sim_hospital
+
+    cyte = next(h for h in get_hospitals() if h["id"] == 1)
+    h, lat, lng, name, notice = _critical_sim_hospital(
+        (13.1344, 77.5693),
+        cyte,
+        cyte["lat"],
+        cyte["lng"],
+        cyte["name"],
+        7,
+        "trauma",
+        {},
+        False,
+        [],
+    )
+    assert notice is None
+    assert h["id"] == 1
+    assert lat == cyte["lat"]
+
+
+def test_sim_danger_10_switches_to_nearest(monkeypatch):
+    from app.api import tracking
+
+    cyte = next(h for h in get_hospitals() if h["id"] == 1)
+    nearest = next(h for h in get_hospitals() if h.get("simulation") and "Avalahalli" in h["name"])
+
+    monkeypatch.setattr(
+        tracking,
+        "nearest_eligible_hospital",
+        lambda *_args, **_kwargs: {"hospital": nearest, "match_status": "specialty_match"},
+    )
+    h, lat, lng, name, notice = tracking._critical_sim_hospital(
+        (13.1344, 77.5693),
+        cyte,
+        cyte["lat"],
+        cyte["lng"],
+        cyte["name"],
+        10,
+        "trauma",
+        {},
+        False,
+        [],
+    )
+    assert notice["changed"] is True
+    assert notice["danger_rating"] == 10
+    assert h["id"] == nearest["id"]
+    assert lat == nearest["lat"]
+    assert name == nearest["name"]

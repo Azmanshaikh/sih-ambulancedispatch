@@ -7,8 +7,10 @@ from app.core.ratelimit import enforce_rate_limit
 from app.core.security import require_main_admin, require_roles, user_from_access_token
 from app.services.corridor import arm_corridor, corridor_snapshot, mission_priority, resolve_conflict
 from app.services.dispatch_optimizer import (
+    dispatch_requirement,
     get_optimal_ambulance,
     get_optimal_hospital_dispatch,
+    nearest_eligible_hospital,
     simulate_custom_route,
     simulate_dual_custom_routes,
 )
@@ -77,6 +79,7 @@ class AdminSimMission2(BaseModel):
     pregnant: bool = False
     previous_drop_sig: str | None = None
     previous_pickup_sig: str | None = None
+    danger_rating: int | None = None
 
 
 class AdminSimulateRequest(BaseModel):
@@ -102,6 +105,7 @@ class AdminSimulateRequest(BaseModel):
     epilepsy: bool = False
     pregnant: bool = False
     mission2: AdminSimMission2 | None = None
+    danger_rating: int | None = None
 
 
 @router.post("/geocode")
@@ -329,6 +333,57 @@ def _sim_destination(hospital_id: int | None, dest_lat: float, dest_lng: float, 
     return None, dest_lat, dest_lng, dest_address
 
 
+def _critical_sim_hospital(
+    pickup: tuple[float, float],
+    assigned: dict[str, Any] | None,
+    dest_lat: float,
+    dest_lng: float,
+    dest_address: str,
+    rating: int | None,
+    category: str,
+    flags: dict[str, bool],
+    is_raining: bool,
+    traffic: list[dict[str, Any]],
+):
+    """Danger 8–10: replace the assigned drop with the nearest eligible hospital (simulation)."""
+    try:
+        n = int(rating) if rating is not None else 0
+    except (TypeError, ValueError):
+        n = 0
+    if n < 8:
+        return assigned, dest_lat, dest_lng, dest_address, None
+    chosen = nearest_eligible_hospital(
+        pickup,
+        get_hospitals(),
+        dispatch_requirement(category, flags),
+        is_raining=is_raining,
+        traffic_points=traffic or None,
+    )
+    if not chosen:
+        return assigned, dest_lat, dest_lng, dest_address, None
+    hospital = chosen["hospital"]
+    notice = {
+        "danger_rating": n,
+        "previous_hospital": (assigned or {}).get("name") or dest_address,
+        "previous_hospital_id": (assigned or {}).get("id"),
+        "new_hospital": hospital.get("name"),
+        "new_hospital_id": hospital.get("id"),
+        "match_status": chosen.get("match_status"),
+        "reason": f"Danger rating {n}/10 — nearest eligible hospital selected.",
+        "changed": (assigned or {}).get("id") != hospital.get("id"),
+    }
+    if not notice["changed"]:
+        notice["reason"] = "Assigned hospital is already the nearest eligible facility."
+        return assigned, dest_lat, dest_lng, dest_address, notice
+    return (
+        hospital,
+        float(hospital["lat"]),
+        float(hospital["lng"]),
+        hospital.get("name") or dest_address,
+        notice,
+    )
+
+
 def _annotate_sim_result(
     result: dict[str, Any],
     *,
@@ -442,6 +497,19 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
         is_raining = await asyncio.to_thread(is_raining_at, req.pickup_lat, req.pickup_lng)
 
     flags_1 = {"cardiac": req.cardiac, "epilepsy": req.epilepsy, "pregnant": req.pregnant}
+    assigned_hospital, dest_lat, dest_lng, dest_address, reroute_1 = await asyncio.to_thread(
+        _critical_sim_hospital,
+        (req.pickup_lat, req.pickup_lng),
+        assigned_hospital,
+        dest_lat,
+        dest_lng,
+        dest_address,
+        req.danger_rating,
+        req.emergency_category,
+        flags_1,
+        is_raining,
+        traffic,
+    )
     m2 = req.mission2
     if m2:
         if m2.ambulance_id == req.ambulance_id:
@@ -451,6 +519,19 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
             m2.hospital_id, m2.dest_lat, m2.dest_lng, m2.dest_address
         )
         flags_2 = {"cardiac": m2.cardiac, "epilepsy": m2.epilepsy, "pregnant": m2.pregnant}
+        hospital_2, dest2_lat, dest2_lng, dest2_address, reroute_2 = await asyncio.to_thread(
+            _critical_sim_hospital,
+            (m2.pickup_lat, m2.pickup_lng),
+            hospital_2,
+            dest2_lat,
+            dest2_lng,
+            dest2_address,
+            m2.danger_rating,
+            m2.emergency_category,
+            flags_2,
+            is_raining,
+            traffic,
+        )
         result = await asyncio.to_thread(
             simulate_dual_custom_routes,
             sim_ambulance,
@@ -472,6 +553,8 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
             emergency_category_2=m2.emergency_category,
             flags=flags_1,
             flags_2=flags_2,
+            hospital_rerouted=bool(reroute_1 and reroute_1.get("changed")),
+            hospital_rerouted_2=bool(reroute_2 and reroute_2.get("changed")),
         )
         _annotate_sim_result(
             result,
@@ -499,6 +582,10 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
             ambulance_address=m2.ambulance_address,
         )
         result["mission2"] = mission2
+        if reroute_1:
+            result["emergency_reroute"] = reroute_1
+        if reroute_2:
+            mission2["emergency_reroute"] = reroute_2
         if req.push_to_driver:
             _push_sim_job(
                 result,
@@ -549,6 +636,7 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
         hospital=assigned_hospital,
         emergency_category=req.emergency_category,
         flags=flags_1,
+        hospital_rerouted=bool(reroute_1 and reroute_1.get("changed")),
     )
     _annotate_sim_result(
         result,
@@ -562,6 +650,8 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
         ambulance_lng=req.ambulance_lng,
         ambulance_address=req.ambulance_address,
     )
+    if reroute_1:
+        result["emergency_reroute"] = reroute_1
     if req.push_to_driver:
         _push_sim_job(
             result,

@@ -44,6 +44,7 @@
     officerCallEnabled?: boolean;
     onSelectAmbulance?: (id: string) => void;
     onMapClick?: (lat: number, lng: number) => void;
+    allowDrive?: boolean;
   }
 
   const BMSIT: [number, number] = [13.1344, 77.5693];
@@ -65,6 +66,7 @@
     officerCallEnabled = false,
     onSelectAmbulance,
     onMapClick,
+    allowDrive = true,
   }: Props = $props();
 
   let mapElement: HTMLElement;
@@ -535,11 +537,11 @@
           const clip = r.kind === 'pickup' || r.kind === 'drop';
           const pts = clip ? remainingPath(r.points, nearestAmbulance(r.points)) : r.points;
           if (pts.length > 1) {
-            if (r.kind === 'previous') {
+            if (r.kind === 'previous' || r.kind === 'compare') {
               const dashed = L.polyline(pts, {
                 color: r.color || '#64748b',
-                weight: 4,
-                opacity: 0.75,
+                weight: r.kind === 'compare' ? 3 : 4,
+                opacity: r.kind === 'compare' ? 0.45 : 0.75,
                 dashArray: '10 8',
                 lineCap: 'round',
               }).addTo(map);
@@ -573,8 +575,8 @@
         icon: L.divIcon({
           className: 'eta-badge-wrap',
           html: `<div class="eta-badge">⏱ ${etaLabel}</div>`,
-          iconSize: [120, 28],
-          iconAnchor: [60, 14],
+          iconSize: [160, 28],
+          iconAnchor: [80, 14],
         }),
         interactive: false,
         zIndexOffset: 1000,
@@ -770,7 +772,7 @@
     </div>
   {/if}
 
-  {#if !navMode && hasRoute}
+  {#if allowDrive && !navMode && hasRoute}
     <button
       type="button"
       class="nav-go"

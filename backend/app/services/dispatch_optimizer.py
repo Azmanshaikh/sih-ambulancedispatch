@@ -1376,6 +1376,8 @@ def simulate_dual_custom_routes(
     emergency_category_2: str | None = None,
     flags: dict[str, bool] | None = None,
     flags_2: dict[str, bool] | None = None,
+    hospital_rerouted: bool = False,
+    hospital_rerouted_2: bool = False,
 ) -> dict[str, Any]:
     """Jointly assign routes for two admin-simulation missions using the live engine.
 
@@ -1398,6 +1400,7 @@ def simulate_dual_custom_routes(
         hospital=hospital_1,
         emergency_category=emergency_category,
         flags=flags,
+        hospital_rerouted=hospital_rerouted,
     )
     sim2 = simulate_custom_route(
         ambulance_2,
@@ -1411,6 +1414,7 @@ def simulate_dual_custom_routes(
         hospital=hospital_2,
         emergency_category=emergency_category_2,
         flags=flags_2,
+        hospital_rerouted=hospital_rerouted_2,
     )
 
     drops1 = _drop_candidates(sim1)

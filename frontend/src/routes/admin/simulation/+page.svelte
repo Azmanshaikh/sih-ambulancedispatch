@@ -9,7 +9,6 @@
   const PUTTENA = { lat: 13.12, lng: 77.575, name: 'Puttenahalli Junction, Yelahanka' };
   const A2_PICKUP_COLOR = '#ea580c';
   const A2_DROP_COLOR = '#0f766e';
-  const OVERLAP_COLOR = '#f59e0b';
 
   type PinMode = 'pickup' | 'destination' | 'ambulance' | 'traffic';
   type MissionSlot = 1 | 2;
@@ -100,8 +99,9 @@
   let ambAddress2 = $state('');
   let assignedHospitalId2 = $state<number | null>(2);
   let emergencyCategory2 = $state('general_medical');
+  let dangerRating = $state(5);
+  let dangerRating2 = $state(5);
 
-  const ALT_COLORS = ['#2563eb', '#a855f7', '#f59e0b'];
   const CATEGORIES = [
     { id: 'general_medical', label: 'General medical' },
     { id: 'cardiac', label: 'Cardiac' },
@@ -176,6 +176,7 @@
     }
     for (const h of hospitals) {
       const selected = assignedHospitalId === h.id || (showMission2 && assignedHospitalId2 === h.id);
+      if (pinMode !== 'destination' && !selected) continue;
       const specs = (h.specializations || []).join(', ');
       const sim = h.simulation ? 'Simulation · ' : '';
       const tag =
@@ -218,7 +219,6 @@
         points: mission2.pickup_route,
         color: A2_PICKUP_COLOR,
         kind: 'mission2-pickup',
-        label: 'A2 pickup',
       });
     }
     if (mission2?.route?.length > 1) {
@@ -226,15 +226,6 @@
         points: mission2.route,
         color: A2_DROP_COLOR,
         kind: 'mission2-drop',
-        label: 'A2 hospital',
-      });
-    }
-    if (dual?.overlap_route?.length > 1) {
-      list.push({
-        points: dual.overlap_route,
-        color: OVERLAP_COLOR,
-        kind: 'overlap',
-        label: 'Shared corridor',
       });
     }
     if (showAltCompare && result?.candidate_routes) {
@@ -243,9 +234,8 @@
         if (rank === 1 || !alt.coords?.length) continue;
         list.push({
           points: alt.coords,
-          color: ALT_COLORS[Math.min(rank - 1, ALT_COLORS.length - 1)],
+          color: '#64748b',
           kind: 'compare',
-          label: `A1 ${alt.label || `Route ${rank}`}`,
         });
       }
     }
@@ -255,23 +245,19 @@
         if (rank === 1 || !alt.coords?.length) continue;
         list.push({
           points: alt.coords,
-          color: rank === 2 ? '#a855f7' : '#f59e0b',
+          color: '#94a3b8',
           kind: 'compare',
-          label: `A2 ${alt.label || `Route ${rank}`}`,
         });
       }
-    }
-    if (!showAltCompare && previousDropRoute && previousDropRoute.length > 1) {
-      list.push({ points: previousDropRoute, color: '#64748b', kind: 'previous', label: 'Previous route' });
     }
     return list;
   });
 
   let etaLabel = $derived(
     dual?.active
-      ? `SIM · A1: ${dual.a1_eta_minutes ?? '—'} min | A2: ${dual.a2_eta_minutes ?? '—'} min`
+      ? `A1 ${dual.a1_eta_minutes ?? '—'}m · A2 ${dual.a2_eta_minutes ?? '—'}m`
       : result?.eta_minutes != null
-        ? `ETA ${result.eta_minutes} min · ${result.total_distance_km ?? '—'} km`
+        ? `ETA ${result.eta_minutes} min`
         : ''
   );
 
@@ -760,6 +746,7 @@
         hospital_id: assignedHospitalId,
         emergency_category: emergencyCategory,
         cardiac: emergencyCategory === 'cardiac',
+        danger_rating: dangerRating,
       };
       if (showMission2) {
         body.mission2 = {
@@ -778,6 +765,7 @@
           cardiac: emergencyCategory2 === 'cardiac',
           previous_drop_sig: previousDropSig2,
           previous_pickup_sig: previousPickupSig2,
+          danger_rating: dangerRating2,
         };
       }
       const res = await apiFetch('/tracking/admin/simulate-route', {
@@ -811,7 +799,12 @@
         destLng2 = next.mission2.destination.lng;
         destAddress2 = next.mission2.destination.address || destAddress2;
       }
-      emergencyNotice = next?.emergency_reroute?.changed ? next.emergency_reroute : emergencyNotice;
+      emergencyNotice =
+        next?.emergency_reroute?.changed
+          ? next.emergency_reroute
+          : next?.mission2?.emergency_reroute?.changed
+            ? next.mission2.emergency_reroute
+            : emergencyNotice;
       startCompareAndPanel();
       const snapped = [...(next?.sim_traffic || []), ...(next?.mission2?.sim_traffic || [])];
       if (Array.isArray(snapped) && snapped.length) {
@@ -935,6 +928,17 @@
           <option value={c.id}>{c.label}</option>
         {/each}
       </select>
+      <p class="med-section-title">Danger rating · {dangerRating}/10</p>
+      <input
+        class="rating-slider"
+        type="range"
+        min="1"
+        max="10"
+        step="1"
+        bind:value={dangerRating}
+        onchange={() => { if (result) scheduleTrafficRecalc(); }}
+      />
+      <p class="hint">At 8–10 the drop switches to the nearest eligible hospital and the route is recalculated.</p>
     </section>
 
     {#if showMission2}
@@ -988,6 +992,17 @@
           <option value={c.id}>{c.label}</option>
         {/each}
       </select>
+      <p class="med-section-title">Danger rating · {dangerRating2}/10</p>
+      <input
+        class="rating-slider"
+        type="range"
+        min="1"
+        max="10"
+        step="1"
+        bind:value={dangerRating2}
+        onchange={() => { if (result) scheduleTrafficRecalc(); }}
+      />
+      <p class="hint">At 8–10 Ambulance 2 reroutes to the nearest eligible hospital.</p>
     </section>
     {/if}
 
@@ -1033,10 +1048,8 @@
         <p class="med-section-title">{dual?.active ? 'Combined simulation results' : 'Route results'}</p>
         {#if dual?.active}
           <div class="dual-summary">
-            <p>A1: {dual.a1_eta_minutes} min | A2: {dual.a2_eta_minutes} min</p>
-            <p>Combined optimization: Active</p>
-            <p>Traffic starvation: {dual.traffic_starvation === 'prevented' ? 'Prevented' : dual.traffic_starvation === 'accepted' ? 'Accepted (clinical)' : 'Not applicable'}</p>
-            <p>Corridor conflict: {dual.corridor_conflict === 'none' ? 'None' : dual.corridor_conflict === 'avoided' ? 'Avoided' : dual.corridor_conflict === 'priority_hold' ? 'Priority hold' : 'Shared'}</p>
+            <p>A1 {dual.a1_eta_minutes} min · A2 {dual.a2_eta_minutes} min</p>
+            <p class="hint" style="margin-top:4px;">Combined · starvation {dual.traffic_starvation === 'prevented' ? 'prevented' : dual.traffic_starvation} · corridor {dual.corridor_conflict}</p>
           </div>
         {/if}
         <div class="med-stat-grid">
@@ -1080,6 +1093,9 @@
           {#if result.rerouted}
             <span class="nb-chip chip-info">Route updated</span>
           {/if}
+          {#if result.emergency_reroute?.changed || result.hospital_rerouted}
+            <span class="nb-chip chip-warning">Nearest hospital (rating {result.emergency_reroute?.danger_rating ?? dangerRating})</span>
+          {/if}
           <span class="nb-chip chip-info">{result.constraints?.routing || 'emergency-shortest'}</span>
         </div>
       </section>
@@ -1095,10 +1111,21 @@
         extraRoutes={extraRoutes}
         {etaLabel}
         selectedAmbulanceId={selectedAmbulanceId}
-        showLegend={true}
+        showLegend={false}
+        allowDrive={false}
         fitRoute={true}
         onMapClick={onMapClick}
       />
+      {#if pickupRoute || dropRoute || extraRoutes.length}
+        <div class="sim-legend" aria-hidden="true">
+          <p><span class="lg-a1p"></span> A1 pickup</p>
+          <p><span class="lg-a1d"></span> A1 hospital</p>
+          {#if showMission2}
+            <p><span class="lg-a2p"></span> A2 pickup</p>
+            <p><span class="lg-a2d"></span> A2 hospital</p>
+          {/if}
+        </div>
+      {/if}
       {#if rerouteNotice}
         <div class="reroute-banner" role="status">
           <strong>Route Updated</strong>
@@ -1119,17 +1146,7 @@
         </div>
       {/if}
       {#if showAltCompare}
-        <div class="compare-chip" role="status">
-          {dual?.active ? 'Comparing calculated route combinations · selected pair stays active' : 'Comparing calculated routes · Route 1 stays active'}
-        </div>
-      {/if}
-      {#if dual?.active}
-        <div class="dual-map-chip" role="status">
-          A1: {dual.a1_eta_minutes} min | A2: {dual.a2_eta_minutes} min
-          · Combined optimization: Active
-          · Traffic starvation: {dual.traffic_starvation === 'prevented' ? 'Prevented' : dual.traffic_starvation === 'accepted' ? 'Accepted (clinical)' : 'N/A'}
-          · Corridor conflict: {dual.corridor_conflict === 'none' ? 'None' : dual.corridor_conflict === 'avoided' ? 'Avoided' : dual.corridor_conflict === 'priority_hold' ? 'Priority hold' : 'Shared'}
-        </div>
+        <div class="compare-chip" role="status">Comparing alternatives</div>
       {/if}
       {#if showDecisionPanel && result?.decision}
         <aside class="decision-panel" role="dialog" aria-label="Route decision">
@@ -1243,6 +1260,39 @@
   .mission-active {
     outline: 3px solid var(--clr-primary);
   }
+  .rating-slider {
+    width: 100%;
+    accent-color: #dc2626;
+  }
+  .sim-legend {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    z-index: 500;
+    background: #fff;
+    border: 2px solid #111;
+    padding: 6px 8px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.45;
+  }
+  .sim-legend p {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sim-legend span {
+    width: 16px;
+    height: 3px;
+    display: inline-block;
+  }
+  .lg-a1p { background: #dc2626; }
+  .lg-a1d { background: #2563eb; }
+  .lg-a2p { background: #ea580c; }
+  .lg-a2d { background: #0f766e; }
   .dual-summary {
     margin: 0;
     padding: 8px 10px;
