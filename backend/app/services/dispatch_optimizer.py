@@ -1675,7 +1675,12 @@ def maybe_emergency_hospital_reroute(
 
     amb = ambulance or get_ambulance(mission.get("ambulance_id")) or mission.get("ambulance") or {}
     if origin is None:
-        origin = (float(amb.get("lat") or 0), float(amb.get("lng") or 0))
+        pickup = mission.get("pickup") or {}
+        pickup_pt = (float(pickup.get("lat") or 0), float(pickup.get("lng") or 0))
+        if mission.get("simulation") and pickup_pt[0]:
+            origin = pickup_pt
+        else:
+            origin = (float(amb.get("lat") or 0), float(amb.get("lng") or 0))
     if not origin[0] and not origin[1]:
         pickup = mission.get("pickup") or {}
         origin = (float(pickup.get("lat") or 0), float(pickup.get("lng") or 0))

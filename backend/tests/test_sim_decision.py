@@ -142,3 +142,56 @@ def test_sim_danger_10_switches_to_nearest(monkeypatch):
     assert h["id"] == nearest["id"]
     assert lat == nearest["lat"]
     assert name == nearest["name"]
+
+
+def test_sim_reroute_uses_pickup_not_distant_ambulance(monkeypatch):
+    from app.services import dispatch_optimizer
+
+    def fake_route_full(origin, dest, **_kwargs):
+        dist = abs(origin[0] - dest[0]) + abs(origin[1] - dest[1])
+        return {
+            "duration": max(60.0, dist * 80000.0),
+            "coords": [origin, dest],
+            "source": "mock",
+            "engine": "direct",
+            "alternatives": [{"rank": 1, "label": "Route 1", "coords": [origin, dest], "duration": 60, "distance": 1000, "kind": "selected"}],
+            "path_sig": f"{dest[0]:.3f}",
+        }
+
+    monkeypatch.setattr(dispatch_optimizer.optimizer, "route_full", fake_route_full)
+    monkeypatch.setattr(dispatch_optimizer.optimizer, "compute_route", fake_route_full)
+
+    cyte = next(h for h in get_hospitals() if h["id"] == 1)
+    pickup = (13.1344, 77.5693)
+    mission = {
+        "simulation": True,
+        "ambulance_id": "AMB-104",
+        "ambulance": {"id": "AMB-104", "lat": 12.90, "lng": 77.60},
+        "hospital_id": 1,
+        "hospital": cyte,
+        "hospital_name": cyte["name"],
+        "emergency_category": "cardiac",
+        "pickup": {"lat": pickup[0], "lng": pickup[1], "name": "BMSIT"},
+        "phase": "pickup",
+        "pickup_route": [],
+        "pickup_seconds": 120,
+        "is_raining": False,
+    }
+    maybe_emergency_hospital_reroute(mission, 10)
+    expected = nearest_eligible_hospital(pickup, get_hospitals(), dispatch_requirement("cardiac"))
+    assert mission["hospital_id"] == expected["hospital"]["id"]
+    far = nearest_eligible_hospital((12.90, 77.60), get_hospitals(), dispatch_requirement("cardiac"))
+    if far["hospital"]["id"] != expected["hospital"]["id"]:
+        assert mission["hospital_id"] != far["hospital"]["id"]
+
+
+def test_missions_stay_isolated_per_ambulance():
+    from app.services.runtime_state import get_mission_for_ambulance, save_mission
+
+    save_mission({"id": "m1", "ambulance_id": "AMB-101", "hospital_name": "H1", "simulation": True})
+    save_mission({"id": "m2", "ambulance_id": "AMB-102", "hospital_name": "H2", "simulation": True})
+    a1 = get_mission_for_ambulance("AMB-101")
+    a2 = get_mission_for_ambulance("AMB-102")
+    assert a1["hospital_name"] == "H1"
+    assert a2["hospital_name"] == "H2"
+    assert a1["id"] != a2["id"]

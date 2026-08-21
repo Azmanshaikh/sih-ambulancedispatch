@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import MapWidget from '$lib/components/MapWidget.svelte';
-  import { apiFetch } from '$lib/auth.svelte';
-  import { postToMarker } from '$lib/officers';
+  import { apiFetch, auth, refreshProfile } from '$lib/auth.svelte';
   import { t } from '$lib/i18n.svelte';
   import { bandColor, bandFromScore, type PriorityBand } from '$lib/priority';
 
@@ -11,11 +10,13 @@
   let pickupRoute = $state<[number, number][]>([]);
   let dropRoute = $state<[number, number][]>([]);
   let etaLabel = $state('');
-  let posts = $state<any[]>([]);
   let score = $state(5);
   let saving = $state(false);
   let savedNote = $state('');
   let error = $state('');
+  let fleet = $state<any[]>([]);
+  let switching = $state(false);
+  let unitId = $derived(auth.profile?.ambulance_id || mission?.ambulance_id || '');
 
   let previewBand = $derived(bandFromScore(score) as PriorityBand);
   let liveBand = $derived((mission?.priority_band as PriorityBand | undefined) || previewBand);
@@ -26,7 +27,7 @@
       pickupRoute = [];
       dropRoute = [];
       etaLabel = '';
-      markers = posts.map((p) => postToMarker(p, true));
+      markers = [];
       return;
     }
     mission = m;
@@ -38,7 +39,7 @@
     if (drv.lat) {
       pts.push({
         position: [drv.lat, drv.lng],
-        popup: `Unit ${m.ambulance_id}`,
+        popup: `Your unit ${m.ambulance_id}`,
         type: 'ambulance',
         id: m.ambulance_id,
         ambulanceId: m.ambulance_id,
@@ -47,11 +48,40 @@
       });
     }
     if (pickup.lat) pts.push({ position: [pickup.lat, pickup.lng], popup: `Pickup · ${m.pickup_person}`, type: 'incident' });
-    if (hosp.lat) pts.push({ position: [hosp.lat, hosp.lng], popup: `Hospital · ${m.destination}`, type: 'hospital_selected' });
-    markers = [...pts, ...posts.map((p) => postToMarker(p, true))];
+    const hospName = m.destination || m.hospital_name || hosp.name;
+    if (hosp.lat) pts.push({ position: [hosp.lat, hosp.lng], popup: `Hospital · ${hospName}`, type: 'hospital_selected' });
+    markers = pts;
     pickupRoute = m.pickup_route || [];
-    dropRoute = m.drop_route || [];
+    dropRoute = m.drop_route || m.route || [];
     etaLabel = m.eta_label || '';
+  }
+
+  async function loadFleet() {
+    try {
+      const res = await apiFetch('/accounts/fleet-units');
+      if (!res.ok) return;
+      const data = await res.json();
+      fleet = data.ambulances || [];
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function switchUnit(id: string) {
+    if (!id || id === unitId || switching) return;
+    switching = true;
+    try {
+      const res = await apiFetch('/accounts/me/ambulance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ambulance_id: id }),
+      });
+      if (!res.ok) return;
+      await refreshProfile();
+      await loadMission();
+    } finally {
+      switching = false;
+    }
   }
 
   async function loadMission() {
@@ -59,19 +89,6 @@
     if (!res.ok) return;
     const data = await res.json();
     applyMission(data.mission);
-  }
-
-  async function loadPosts() {
-    try {
-      const res = await apiFetch('/tracking/corridor');
-      if (!res.ok) return;
-      const data = await res.json();
-      posts = data.posts || [];
-      if (mission) applyMission(mission);
-      else markers = posts.map((p) => postToMarker(p, true));
-    } catch {
-      /* ignore */
-    }
   }
 
   async function saveCondition() {
@@ -88,7 +105,8 @@
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not update');
       savedNote = t('doctor.saved');
-      await loadMission();
+      if (data.mission) applyMission(data.mission);
+      else await loadMission();
     } catch (e: any) {
       error = e?.message || 'Could not update';
     } finally {
@@ -98,10 +116,9 @@
 
   onMount(() => {
     loadMission();
-    loadPosts();
+    loadFleet();
     const timer = setInterval(() => {
       loadMission();
-      loadPosts();
     }, 2000);
     return () => clearInterval(timer);
   });
@@ -117,10 +134,12 @@
       {markers}
       {pickupRoute}
       {dropRoute}
+      extraRoutes={[]}
       {etaLabel}
       selectedAmbulanceId={mission?.ambulance_id || ''}
-      officerCallEnabled
-      showLegend
+      officerCallEnabled={false}
+      showLegend={false}
+      allowDrive={false}
     />
     <div class="absolute top-5 left-5 z-10 w-80 max-w-[calc(100%-2.5rem)] pointer-events-none">
       <div class="glass p-5 pointer-events-auto">
@@ -128,16 +147,44 @@
           <p class="nb-chip nb-red mb-2" >{t('doctor.standby')}</p>
           <h2 class="text-xl font-black mb-2 uppercase">{t('doctor.noAssignment')}</h2>
           <p class="text-xs text-[#4B4B4B] font-semibold">{t('doctor.alertHint')}</p>
+          <p class="text-[11px] text-[#4B4B4B] font-semibold mt-2">This panel only shows the route for the ambulance assigned to you.</p>
+          {#if unitId}
+            <p class="text-xs font-black uppercase tracking-widest mt-3 mb-2">Your unit · {unitId}</p>
+          {/if}
+          {#if fleet.length}
+            <label class="text-[10px] font-black uppercase tracking-widest">Pick ambulance</label>
+            <select
+              class="nb-input w-full mt-1"
+              disabled={switching}
+              value={unitId}
+              onchange={(e) => switchUnit((e.currentTarget as HTMLSelectElement).value)}
+            >
+              {#each fleet as a}
+                <option value={a.id}>{a.id} · {a.label || a.type_label || a.status}</option>
+              {/each}
+            </select>
+          {/if}
         {:else}
           <p class="nb-chip mb-2" style="color:{liveBand === 'urgent' ? '#111' : '#fff'};background:{bandColor(liveBand)};">
             {mission.phase === 'drop' ? t('doctor.toDrop') : t('doctor.toPickup')}
           </p>
+          <p class="text-[10px] font-black uppercase tracking-widest mb-1">Your unit only · {mission.ambulance_id}</p>
           <h2 class="text-lg font-black mb-1 uppercase">{mission.pickup_person}</h2>
-          <p class="text-xs text-[#4B4B4B] font-bold mb-3">{t('navPage.eta')} {mission.eta_minutes ?? '—'} min · {mission.ambulance_id}</p>
-          {#if mission.phase === 'drop'}
-            <p class="text-xs text-black font-semibold mb-1">{t('doctor.onBoard')}</p>
-            <p class="text-sm font-black mb-3">{mission.destination}</p>
+          {#if mission.patient?.history || mission.notes}
+            <p class="text-[11px] font-bold mb-1" style="color:#b91c1c;">{mission.patient?.alert || 'Simulation patient'}</p>
+            <p class="text-[11px] text-[#4B4B4B] font-semibold mb-2">{mission.patient?.history || mission.notes}</p>
           {/if}
+          {#if (mission.doctor_cautions || mission.patient?.do_not || []).length}
+            <p class="text-[10px] font-black uppercase tracking-widest mb-1">Doctors — do not</p>
+            <ul class="text-[11px] font-semibold mb-3 pl-4 list-disc" style="color:#0F172A;">
+              {#each mission.doctor_cautions || mission.patient?.do_not || [] as item}
+                <li class="mb-1">{item}</li>
+              {/each}
+            </ul>
+          {/if}
+          <p class="text-xs text-[#4B4B4B] font-bold mb-1">{t('navPage.eta')} {mission.eta_minutes ?? '—'} min · {mission.ambulance_id}</p>
+          <p class="text-xs text-black font-semibold mb-1">Hospital</p>
+          <p class="text-sm font-black mb-3">{mission.destination || mission.hospital_name || '—'}</p>
 
           <p class="text-[10px] font-black uppercase tracking-widest mb-1">{t('doctor.condition')}</p>
           <p class="text-[11px] text-[#4B4B4B] font-semibold mb-2">{t('doctor.conditionHint')}</p>

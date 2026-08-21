@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.core.ratelimit import enforce_rate_limit
 from app.core.security import require_main_admin, require_roles, user_from_access_token
-from app.services.corridor import arm_corridor, corridor_snapshot, mission_priority, resolve_conflict
+from app.services.corridor import apply_condition_score, arm_corridor, corridor_snapshot, mission_priority, resolve_conflict
 from app.services.dispatch_optimizer import (
     dispatch_requirement,
     get_optimal_ambulance,
@@ -28,6 +28,29 @@ from app.services.runtime_state import push_alert, save_mission, set_medical_rec
 from app.services.weather import is_raining_at, weather_snapshot
 
 router = APIRouter(prefix="/tracking", tags=["Tracking"])
+
+# Simulation-only patient briefs. Slot 1 is always Azman for the Main Admin lab.
+SIM_PATIENTS: dict[int, dict[str, Any]] = {
+    1: {
+        "name": "Azman",
+        "alert": "On blood thinners — high bleeding risk",
+        "history": (
+            "Azman is on anticoagulant (blood-thinner) therapy because of past blood-clotting / VTE problems."
+        ),
+        "do_not": [
+            "Do not give intramuscular injections (hematoma risk).",
+            "Do not give NSAIDs (ibuprofen, diclofenac, aspirin) for pain.",
+            "Do not add more anticoagulants or thrombolytics without the receiving doctor.",
+            "Do not reverse anticoagulation in the field unless a hospital life-threatening-bleed protocol is in place.",
+            "Do not downplay head injury, new weakness, or unexplained hypotension — occult bleeding is more likely.",
+        ],
+    },
+}
+
+
+def sim_patient_for_slot(slot: int) -> dict[str, Any] | None:
+    row = SIM_PATIENTS.get(int(slot))
+    return dict(row) if row else None
 
 
 class DispatchRequest(BaseModel):
@@ -441,14 +464,23 @@ def _push_sim_job(
         place_ambulance(ambulance_id, ambulance_lat, ambulance_lng)
     assign_ambulance(ambulance_id, pickup_path, drop_path)
     hospital_payload = hospital or {"name": dest_name, "lat": dest_lat, "lng": dest_lng}
+    patient = sim_patient_for_slot(slot) or result.get("patient")
+    patient_name = (patient or {}).get("name") or f"Admin simulation {slot}"
+    notes = (
+        f"{(patient or {}).get('history') or ''} Simulation only — not a live patient.".strip()
+        if patient
+        else "Pushed from admin route simulation"
+    )
     payload = {k: v for k, v in result.items() if k not in ("mission2", "dual")}
     mission = save_mission(
         {
             **payload,
             "simulation": True,
             "patient_id": None,
-            "patient_name": f"Admin simulation {slot}",
+            "patient_name": patient_name,
             "patient_email": "",
+            "patient": patient,
+            "doctor_cautions": (patient or {}).get("do_not") or [],
             "pickup": {"name": pickup_name, "lat": pickup_lat, "lng": pickup_lng},
             "ambulance_id": ambulance_id,
             "hospital_name": hospital_payload.get("name") or dest_name,
@@ -466,16 +498,29 @@ def _push_sim_job(
             "phase": "pickup",
             "priority": int(result.get("priority") or 1),
             "priority_label": result.get("priority_label") or "simulation",
-            "notes": "Pushed from admin route simulation",
+            "notes": notes,
+            "condition_score": result.get("condition_score"),
+            "emergency_reroute": result.get("emergency_reroute"),
         }
     )
+    if mission.get("condition_score"):
+        apply_condition_score(mission, int(mission["condition_score"]))
+        save_mission(mission)
     push_alert(
         "driver",
         "SIMULATION JOB",
-        f"Admin simulation {slot}: pick up at {pickup_name}, then drop at {dest_name}.",
+        f"Admin simulation {slot}: pick up {patient_name} at {pickup_name}, then drop at {dest_name}.",
         ambulance_id=ambulance_id,
         mission_id=mission.get("id"),
-        extra={"pickup": pickup_name, "drop": dest_name, "patient_name": f"Admin simulation {slot}", "slot": slot},
+        extra={"pickup": pickup_name, "drop": dest_name, "patient_name": patient_name, "slot": slot},
+    )
+    push_alert(
+        "doctor",
+        "SIMULATION JOB",
+        f"Admin simulation {slot}: your unit {ambulance_id} only. Pickup {patient_name} at {pickup_name} → {dest_name}.",
+        ambulance_id=ambulance_id,
+        mission_id=mission.get("id"),
+        extra={"pickup": pickup_name, "drop": dest_name, "patient_name": patient_name, "slot": slot},
     )
     arm_corridor(mission)
     result["pushed"] = True
@@ -582,6 +627,11 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
             ambulance_address=m2.ambulance_address,
         )
         result["mission2"] = mission2
+        result["patient"] = sim_patient_for_slot(1)
+        if req.danger_rating is not None:
+            result["condition_score"] = int(req.danger_rating)
+        if m2.danger_rating is not None:
+            mission2["condition_score"] = int(m2.danger_rating)
         if reroute_1:
             result["emergency_reroute"] = reroute_1
         if reroute_2:
@@ -652,6 +702,9 @@ async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] 
     )
     if reroute_1:
         result["emergency_reroute"] = reroute_1
+    result["patient"] = sim_patient_for_slot(1)
+    if req.danger_rating is not None:
+        result["condition_score"] = int(req.danger_rating)
     if req.push_to_driver:
         _push_sim_job(
             result,

@@ -1,9 +1,10 @@
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.core.security import get_current_user, require_roles
+from app.services.corridor import apply_condition_score, display_priority_label, priority_band_of, resolve_conflict
 from app.services.dispatch_optimizer import maybe_emergency_hospital_reroute
 from app.services.fleet import BMSIT, get_ambulance, get_ambulances, get_hospital
 from app.services.otp import issue_otp, list_active_otps, verify_otp
@@ -282,20 +283,7 @@ async def bind_ambulance(user_id: str, body: DecideBody, user: dict[str, Any] = 
     return {"status": "success", "profile": profile}
 
 
-@router.get("/mission")
-async def live_mission(user: dict[str, Any] = Depends(require_roles("driver", "doctor", "patient", "staff"))):
-    profile = user.get("profile") or {}
-    role = profile.get("role")
-    if role in ("driver", "doctor"):
-        mission = live_mission_or_none(enrich_mission(get_mission_for_ambulance(profile.get("ambulance_id"))))
-    elif role == "patient":
-        mission = live_mission_or_none(enrich_mission(get_mission_for_patient(user["id"])))
-    elif role in ("staff", "main_admin"):
-        mission = live_mission_or_none(enrich_mission(get_latest_mission()))
-    else:
-        raise HTTPException(status_code=403, detail="Not allowed for this role")
-    if not mission:
-        return {"status": "success", "mission": None}
+def _public_mission(mission: dict[str, Any]) -> dict[str, Any]:
     phase = mission.get("phase") or "pickup"
     pickup_route = mission.get("pickup_route") or []
     drop_route = mission.get("drop_route") or mission.get("route") or []
@@ -304,39 +292,65 @@ async def live_mission(user: dict[str, Any] = Depends(require_roles("driver", "d
         eta = mission.get("eta_minutes")
     band = priority_band_of(mission)
     return {
-        "status": "success",
-        "mission": {
-            "id": mission.get("id"),
-            "phase": phase,
-            "pickup_name": (mission.get("pickup") or {}).get("name") or BMSIT["name"],
-            "pickup_person": mission.get("patient_name") or "Assigned patient",
-            "heading": ((mission.get("pickup") or {}).get("name") or BMSIT["name"]) if phase == "pickup" else mission.get("hospital_name"),
-            "destination": mission.get("hospital_name"),
-            "hospital": mission.get("hospital"),
-            "route": pickup_route if phase == "pickup" else drop_route,
-            "pickup_route": pickup_route,
-            "drop_route": drop_route,
-            "eta_minutes": eta,
-            "eta_label": f"{eta} min" if eta is not None else None,
-            "ambulance_id": mission.get("ambulance_id"),
-            "driver_location": mission.get("driver_location"),
-            "pickup": mission.get("pickup"),
-            "conflict": mission.get("conflict"),
-            "priority": mission.get("priority"),
-            "priority_label": display_priority_label(mission),
-            "condition_score": mission.get("condition_score"),
-            "priority_band": band,
-            "priority_color": mission.get("priority_color"),
-            "report": mission.get("report"),
-            "emergency_reroute": mission.get("emergency_reroute"),
-            "reason": mission.get("reason"),
-            "decision": mission.get("decision"),
-            "candidate_routes": mission.get("candidate_routes"),
-            "hospital_id": mission.get("hospital_id"),
-            "simulation": bool(mission.get("simulation")),
-            "eta_total_minutes": mission.get("eta_minutes"),
-        },
+        "id": mission.get("id"),
+        "phase": phase,
+        "pickup_name": (mission.get("pickup") or {}).get("name") or BMSIT["name"],
+        "pickup_person": mission.get("patient_name") or "Assigned patient",
+        "heading": ((mission.get("pickup") or {}).get("name") or BMSIT["name"]) if phase == "pickup" else mission.get("hospital_name"),
+        "destination": mission.get("hospital_name"),
+        "hospital": mission.get("hospital"),
+        "route": pickup_route if phase == "pickup" else drop_route,
+        "pickup_route": pickup_route,
+        "drop_route": drop_route,
+        "eta_minutes": eta,
+        "eta_label": f"{eta} min" if eta is not None else None,
+        "ambulance_id": mission.get("ambulance_id"),
+        "driver_location": mission.get("driver_location"),
+        "pickup": mission.get("pickup"),
+        "conflict": mission.get("conflict"),
+        "priority": mission.get("priority"),
+        "priority_label": display_priority_label(mission),
+        "condition_score": mission.get("condition_score"),
+        "priority_band": band,
+        "priority_color": mission.get("priority_color"),
+        "report": mission.get("report"),
+        "emergency_reroute": mission.get("emergency_reroute"),
+        "reason": mission.get("reason"),
+        "decision": mission.get("decision"),
+        "candidate_routes": mission.get("candidate_routes"),
+        "hospital_id": mission.get("hospital_id"),
+        "hospital_name": mission.get("hospital_name"),
+        "simulation": bool(mission.get("simulation")),
+        "eta_total_minutes": mission.get("eta_minutes"),
+        "notes": mission.get("notes"),
+        "patient": mission.get("patient"),
+        "doctor_cautions": mission.get("doctor_cautions") or [],
     }
+
+
+@router.get("/mission")
+async def live_mission(
+    user: dict[str, Any] = Depends(require_roles("driver", "doctor", "patient", "staff")),
+    ambulance_id: str | None = Query(default=None),
+):
+    profile = user.get("profile") or {}
+    role = profile.get("role")
+    if role in ("driver", "doctor"):
+        # Bound unit only — never another ambulance's corridor.
+        mission = live_mission_or_none(enrich_mission(get_mission_for_ambulance(profile.get("ambulance_id"))))
+    elif role == "patient":
+        mission = live_mission_or_none(enrich_mission(get_mission_for_patient(user["id"])))
+    elif role in ("staff", "main_admin"):
+        wanted = (ambulance_id or "").strip() or profile.get("ambulance_id")
+        if wanted:
+            mission = live_mission_or_none(enrich_mission(get_mission_for_ambulance(wanted)))
+        else:
+            mission = live_mission_or_none(enrich_mission(get_latest_mission()))
+    else:
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
+    if not mission:
+        return {"status": "success", "mission": None}
+    return {"status": "success", "mission": _public_mission(mission)}
 
 
 @router.post("/mission/condition")
@@ -398,6 +412,16 @@ async def mission_condition(body: ConditionBody, user: dict[str, Any] = Depends(
             ambulance_id=mission.get("ambulance_id"),
             mission_id=mission.get("id"),
         )
+        push_alert(
+            "doctor",
+            "EMERGENCY REROUTE",
+            (
+                f"Danger Rating: {score}/10. Previous Hospital: {reroute.get('previous_hospital') or previous_hospital}. "
+                f"New Hospital: {reroute.get('new_hospital')}. {reroute.get('reason')}"
+            ),
+            ambulance_id=mission.get("ambulance_id"),
+            mission_id=mission.get("id"),
+        )
     return {
         "status": "success",
         "condition_score": mission.get("condition_score"),
@@ -406,7 +430,13 @@ async def mission_condition(body: ConditionBody, user: dict[str, Any] = Depends(
         "priority_color": mission.get("priority_color"),
         "priority_label": display_priority_label(mission),
         "emergency_reroute": reroute or None,
-        "mission": enrich_mission(mission),
+        "mission": _public_mission(enrich_mission(mission)),
+        "hospital": mission.get("hospital"),
+        "hospital_id": mission.get("hospital_id"),
+        "hospital_name": mission.get("hospital_name"),
+        "drop_route": mission.get("drop_route") or mission.get("route") or [],
+        "pickup_route": mission.get("pickup_route") or [],
+        "eta_minutes": mission.get("eta_minutes"),
     }
 
 

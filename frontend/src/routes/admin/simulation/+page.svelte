@@ -126,7 +126,7 @@
       list.push({
         position: [pickupLat, pickupLng] as [number, number],
         type: 'pickup',
-        popup: `A1 pickup: ${pickupAddress}`,
+        popup: `A1 pickup · Azman: ${pickupAddress}`,
       });
     }
     if (destLat && destLng && !assignedHospitalId) {
@@ -422,45 +422,120 @@
   }
 
   async function pollMission() {
-    if (!selectedAmbulanceId || !result) return;
+    if (!result) return;
+    await pollUnitMission(selectedAmbulanceId, 1);
+    if (showMission2 && selectedAmbulanceId2) await pollUnitMission(selectedAmbulanceId2, 2);
+  }
+
+  function applyMissionSync(mission: any, slot: 1 | 2) {
+    if (!mission || !result) return;
+    const reroute = mission.emergency_reroute;
+    const newHospitalId = mission.hospital_id ?? reroute?.new_hospital_id;
+    const currentId = slot === 1 ? assignedHospitalId : assignedHospitalId2;
+    const hospitalChanged =
+      newHospitalId != null && String(newHospitalId) !== String(currentId ?? '');
+    if (!hospitalChanged) return;
+
+    const destName = mission.destination || mission.hospital_name || reroute?.new_hospital;
+    const drop = mission.drop_route?.length ? mission.drop_route : mission.route;
+    const pickup = mission.pickup_route;
+    const eta = mission.eta_total_minutes ?? mission.eta_minutes;
+    const score = typeof mission.condition_score === 'number' ? mission.condition_score : null;
+
+    if (slot === 1) {
+      if (score != null) dangerRating = score;
+      assignedHospitalId = newHospitalId ?? assignedHospitalId;
+      destAddress = destName || destAddress;
+      const h = hospitals.find((row) => row.id === assignedHospitalId);
+      if (h) {
+        destLat = h.lat;
+        destLng = h.lng;
+      } else if (mission.hospital?.lat) {
+        destLat = mission.hospital.lat;
+        destLng = mission.hospital.lng;
+      }
+      if (drop?.length) {
+        previousDropRoute = result.route ? [...result.route] : previousDropRoute;
+        result = {
+          ...result,
+          route: drop,
+          pickup_route: pickup?.length ? pickup : result.pickup_route,
+          eta_minutes: eta ?? result.eta_minutes,
+          hospital: mission.hospital || result.hospital,
+          hospital_id: newHospitalId ?? result.hospital_id,
+          hospital_name: destName || result.hospital_name,
+          destination: {
+            ...(result.destination || {}),
+            lat: destLat,
+            lng: destLng,
+            address: destName || result.destination?.address,
+          },
+          reason: mission.reason || result.reason,
+          decision: mission.decision || result.decision,
+          candidate_routes: mission.candidate_routes || result.candidate_routes,
+          hospital_rerouted: true,
+          emergency_reroute: reroute || result.emergency_reroute,
+          condition_score: score ?? result.condition_score,
+        };
+      }
+      emergencyNotice = reroute || emergencyNotice;
+      rerouteNotice = false;
+      startCompareAndPanel();
+      return;
+    }
+
+    const m2 = result.mission2 || {};
+    if (score != null) dangerRating2 = score;
+    assignedHospitalId2 = newHospitalId ?? assignedHospitalId2;
+    destAddress2 = destName || destAddress2;
+    const h = hospitals.find((row) => row.id === assignedHospitalId2);
+    if (h) {
+      destLat2 = h.lat;
+      destLng2 = h.lng;
+    } else if (mission.hospital?.lat) {
+      destLat2 = mission.hospital.lat;
+      destLng2 = mission.hospital.lng;
+    }
+    if (drop?.length) {
+      result = {
+        ...result,
+        mission2: {
+          ...m2,
+          route: drop,
+          pickup_route: pickup?.length ? pickup : m2.pickup_route,
+          eta_minutes: eta ?? m2.eta_minutes,
+          hospital: mission.hospital || m2.hospital,
+          hospital_id: newHospitalId ?? m2.hospital_id,
+          hospital_name: destName || m2.hospital_name,
+          destination: {
+            ...(m2.destination || {}),
+            lat: destLat2,
+            lng: destLng2,
+            address: destName || m2.destination?.address,
+          },
+          emergency_reroute: reroute || m2.emergency_reroute,
+          hospital_rerouted: true,
+          condition_score: score ?? m2.condition_score,
+        },
+        dual: result.dual
+          ? { ...result.dual, a2_eta_minutes: eta ?? result.dual.a2_eta_minutes }
+          : result.dual,
+      };
+    }
+    emergencyNotice = reroute || emergencyNotice;
+    rerouteNotice = false;
+    startCompareAndPanel();
+  }
+
+  async function pollUnitMission(ambId: string, slot: 1 | 2) {
+    if (!ambId) return;
     try {
-      const res = await apiFetch('/accounts/mission');
+      const res = await apiFetch(`/accounts/mission?ambulance_id=${encodeURIComponent(ambId)}`);
       if (!res.ok) return;
       const data = await res.json();
       const mission = data.mission;
-      if (!mission || mission.ambulance_id !== selectedAmbulanceId) return;
-      const reroute = mission.emergency_reroute;
-      if (reroute?.changed && reroute.new_hospital_id && reroute.new_hospital_id !== assignedHospitalId) {
-        assignedHospitalId = reroute.new_hospital_id;
-        destAddress = reroute.new_hospital || destAddress;
-        const h = hospitals.find((row) => row.id === assignedHospitalId);
-        if (h) {
-          destLat = h.lat;
-          destLng = h.lng;
-        } else if (mission.hospital?.lat) {
-          destLat = mission.hospital.lat;
-          destLng = mission.hospital.lng;
-        }
-        if (mission.drop_route?.length) {
-          previousDropRoute = result?.route ? [...result.route] : previousDropRoute;
-          result = {
-            ...result,
-            route: mission.drop_route,
-            pickup_route: mission.pickup_route || result.pickup_route,
-            eta_minutes: mission.eta_total_minutes ?? mission.eta_minutes ?? result.eta_minutes,
-            hospital: mission.hospital,
-            hospital_id: mission.hospital_id,
-            hospital_name: mission.destination,
-            reason: mission.reason || result.reason,
-            decision: mission.decision || result.decision,
-            candidate_routes: mission.candidate_routes || result.candidate_routes,
-            hospital_rerouted: true,
-          };
-        }
-        emergencyNotice = reroute;
-        rerouteNotice = false;
-        startCompareAndPanel();
-      }
+      if (!mission || mission.ambulance_id !== ambId) return;
+      applyMissionSync(mission, slot);
     } catch {
       /* ignore */
     }
@@ -1094,7 +1169,10 @@
             <span class="nb-chip chip-info">Route updated</span>
           {/if}
           {#if result.emergency_reroute?.changed || result.hospital_rerouted}
-            <span class="nb-chip chip-warning">Nearest hospital (rating {result.emergency_reroute?.danger_rating ?? dangerRating})</span>
+            <span class="nb-chip chip-warning">A1 nearest hospital (rating {result.emergency_reroute?.danger_rating ?? dangerRating})</span>
+          {/if}
+          {#if result.mission2?.emergency_reroute?.changed || result.mission2?.hospital_rerouted}
+            <span class="nb-chip chip-warning">A2 nearest hospital (rating {result.mission2?.emergency_reroute?.danger_rating ?? dangerRating2})</span>
           {/if}
           <span class="nb-chip chip-info">{result.constraints?.routing || 'emergency-shortest'}</span>
         </div>
@@ -1151,6 +1229,18 @@
       {#if showDecisionPanel && result?.decision}
         <aside class="decision-panel" role="dialog" aria-label="Route decision">
           <button type="button" class="decision-close" onclick={() => { showDecisionPanel = false; if (panelTimer) clearTimeout(panelTimer); }}>×</button>
+          {#if result.patient}
+            <p class="decision-kicker">Patient · Simulation</p>
+            <p class="patient-name">{result.patient.name}</p>
+            <p class="patient-alert">{result.patient.alert}</p>
+            <p class="patient-history">{result.patient.history}</p>
+            <p class="decision-kicker">Doctors — do not</p>
+            <ul class="do-not">
+              {#each result.patient.do_not || [] as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          {/if}
           {#if dual?.active && result.decision?.a1}
             <p class="decision-kicker">Multi-ambulance route decision · Simulation</p>
             <p class="decision-pair">🚑 Ambulance 1: {result.decision.a1.route} — {result.decision.a1.eta_minutes} min</p>
@@ -1487,6 +1577,31 @@
     font-weight: 900;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+  .patient-name {
+    margin: 0 0 2px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  .patient-alert {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #b91c1c;
+  }
+  .patient-history {
+    margin: 0 0 10px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .do-not {
+    margin: 0 0 12px;
+    padding-left: 16px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .do-not li {
+    margin-bottom: 4px;
   }
   .decision-panel dl {
     margin: 0 0 10px;
