@@ -130,7 +130,7 @@
           {:else}
             {#each alerts as a}
               <div class="p-3 bg-[#FFF3E6] {a.read ? 'opacity-60' : ''}" style="border:3px solid #111;">
-                <p class="nb-chip nb-red" style="color:#fff;">{a.title}</p>
+                <p class="nb-chip nb-red">{a.title}</p>
                 <p class="text-xs text-black mt-2 font-semibold">{a.body}</p>
                 {#if !a.read}
                   <button class="btn btn-primary mt-2 text-[10px]" style="padding:6px 12px;" onclick={() => ack(a.id)}>{t('notif.acknowledge')}</button>
@@ -190,7 +190,7 @@
       </div>
 
       <div class="nb-card p-5">
-        <h3 class="nb-chip nb-blue mb-3" style="color:#fff;">{t('notif.patientDetails')}</h3>
+        <h3 class="nb-chip nb-blue mb-3">{t('notif.patientDetails')}</h3>
         {#if monitor?.patient?.name || monitor?.patient?.email}
           <p class="text-lg font-black text-black">{monitor.patient.name || '—'}</p>
           <p class="text-xs text-[#4B4B4B] font-semibold">{monitor.patient.email || t('notif.noEmail')}</p>
@@ -208,7 +208,7 @@
 
     <div class="col-span-12 lg:col-span-3 flex flex-col gap-4">
       <div class="nb-card p-5">
-        <h3 class="nb-chip nb-red mb-3" style="color:#fff;">{t('notif.tripReports')}</h3>
+        <h3 class="nb-chip nb-red mb-3">{t('notif.tripReports')}</h3>
         {#if reports.length === 0}
           <p class="text-xs text-[#4B4B4B] mb-4 font-semibold">{t('notif.reportsHint')}</p>
         {:else}

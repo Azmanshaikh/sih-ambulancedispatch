@@ -265,7 +265,7 @@
     </div>
 
     <section class="nb-card p-5">
-      <h2 class="nb-chip nb-red mb-3" style="color:#fff;">{t('patient.vitals')}</h2>
+      <h2 class="nb-chip nb-red mb-3" >{t('patient.vitals')}</h2>
       <p class="text-[10px] text-[#4B4B4B] uppercase mb-4 font-bold">{t('patient.vitalsHint')}</p>
       <div class="grid grid-cols-2 gap-3">
         <div class="nb-yellow p-3" style="border:3px solid #111;">
@@ -292,7 +292,7 @@
     </section>
 
     <section class="nb-card p-5">
-      <h2 class="nb-chip nb-red mb-2" style="color:#fff;">{t('patient.healthRecords')}</h2>
+      <h2 class="nb-chip nb-red mb-2" >{t('patient.healthRecords')}</h2>
       <p class="text-[10px] text-[#4B4B4B] uppercase mb-3 font-bold">{t('patient.healthHint')}</p>
       <label class="text-[10px] uppercase tracking-widest text-black font-black">{t('patient.allergies')}</label>
       <textarea class="nb-input text-sm mb-2 mt-1" rows="2" bind:value={health.allergies}></textarea>
@@ -332,7 +332,7 @@
 
     {#if reports.length}
       <section class="nb-card p-5">
-        <h2 class="nb-chip nb-red mb-3" style="color:#fff;">{t('patient.tripReports')}</h2>
+        <h2 class="nb-chip nb-red mb-3" >{t('patient.tripReports')}</h2>
         {#each reports as r}
           <article class="mb-3 p-3 bg-[#FFF3E6]" style="border:3px solid #111;">
             <p class="text-[10px] uppercase text-[#4B4B4B] font-bold">{r.hospital_name} · {r.created_at?.slice(0, 16) || ''}</p>

@@ -343,7 +343,7 @@
           </div>
           <div class="flex flex-col items-end gap-2">
             {#if monitor?.unread_alerts}
-              <a href="/notifications" class="glass px-3 py-1.5 text-[10px] text-black font-black uppercase tracking-widest nb-red" style="color:#fff;">
+              <a href="/notifications" class="glass px-3 py-1.5 text-[10px] font-black uppercase tracking-widest nb-red">
                 {monitor.unread_alerts === 1
                   ? t('dash.staffAlerts', { count: monitor.unread_alerts })
                   : t('dash.staffAlertsPlural', { count: monitor.unread_alerts })}
@@ -427,7 +427,7 @@
         <div class="space-y-3 overflow-y-auto no-sb flex-1 pr-1">
           <div class="telemetry-card">
             <div class="flex justify-between items-center mb-1">
-              <span class="nb-chip nb-green" style="color:#fff;">{t('dash.fleet')}</span>
+              <span class="nb-chip nb-green" >{t('dash.fleet')}</span>
               <span class="text-[9px] text-[var(--clr-success)] font-bold uppercase">{t('dash.live')}</span>
             </div>
             <p class="text-xs text-black font-semibold mt-1">{t('dash.fleetTracked', { count: ambulances.length })}</p>
@@ -435,7 +435,7 @@
           {#if monitor?.patient}
             <div class="telemetry-card">
               <div class="flex justify-between items-center mb-1">
-                <span class="nb-chip nb-green" style="color:#fff;">{t('dash.patient')}</span>
+                <span class="nb-chip nb-green" >{t('dash.patient')}</span>
                 <span class="text-[9px] text-[#4B4B4B] font-bold">{monitor.patient.vitals?.heart_rate ?? '—'} bpm</span>
               </div>
               <p class="text-xs text-black font-semibold mt-1">{monitor.patient.name || t('dash.unassigned')} · {monitor.patient.address}</p>
@@ -452,7 +452,7 @@
           {#if activeMissions.length}
             <div class="telemetry-card">
               <div class="flex justify-between items-center mb-1">
-                <span class="nb-chip nb-red" style="color:#fff;">{t('dash.liveCorridors')}</span>
+                <span class="nb-chip nb-red" >{t('dash.liveCorridors')}</span>
                 <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">{activeMissions.length === 1 ? t('dash.unit', { count: activeMissions.length }) : t('dash.units', { count: activeMissions.length })}</span>
               </div>
               {#each activeMissions as m}
@@ -477,7 +477,7 @@
           {#if selectedHospital}
             <div class="telemetry-card">
               <div class="flex justify-between items-center mb-1">
-                <span class="nb-chip nb-red" style="color:#fff;">Route</span>
+                <span class="nb-chip nb-red" >Route</span>
                 <span class="text-[9px] text-[#4B4B4B] font-bold uppercase">Now</span>
               </div>
               <p class="text-xs text-black font-semibold mt-1">{etaLabel} · {selectedHospital.name}</p>
@@ -485,7 +485,7 @@
           {/if}
           {#if monitor?.mission?.report?.body}
             <div class="telemetry-card">
-              <span class="nb-chip nb-red" style="color:#fff;">Trip report</span>
+              <span class="nb-chip nb-red" >Trip report</span>
               <pre class="text-[10px] text-black whitespace-pre-wrap font-sans mt-2">{monitor.mission.report.body}</pre>
             </div>
           {/if}

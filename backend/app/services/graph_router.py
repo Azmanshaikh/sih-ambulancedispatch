@@ -40,6 +40,25 @@ except Exception:  # pragma: no cover - only hit when dependency missing
 NODE_M = 40.0  # graph node quantization (metres)
 OCC_PENALTY = 4.0  # time multiplier for edges on an occupied corridor
 _DEG = NODE_M / 111_000.0
+_TRAFFIC_RADIUS_M = 90.0
+
+
+def _taps_mult(taps: int) -> float:
+    n = max(1, int(taps or 1))
+    if n >= 4:
+        return 6.5
+    return {1: 1.55, 2: 2.4, 3: 3.8}[n]
+
+
+def _taps_label(taps: int) -> str:
+    n = max(1, int(taps or 1))
+    if n <= 1:
+        return "Low"
+    if n == 2:
+        return "Moderate"
+    if n == 3:
+        return "High"
+    return "Severe"
 
 _CACHE_TTL_S = 20.0
 _cache: dict[tuple, tuple[float, list[dict[str, Any]]]] = {}
@@ -223,6 +242,67 @@ def _occupied_keys(avoid_paths: list[list[tuple[float, float]]] | None) -> set[t
     return keys
 
 
+def _traffic_multipliers(graph, points: list[dict[str, Any]] | None) -> dict[tuple[int, int], float]:
+    """Map road-graph nodes to simulated traffic time multipliers."""
+    out: dict[tuple[int, int], float] = {}
+    if not points or graph.number_of_nodes() < 1:
+        return out
+    for raw in points:
+        try:
+            lat = float(raw.get("lat"))
+            lng = float(raw.get("lng"))
+            taps = int(raw.get("taps") or 1)
+        except (TypeError, ValueError):
+            continue
+        if taps < 1:
+            continue
+        nearest = _nearest_node(graph, (lat, lng))
+        if nearest is None:
+            continue
+        origin = graph.nodes[nearest].get("coord") or (lat, lng)
+        mult = _taps_mult(taps)
+        for node, coord in graph.nodes(data="coord"):
+            if coord and _haversine_m(origin, coord) <= _TRAFFIC_RADIUS_M:
+                out[node] = max(out.get(node, 1.0), mult)
+    return out
+
+
+def _snap_traffic_points(graph, points: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    snapped: list[dict[str, Any]] = []
+    if not points:
+        return snapped
+    for raw in points:
+        try:
+            lat = float(raw.get("lat"))
+            lng = float(raw.get("lng"))
+            taps = max(1, int(raw.get("taps") or 1))
+        except (TypeError, ValueError):
+            continue
+        node = _nearest_node(graph, (lat, lng))
+        coord = (graph.nodes[node].get("coord") if node is not None else None) or (lat, lng)
+        snapped.append(
+            {
+                "lat": float(coord[0]),
+                "lng": float(coord[1]),
+                "taps": taps,
+                "level": min(taps, 4),
+                "level_label": _taps_label(taps),
+                "node": list(node) if node is not None else None,
+            }
+        )
+    return snapped
+
+
+def path_signature(coords: list[tuple[float, float]] | None) -> str:
+    if not coords:
+        return ""
+    keys = [_node_key(float(p[0]), float(p[1])) for p in coords if p]
+    if not keys:
+        return ""
+    step = max(1, len(keys) // 48)
+    return ",".join(f"{a}:{b}" for a, b in keys[::step])
+
+
 def _path_metrics(graph, nodes: list) -> tuple[list[tuple[float, float]], float, float]:
     coords = [graph.nodes[n]["coord"] for n in nodes]
     length_m = 0.0
@@ -234,6 +314,115 @@ def _path_metrics(graph, nodes: list) -> tuple[list[tuple[float, float]], float,
     return coords, length_m, time_s
 
 
+def _snap_path_nodes(graph, coords: list[tuple[float, float]]) -> list:
+    nodes = []
+    for p in coords:
+        k = _node_key(float(p[0]), float(p[1]))
+        if k not in graph:
+            k = _nearest_node(graph, (float(p[0]), float(p[1])))
+        if k is None:
+            continue
+        if not nodes or nodes[-1] != k:
+            nodes.append(k)
+    return nodes
+
+
+def _weighted_path_cost(graph, nodes: list, time_weight) -> tuple[float, float] | None:
+    if len(nodes) < 2:
+        return None
+    time_s = 0.0
+    length_m = 0.0
+    for u, v in zip(nodes, nodes[1:]):
+        if not graph.has_edge(u, v):
+            return None
+        data = graph[u][v]
+        time_s += float(time_weight(u, v, data))
+        length_m += float(data.get("length_m") or 0.0)
+    return time_s, length_m
+
+
+def _pack_alternative(
+    rank: int,
+    coords: list[tuple[float, float]],
+    duration: float,
+    distance: float,
+    kind: str,
+    origin: tuple[float, float],
+    dest: tuple[float, float],
+) -> dict[str, Any]:
+    if coords and _haversine_m(coords[0], origin) > 5:
+        coords = [origin] + coords
+    if coords and _haversine_m(coords[-1], dest) > 5:
+        coords = coords + [dest]
+    return {
+        "rank": rank,
+        "label": f"Route {rank}",
+        "coords": coords,
+        "duration": duration,
+        "distance": distance,
+        "kind": kind,
+        "path_sig": path_signature(coords),
+    }
+
+
+def _top_alternatives(
+    graph,
+    candidates: list[dict[str, Any]],
+    chosen_coords: list[tuple[float, float]],
+    chosen_dur: float,
+    chosen_dist: float,
+    shortest_coords: list[tuple[float, float]],
+    shortest_dur: float,
+    shortest_dist: float,
+    time_weight,
+    origin: tuple[float, float],
+    dest: tuple[float, float],
+) -> list[dict[str, Any]]:
+    """Rank real graph/provider paths. Route 1 is always the already-selected path."""
+    selected = _pack_alternative(1, chosen_coords, chosen_dur, chosen_dist, "selected", origin, dest)
+    extras: list[dict[str, Any]] = []
+    seen = {selected["path_sig"]}
+
+    def consider(coords: list[tuple[float, float]], duration: float, distance: float, kind: str):
+        if not coords or len(coords) < 2:
+            return
+        sig = path_signature(coords)
+        if not sig or sig in seen:
+            return
+        seen.add(sig)
+        extras.append(
+            {
+                "coords": coords,
+                "duration": duration,
+                "distance": distance,
+                "kind": kind,
+                "path_sig": sig,
+            }
+        )
+
+    consider(shortest_coords, shortest_dur, shortest_dist, "shortest")
+    for cand in candidates:
+        coords = cand.get("coords") or []
+        nodes = _snap_path_nodes(graph, coords)
+        weighed = _weighted_path_cost(graph, nodes, time_weight)
+        if weighed:
+            dur, dist = weighed
+            path_coords = [graph.nodes[n]["coord"] for n in nodes]
+        else:
+            dur = float(cand.get("duration") or 0.0)
+            dist = float(cand.get("distance") or 0.0)
+            path_coords = coords
+        consider(path_coords, dur, dist, "provider")
+
+    extras.sort(key=lambda row: (row["duration"] if row["duration"] else 10**12, row["distance"]))
+    out = [selected]
+    for i, row in enumerate(extras[:2], start=2):
+        out.append(
+            _pack_alternative(i, row["coords"], row["duration"], row["distance"], row["kind"], origin, dest)
+        )
+    return out
+
+
 def route(
     origin: tuple[float, float],
     dest: tuple[float, float],
@@ -242,6 +431,7 @@ def route(
     avoid_paths: list[list[tuple[float, float]]] | None = None,
     prefer: str = "fastest",
     enrich: bool = False,
+    traffic_points: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Return a NetworkX Dijkstra route or ``None`` (so the caller falls back).
 
@@ -264,11 +454,14 @@ def route(
         return None
 
     occupied = _occupied_keys(avoid_paths)
+    traffic_mult = _traffic_multipliers(graph, traffic_points)
+    snapped = _snap_traffic_points(graph, traffic_points)
 
     def time_weight(u, v, data) -> float:
         t = data.get("time_s", data.get("length_m", 1.0) / 13.9)
         if u in occupied or v in occupied:
             t *= OCC_PENALTY
+        t *= max(traffic_mult.get(u, 1.0), traffic_mult.get(v, 1.0))
         return t
 
     try:
@@ -300,6 +493,39 @@ def route(
         coords = coords + [dest]
 
     occupied_hits = sum(1 for n in chosen_nodes if n in occupied)
+    traffic_hits = sum(1 for n in chosen_nodes if traffic_mult.get(n, 1.0) > 1.0)
+    chosen_set = set(chosen_nodes)
+    for row in snapped:
+        node = tuple(row["node"]) if row.get("node") else None
+        on_route = False
+        if node is not None:
+            if node in chosen_set:
+                on_route = True
+            else:
+                on_route = any(
+                    n in chosen_set
+                    and traffic_mult.get(n, 1.0) > 1.0
+                    and _haversine_m(graph.nodes[n]["coord"], (row["lat"], row["lng"]))
+                    <= _TRAFFIC_RADIUS_M
+                    for n in chosen_set
+                )
+        row["on_route"] = on_route
+        row["status"] = "on_route" if on_route else "avoided" if traffic_mult else "nearby"
+
+    alternatives = _top_alternatives(
+        graph,
+        candidates,
+        coords,
+        dur_s,
+        dist_m,
+        s_coords,
+        s_time,
+        s_len,
+        time_weight,
+        origin,
+        dest,
+    )
+
     return {
         "coords": coords,
         "duration": dur_s,
@@ -308,6 +534,10 @@ def route(
         "shortest_km": round(s_len / 1000.0, 2),
         "fastest_min": round(f_time / 60.0, 1),
         "occupied_hits": occupied_hits,
+        "traffic_hits": traffic_hits,
+        "sim_traffic": snapped,
+        "path_sig": path_signature(coords),
+        "alternatives": alternatives,
         "nodes": len(chosen_nodes),
         "graph_nodes": graph.number_of_nodes(),
     }

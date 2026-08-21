@@ -15,6 +15,8 @@
     officerName?: string;
     phone?: string;
     postId?: string;
+    trafficLevel?: number;
+    taps?: number;
   }
 
   interface ExtraRoute {
@@ -139,6 +141,17 @@
       iconSize: [size, size],
       iconAnchor: [size / 2, size],
       popupAnchor: [0, -size],
+    });
+  }
+
+  function trafficIcon(level = 1, taps = 1) {
+    const size = 22 + Math.min(level, 4) * 4;
+    return L.divIcon({
+      html: `<div class="traffic-dot traffic-dot--${level}">${taps}<span>${['', 'Low', 'Mod', 'High', 'Sev'][Math.min(level, 4)]}</span></div>`,
+      className: 'traffic-marker',
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+      popupAnchor: [0, -size / 2],
     });
   }
 
@@ -467,13 +480,18 @@
       const ambId = markerAmbulanceId(marker);
       const selectedAmb = marker.type === 'ambulance' && ambId && ambId === selectedAmbulanceId;
       const icon =
-        marker.type === 'ambulance'
-          ? ambulanceIcon(Boolean(selectedAmb), marker.priorityBand)
-          : ICONS[selectedAmb ? 'ambulance_selected' : marker.type || 'default'] || ICONS.default;
+        marker.type === 'traffic'
+          ? trafficIcon(marker.trafficLevel || 1, marker.taps || 1)
+          : marker.type === 'ambulance'
+            ? ambulanceIcon(Boolean(selectedAmb), marker.priorityBand)
+            : ICONS[selectedAmb ? 'ambulance_selected' : marker.type || 'default'] || ICONS.default;
       const m = L.marker(marker.position, {
         icon,
+        interactive: marker.type !== 'traffic',
         zIndexOffset:
-          selectedAmb
+          marker.type === 'traffic'
+            ? 860
+            : selectedAmb
             ? 900
             : marker.type === 'hospital_selected'
               ? 600
@@ -516,7 +534,34 @@
           const color = r.color || '#38bdf8';
           const clip = r.kind === 'pickup' || r.kind === 'drop';
           const pts = clip ? remainingPath(r.points, nearestAmbulance(r.points)) : r.points;
-          if (pts.length > 1) drawLine(pts, color, r.halo || color);
+          if (pts.length > 1) {
+            if (r.kind === 'previous') {
+              const dashed = L.polyline(pts, {
+                color: r.color || '#64748b',
+                weight: 4,
+                opacity: 0.75,
+                dashArray: '10 8',
+                lineCap: 'round',
+              }).addTo(map);
+              mapPolylines.push(dashed);
+            } else {
+              drawLine(pts, color, r.halo || color);
+            }
+            if (r.label) {
+              const mid = pts[Math.floor(pts.length / 2)];
+              const badge = L.marker(mid, {
+                icon: L.divIcon({
+                  className: 'route-alt-label',
+                  html: `<div class="route-alt-chip" style="background:${color}">${r.label}</div>`,
+                  iconSize: [78, 22],
+                  iconAnchor: [39, 11],
+                }),
+                interactive: false,
+                zIndexOffset: 940,
+              }).addTo(map);
+              mapMarkers.push(badge);
+            }
+          }
         }
       });
     }
@@ -718,6 +763,7 @@
       <p><span style="color:#38bdf8">━</span> {t('map.otherCorridor')}</p>
       <p><span style="color:#f59e0b">━</span> {t('map.shared')}</p>
       <p><span style="color:#a855f7">━</span> {t('map.rerouted')}</p>
+      <p><span style="color:#ef4444">●</span> Sim traffic</p>
       <p><span style="color:#FF2D2D">●</span> {t('map.critical')}</p>
       <p><span style="color:#FFD23F">●</span> {t('map.urgent')}</p>
       <p><span style="color:#22C55E">●</span> {t('map.stable')}</p>
@@ -1022,5 +1068,51 @@
     text-align: center;
     border: 3px solid #111;
     box-shadow: 2px 2px 0 #111;
+  }
+  :global(.traffic-marker) {
+    background: transparent !important;
+    border: none !important;
+  }
+  :global(.traffic-dot) {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 3px solid #111;
+    box-shadow: 2px 2px 0 #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    color: #0F172A;
+  }
+  :global(.traffic-dot span) {
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+  :global(.traffic-dot--1) { background: #86efac; }
+  :global(.traffic-dot--2) { background: #fde047; }
+  :global(.traffic-dot--3) { background: #fb923c; }
+  :global(.traffic-dot--4) { background: #ef4444; color: #fff; }
+  :global(.route-alt-label) {
+    background: transparent !important;
+    border: none !important;
+  }
+  :global(.route-alt-chip) {
+    color: #fff;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border: 2px solid #111;
+    box-shadow: 2px 2px 0 #111;
+    text-align: center;
+    white-space: nowrap;
   }
 </style>

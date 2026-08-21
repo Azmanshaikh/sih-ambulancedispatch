@@ -125,7 +125,7 @@
     <div class="absolute top-5 left-5 z-10 w-80 max-w-[calc(100%-2.5rem)] pointer-events-none">
       <div class="glass p-5 pointer-events-auto">
         {#if !mission}
-          <p class="nb-chip nb-red mb-2" style="color:#fff;">{t('doctor.standby')}</p>
+          <p class="nb-chip nb-red mb-2" >{t('doctor.standby')}</p>
           <h2 class="text-xl font-black mb-2 uppercase">{t('doctor.noAssignment')}</h2>
           <p class="text-xs text-[#4B4B4B] font-semibold">{t('doctor.alertHint')}</p>
         {:else}
@@ -163,6 +163,15 @@
             {saving ? t('doctor.updating') : t('doctor.update')}
           </button>
           {#if savedNote}<p class="text-[11px] font-bold mt-2">{savedNote}</p>{/if}
+          {#if mission.emergency_reroute?.changed}
+            <div class="mt-3 p-3" style="border:3px solid #111;background:#fee2e2;color:#0F172A;">
+              <p class="text-[10px] font-black uppercase tracking-widest mb-1">Emergency reroute</p>
+              <p class="text-[11px] font-bold">Danger Rating: {mission.emergency_reroute.danger_rating}/10</p>
+              <p class="text-[11px] font-semibold">Previous Hospital: {mission.emergency_reroute.previous_hospital}</p>
+              <p class="text-[11px] font-semibold">New Hospital: {mission.emergency_reroute.new_hospital}</p>
+              <p class="text-[11px] font-semibold">{mission.emergency_reroute.reason}</p>
+            </div>
+          {/if}
           {#if error}<p class="text-[11px] font-bold mt-2" style="color:#FF2D2D;">{error}</p>{/if}
         {/if}
       </div>

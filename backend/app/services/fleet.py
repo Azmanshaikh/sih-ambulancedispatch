@@ -14,87 +14,65 @@ BMSIT = {
     "lng": 77.5693,
 }
 
+def _hospital(
+    id: int,
+    name: str,
+    lat: float,
+    lng: float,
+    available_beds: int,
+    total_beds: int,
+    specializations: list[str],
+    phone: str,
+    *,
+    simulation: bool = False,
+    status: str = "operational",
+    icu_beds: int | None = None,
+    emergency_available: bool | None = None,
+) -> dict[str, Any]:
+    specs = list(specializations)
+    icu_available = "ICU" in specs
+    if icu_beds is None:
+        icu_beds = 6 if icu_available else 0
+    if emergency_available is None:
+        emergency_available = "Emergency" in specs or "Trauma" in specs or icu_available
+    return {
+        "id": id,
+        "name": name,
+        "lat": lat,
+        "lng": lng,
+        "available_beds": available_beds,
+        "total_beds": total_beds,
+        "specializations": specs,
+        "phone": phone,
+        "emergency_available": bool(emergency_available),
+        "icu_available": icu_available,
+        "icu_beds": int(icu_beds),
+        "status": status,
+        "capacity": total_beds,
+        "simulation": simulation,
+    }
+
+
 _HOSPITAL_SEED: list[dict[str, Any]] = [
-    {
-        "id": 1,
-        "name": "Cytecare Cancer Hospital",
-        "lat": 13.1168,
-        "lng": 77.5819,
-        "available_beds": 14,
-        "total_beds": 40,
-        "specializations": ["Oncology", "Trauma", "ICU"],
-        "phone": "080-2218-8888",
-    },
-    {
-        "id": 2,
-        "name": "Sparsh Hospital, Yelahanka",
-        "lat": 13.0995,
-        "lng": 77.5963,
-        "available_beds": 8,
-        "total_beds": 32,
-        "specializations": ["Ortho", "Trauma", "Emergency"],
-        "phone": "080-4911-1111",
-    },
-    {
-        "id": 3,
-        "name": "People Tree Hospitals, Yelahanka",
-        "lat": 13.1018,
-        "lng": 77.5805,
-        "available_beds": 11,
-        "total_beds": 28,
-        "specializations": ["General", "Pediatric", "Emergency"],
-        "phone": "080-2308-8888",
-    },
-    {
-        "id": 4,
-        "name": "Yelahanka Government Hospital",
-        "lat": 13.1009,
-        "lng": 77.5965,
-        "available_beds": 22,
-        "total_beds": 80,
-        "specializations": ["General", "Emergency"],
-        "phone": "080-2856-1234",
-    },
-    {
-        "id": 5,
-        "name": "Aster CMI Hospital, Hebbal",
-        "lat": 13.0476,
-        "lng": 77.5915,
-        "available_beds": 6,
-        "total_beds": 90,
-        "specializations": ["Cardiac", "Trauma", "Neuro", "ICU"],
-        "phone": "080-4342-0100",
-    },
-    {
-        "id": 6,
-        "name": "Manipal Hospital, Hebbal",
-        "lat": 13.0494,
-        "lng": 77.5929,
-        "available_beds": 9,
-        "total_beds": 70,
-        "specializations": ["Cardiac", "Trauma", "Emergency"],
-        "phone": "080-2502-4444",
-    },
-    {
-        "id": 7,
-        "name": "M.S. Ramaiah Memorial Hospital",
-        "lat": 13.0306,
-        "lng": 77.5648,
-        "available_beds": 15,
-        "total_beds": 120,
-        "specializations": ["Trauma", "Cardiac", "Neuro"],
-        "phone": "080-2360-8888",
-    },
-    {
-        "id": 8,
-        "name": "Bangalore Baptist Hospital",
-        "lat": 13.0356,
-        "lng": 77.5891,
-        "available_beds": 7,
-        "total_beds": 50,
-        "specializations": ["General", "Emergency", "Pediatric"],
-        "phone": "080-2202-4700",
-    },
+    _hospital(1, "Cytecare Cancer Hospital", 13.1168, 77.5819, 14, 40, ["Oncology", "Trauma", "ICU"], "080-2218-8888"),
+    _hospital(2, "Sparsh Hospital, Yelahanka", 13.0995, 77.5963, 8, 32, ["Ortho", "Trauma", "Emergency"], "080-4911-1111"),
+    _hospital(3, "People Tree Hospitals, Yelahanka", 13.1018, 77.5805, 11, 28, ["General", "Pediatric", "Emergency"], "080-2308-8888"),
+    _hospital(4, "Yelahanka Government Hospital", 13.1009, 77.5965, 22, 80, ["General", "Emergency"], "080-2856-1234"),
+    _hospital(5, "Aster CMI Hospital, Hebbal", 13.0476, 77.5915, 6, 90, ["Cardiac", "Trauma", "Neuro", "ICU"], "080-4342-0100"),
+    _hospital(6, "Manipal Hospital, Hebbal", 13.0494, 77.5929, 9, 70, ["Cardiac", "Trauma", "Emergency"], "080-2502-4444"),
+    _hospital(7, "M.S. Ramaiah Memorial Hospital", 13.0306, 77.5648, 15, 120, ["Trauma", "Cardiac", "Neuro"], "080-2360-8888"),
+    _hospital(8, "Bangalore Baptist Hospital", 13.0356, 77.5891, 7, 50, ["General", "Emergency", "Pediatric"], "080-2202-4700"),
+    # Simulation-only Yelahanka network (excluded from live SOS unless the mission is a simulation)
+    _hospital(9, "Avalahalli Trauma & Emergency Hub", 13.1330, 77.5710, 10, 36, ["Trauma", "Cardiac", "ICU", "Emergency"], "080-4710-9001", simulation=True, icu_beds=8),
+    _hospital(10, "Puttenahalli Community Hospital", 13.1205, 77.5748, 12, 28, ["General", "Emergency", "Pediatric"], "080-4710-9002", simulation=True),
+    _hospital(11, "Kogilu Cross Medical Centre", 13.1148, 77.6095, 9, 24, ["General", "Emergency"], "080-4710-9003", simulation=True),
+    _hospital(12, "Jakkur Aerodrome Hospital", 13.0788, 77.5978, 7, 40, ["Cardiac", "ICU", "Emergency"], "080-4710-9004", simulation=True, icu_beds=10),
+    _hospital(13, "Attur Layout Care Hospital", 13.1095, 77.5612, 8, 22, ["Pediatric", "Emergency", "General"], "080-4710-9005", simulation=True),
+    _hospital(14, "Yelahanka New Town Trauma Unit", 13.1022, 77.5880, 6, 30, ["Trauma", "ICU", "Emergency"], "080-4710-9006", simulation=True, icu_beds=6),
+    _hospital(15, "Doddaballapur Road District Hospital", 13.1488, 77.5565, 16, 64, ["General", "Emergency", "ICU"], "080-4710-9007", simulation=True, icu_beds=8),
+    _hospital(16, "Bagalur Road Multispeciality", 13.1435, 77.6380, 5, 48, ["Cardiac", "Neuro", "ICU", "Emergency"], "080-4710-9008", simulation=True, icu_beds=12),
+    _hospital(17, "Allalasandra Mother & Child Hospital", 13.0862, 77.5948, 11, 26, ["Pediatric", "Emergency"], "080-4710-9009", simulation=True),
+    _hospital(18, "Rajanukunte Critical Care Hospital", 13.1755, 77.5488, 4, 32, ["Trauma", "Cardiac", "ICU", "Emergency"], "080-4710-9010", simulation=True, icu_beds=8),
 ]
 
 AMBULANCE_TYPES: dict[str, dict[str, Any]] = {
@@ -273,6 +251,36 @@ def assign_ambulance(
         if unit["path"]:
             unit["lat"] = float(unit["path"][0][0])
             unit["lng"] = float(unit["path"][0][1])
+        break
+
+
+def update_ambulance_paths(
+    ambulance_id: str | None,
+    pickup_path: list[tuple[float, float]] | None = None,
+    drop_path: list[tuple[float, float]] | None = None,
+    *,
+    keep_position: bool = True,
+) -> None:
+    if not ambulance_id:
+        return
+    if not _fleet:
+        init_fleet()
+    for unit in _fleet:
+        if unit["id"] != ambulance_id:
+            continue
+        if pickup_path is not None:
+            unit["pickup_path"] = list(pickup_path)
+        if drop_path is not None:
+            unit["drop_path"] = list(drop_path)
+        if unit.get("leg") == "drop":
+            unit["path"] = list(unit.get("drop_path") or [])
+        else:
+            unit["path"] = list(unit.get("pickup_path") or [])
+        if not keep_position:
+            unit["path_i"] = 0
+            if unit["path"]:
+                unit["lat"] = float(unit["path"][0][0])
+                unit["lng"] = float(unit["path"][0][1])
         break
 
 

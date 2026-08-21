@@ -14,7 +14,7 @@
 
 {#if show}
   <div class="fab-stack">
-    <a href="/ai-call" class="fab nb-blue" style="color:#fff;" aria-label={t('patient.videoCall')}>
+    <a href="/ai-call" class="fab nb-blue" aria-label={t('patient.videoCall')}>
       <span class="material-symbols-outlined">videocam</span>
       <span>{t('fab.video')}</span>
     </a>

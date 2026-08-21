@@ -75,7 +75,7 @@
       </div>
     {/if}
 
-    <h2 class="nb-chip nb-blue mt-10 mb-3" style="color:#fff;">{t('otp.directory')}</h2>
+    <h2 class="nb-chip nb-blue mt-10 mb-3" >{t('otp.directory')}</h2>
     <div class="space-y-2">
       {#each profiles as p}
         <div class="text-xs flex justify-between nb-flat px-3 py-2 font-semibold">

@@ -10,12 +10,14 @@ from app.services.dispatch_optimizer import (
     get_optimal_ambulance,
     get_optimal_hospital_dispatch,
     simulate_custom_route,
+    simulate_dual_custom_routes,
 )
 from app.services.fleet import (
     BMSIT,
     assign_ambulance,
     get_ambulance,
     get_ambulances,
+    get_hospital,
     get_hospitals,
     place_ambulance,
 )
@@ -51,6 +53,32 @@ class GeocodeBody(BaseModel):
     lng: float | None = None
 
 
+class SimTrafficPoint(BaseModel):
+    lat: float
+    lng: float
+    taps: int = 1
+
+
+class AdminSimMission2(BaseModel):
+    pickup_lat: float
+    pickup_lng: float
+    pickup_address: str = ""
+    dest_lat: float
+    dest_lng: float
+    dest_address: str = ""
+    ambulance_id: str
+    ambulance_lat: float | None = None
+    ambulance_lng: float | None = None
+    ambulance_address: str = ""
+    hospital_id: int | None = None
+    emergency_category: str = "general_medical"
+    cardiac: bool = False
+    epilepsy: bool = False
+    pregnant: bool = False
+    previous_drop_sig: str | None = None
+    previous_pickup_sig: str | None = None
+
+
 class AdminSimulateRequest(BaseModel):
     pickup_lat: float
     pickup_lng: float
@@ -65,6 +93,15 @@ class AdminSimulateRequest(BaseModel):
     is_raining: bool = False
     prefer: str = "fastest"
     push_to_driver: bool = True
+    traffic_points: list[SimTrafficPoint] = []
+    previous_drop_sig: str | None = None
+    previous_pickup_sig: str | None = None
+    hospital_id: int | None = None
+    emergency_category: str = "general_medical"
+    cardiac: bool = False
+    epilepsy: bool = False
+    pregnant: bool = False
+    mission2: AdminSimMission2 | None = None
 
 
 @router.post("/geocode")
@@ -86,7 +123,7 @@ async def live_fleet(_user: dict[str, Any] = Depends(require_roles("staff"))):
         "status": "success",
         "incident_default": BMSIT,
         "ambulances": get_ambulances(),
-        "hospitals": get_hospitals(),
+        "hospitals": [h for h in get_hospitals() if not h.get("simulation")],
     }
 
 
@@ -125,7 +162,7 @@ async def simulate_dispatch(req: DispatchRequest, user: dict[str, Any] = Depends
             detail="Dispatch rate limit reached.",
         )
     ambulances = get_ambulances()
-    hospitals = get_hospitals()
+    hospitals = [h for h in get_hospitals() if not h.get("simulation")]
     flags = {
         "cardiac": req.cardiac,
         "diabetes": req.diabetes,
@@ -274,96 +311,275 @@ async def dispatch_nearest_ambulance(req: DispatchRequest, _user: dict[str, Any]
     return {"status": "success", "data": result}
 
 
+def _sim_unit(ambulance_id: str, lat: float | None, lng: float | None) -> dict[str, Any]:
+    ambulance = get_ambulance(ambulance_id)
+    if not ambulance:
+        raise HTTPException(status_code=404, detail=f"Ambulance not found: {ambulance_id}")
+    sim = dict(ambulance)
+    if lat is not None and lng is not None:
+        sim["lat"] = lat
+        sim["lng"] = lng
+    return sim
+
+
+def _sim_destination(hospital_id: int | None, dest_lat: float, dest_lng: float, dest_address: str):
+    hospital = get_hospital(hospital_id) if hospital_id is not None else None
+    if hospital:
+        return hospital, float(hospital["lat"]), float(hospital["lng"]), hospital.get("name") or dest_address
+    return None, dest_lat, dest_lng, dest_address
+
+
+def _annotate_sim_result(
+    result: dict[str, Any],
+    *,
+    pickup_lat: float,
+    pickup_lng: float,
+    pickup_address: str,
+    dest_lat: float,
+    dest_lng: float,
+    dest_address: str,
+    ambulance_lat: float | None,
+    ambulance_lng: float | None,
+    ambulance_address: str,
+) -> dict[str, Any]:
+    if ambulance_lat is not None and ambulance_lng is not None:
+        result["ambulance_origin"] = {
+            "lat": ambulance_lat,
+            "lng": ambulance_lng,
+            "address": ambulance_address or f"{ambulance_lat:.5f}, {ambulance_lng:.5f}",
+        }
+    result["pickup"] = {
+        "lat": pickup_lat,
+        "lng": pickup_lng,
+        "address": pickup_address or f"{pickup_lat:.5f}, {pickup_lng:.5f}",
+        "name": pickup_address or f"{pickup_lat:.5f}, {pickup_lng:.5f}",
+    }
+    result["destination"] = {
+        "lat": dest_lat,
+        "lng": dest_lng,
+        "address": dest_address or f"{dest_lat:.5f}, {dest_lng:.5f}",
+    }
+    return result
+
+
+def _push_sim_job(
+    result: dict[str, Any],
+    *,
+    ambulance_id: str,
+    ambulance_lat: float | None,
+    ambulance_lng: float | None,
+    pickup_lat: float,
+    pickup_lng: float,
+    pickup_name: str,
+    dest_name: str,
+    dest_lat: float,
+    dest_lng: float,
+    hospital: dict[str, Any] | None,
+    emergency_category: str,
+    flags: dict[str, bool],
+    traffic_points: list[dict[str, Any]],
+    slot: int = 1,
+) -> dict[str, Any]:
+    pickup_path = [(float(p[0]), float(p[1])) for p in (result.get("pickup_route") or []) if p]
+    drop_path = [(float(p[0]), float(p[1])) for p in (result.get("route") or []) if p]
+    if ambulance_lat is not None and ambulance_lng is not None:
+        place_ambulance(ambulance_id, ambulance_lat, ambulance_lng)
+    assign_ambulance(ambulance_id, pickup_path, drop_path)
+    hospital_payload = hospital or {"name": dest_name, "lat": dest_lat, "lng": dest_lng}
+    payload = {k: v for k, v in result.items() if k not in ("mission2", "dual")}
+    mission = save_mission(
+        {
+            **payload,
+            "simulation": True,
+            "patient_id": None,
+            "patient_name": f"Admin simulation {slot}",
+            "patient_email": "",
+            "pickup": {"name": pickup_name, "lat": pickup_lat, "lng": pickup_lng},
+            "ambulance_id": ambulance_id,
+            "hospital_name": hospital_payload.get("name") or dest_name,
+            "hospital_id": hospital_payload.get("id"),
+            "hospital": hospital_payload,
+            "emergency_category": result.get("emergency_category") or emergency_category,
+            "flags": flags,
+            "traffic_points": traffic_points,
+            "route": result.get("route") or [],
+            "pickup_route": result.get("pickup_route") or [],
+            "drop_route": result.get("route") or [],
+            "eta_minutes": result.get("eta_minutes"),
+            "pickup_minutes": result.get("pickup_minutes"),
+            "transport_minutes": result.get("transport_minutes"),
+            "phase": "pickup",
+            "priority": int(result.get("priority") or 1),
+            "priority_label": result.get("priority_label") or "simulation",
+            "notes": "Pushed from admin route simulation",
+        }
+    )
+    push_alert(
+        "driver",
+        "SIMULATION JOB",
+        f"Admin simulation {slot}: pick up at {pickup_name}, then drop at {dest_name}.",
+        ambulance_id=ambulance_id,
+        mission_id=mission.get("id"),
+        extra={"pickup": pickup_name, "drop": dest_name, "patient_name": f"Admin simulation {slot}", "slot": slot},
+    )
+    arm_corridor(mission)
+    result["pushed"] = True
+    result["mission_id"] = mission.get("id")
+    return result
+
+
 @router.post("/admin/simulate-route")
 async def admin_simulate_route(req: AdminSimulateRequest, _user: dict[str, Any] = Depends(require_main_admin())):
-    """Dry-run routing for Main Admin — uses the live dispatch engine without creating a mission."""
-    ambulance = get_ambulance(req.ambulance_id)
-    if not ambulance:
-        raise HTTPException(status_code=404, detail="Ambulance not found")
-
-    sim_ambulance = dict(ambulance)
-    if req.ambulance_lat is not None and req.ambulance_lng is not None:
-        sim_ambulance["lat"] = req.ambulance_lat
-        sim_ambulance["lng"] = req.ambulance_lng
-
+    """Dry-run routing for Main Admin — uses the live dispatch engine without creating a live SOS."""
+    traffic = [p.model_dump() for p in req.traffic_points]
+    sim_ambulance = _sim_unit(req.ambulance_id, req.ambulance_lat, req.ambulance_lng)
+    assigned_hospital, dest_lat, dest_lng, dest_address = _sim_destination(
+        req.hospital_id, req.dest_lat, req.dest_lng, req.dest_address
+    )
     if req.is_raining:
         is_raining = True
     else:
         is_raining = await asyncio.to_thread(is_raining_at, req.pickup_lat, req.pickup_lng)
 
+    flags_1 = {"cardiac": req.cardiac, "epilepsy": req.epilepsy, "pregnant": req.pregnant}
+    m2 = req.mission2
+    if m2:
+        if m2.ambulance_id == req.ambulance_id:
+            raise HTTPException(status_code=400, detail="Ambulance 2 must be a different unit from Ambulance 1")
+        sim_ambulance_2 = _sim_unit(m2.ambulance_id, m2.ambulance_lat, m2.ambulance_lng)
+        hospital_2, dest2_lat, dest2_lng, dest2_address = _sim_destination(
+            m2.hospital_id, m2.dest_lat, m2.dest_lng, m2.dest_address
+        )
+        flags_2 = {"cardiac": m2.cardiac, "epilepsy": m2.epilepsy, "pregnant": m2.pregnant}
+        result = await asyncio.to_thread(
+            simulate_dual_custom_routes,
+            sim_ambulance,
+            (req.pickup_lat, req.pickup_lng),
+            (dest_lat, dest_lng),
+            sim_ambulance_2,
+            (m2.pickup_lat, m2.pickup_lng),
+            (dest2_lat, dest2_lng),
+            is_raining=is_raining,
+            prefer=req.prefer or "fastest",
+            traffic_points=traffic,
+            previous_drop_sig=req.previous_drop_sig,
+            previous_pickup_sig=req.previous_pickup_sig,
+            previous_drop_sig_2=m2.previous_drop_sig,
+            previous_pickup_sig_2=m2.previous_pickup_sig,
+            hospital_1=assigned_hospital,
+            hospital_2=hospital_2,
+            emergency_category=req.emergency_category,
+            emergency_category_2=m2.emergency_category,
+            flags=flags_1,
+            flags_2=flags_2,
+        )
+        _annotate_sim_result(
+            result,
+            pickup_lat=req.pickup_lat,
+            pickup_lng=req.pickup_lng,
+            pickup_address=req.pickup_address,
+            dest_lat=dest_lat,
+            dest_lng=dest_lng,
+            dest_address=dest_address,
+            ambulance_lat=req.ambulance_lat,
+            ambulance_lng=req.ambulance_lng,
+            ambulance_address=req.ambulance_address,
+        )
+        mission2 = result.get("mission2") or {}
+        _annotate_sim_result(
+            mission2,
+            pickup_lat=m2.pickup_lat,
+            pickup_lng=m2.pickup_lng,
+            pickup_address=m2.pickup_address,
+            dest_lat=dest2_lat,
+            dest_lng=dest2_lng,
+            dest_address=dest2_address,
+            ambulance_lat=m2.ambulance_lat,
+            ambulance_lng=m2.ambulance_lng,
+            ambulance_address=m2.ambulance_address,
+        )
+        result["mission2"] = mission2
+        if req.push_to_driver:
+            _push_sim_job(
+                result,
+                ambulance_id=req.ambulance_id,
+                ambulance_lat=req.ambulance_lat,
+                ambulance_lng=req.ambulance_lng,
+                pickup_lat=req.pickup_lat,
+                pickup_lng=req.pickup_lng,
+                pickup_name=req.pickup_address or "simulated pickup",
+                dest_name=dest_address or "simulated destination",
+                dest_lat=dest_lat,
+                dest_lng=dest_lng,
+                hospital=assigned_hospital,
+                emergency_category=req.emergency_category,
+                flags=flags_1,
+                traffic_points=traffic,
+                slot=1,
+            )
+            _push_sim_job(
+                mission2,
+                ambulance_id=m2.ambulance_id,
+                ambulance_lat=m2.ambulance_lat,
+                ambulance_lng=m2.ambulance_lng,
+                pickup_lat=m2.pickup_lat,
+                pickup_lng=m2.pickup_lng,
+                pickup_name=m2.pickup_address or "simulated pickup",
+                dest_name=dest2_address or "simulated destination",
+                dest_lat=dest2_lat,
+                dest_lng=dest2_lng,
+                hospital=hospital_2,
+                emergency_category=m2.emergency_category,
+                flags=flags_2,
+                traffic_points=traffic,
+                slot=2,
+            )
+        return {"status": "success", "data": result}
+
     result = await asyncio.to_thread(
         simulate_custom_route,
         sim_ambulance,
         (req.pickup_lat, req.pickup_lng),
-        (req.dest_lat, req.dest_lng),
+        (dest_lat, dest_lng),
         is_raining=is_raining,
         prefer=req.prefer or "fastest",
+        traffic_points=traffic,
+        previous_drop_sig=req.previous_drop_sig,
+        previous_pickup_sig=req.previous_pickup_sig,
+        hospital=assigned_hospital,
+        emergency_category=req.emergency_category,
+        flags=flags_1,
     )
-    if req.ambulance_lat is not None and req.ambulance_lng is not None:
-        result["ambulance_origin"] = {
-            "lat": req.ambulance_lat,
-            "lng": req.ambulance_lng,
-            "address": req.ambulance_address or f"{req.ambulance_lat:.5f}, {req.ambulance_lng:.5f}",
-        }
-    result["pickup"] = {
-        "lat": req.pickup_lat,
-        "lng": req.pickup_lng,
-        "address": req.pickup_address or f"{req.pickup_lat:.5f}, {req.pickup_lng:.5f}",
-        "name": req.pickup_address or f"{req.pickup_lat:.5f}, {req.pickup_lng:.5f}",
-    }
-    result["destination"] = {
-        "lat": req.dest_lat,
-        "lng": req.dest_lng,
-        "address": req.dest_address or f"{req.dest_lat:.5f}, {req.dest_lng:.5f}",
-    }
+    _annotate_sim_result(
+        result,
+        pickup_lat=req.pickup_lat,
+        pickup_lng=req.pickup_lng,
+        pickup_address=req.pickup_address,
+        dest_lat=dest_lat,
+        dest_lng=dest_lng,
+        dest_address=dest_address,
+        ambulance_lat=req.ambulance_lat,
+        ambulance_lng=req.ambulance_lng,
+        ambulance_address=req.ambulance_address,
+    )
     if req.push_to_driver:
-        pickup_path = [(float(p[0]), float(p[1])) for p in (result.get("pickup_route") or []) if p]
-        drop_path = [(float(p[0]), float(p[1])) for p in (result.get("route") or []) if p]
-        if req.ambulance_lat is not None and req.ambulance_lng is not None:
-            place_ambulance(req.ambulance_id, req.ambulance_lat, req.ambulance_lng)
-        assign_ambulance(req.ambulance_id, pickup_path, drop_path)
-        dest_name = req.dest_address or "simulated destination"
-        pickup_name = req.pickup_address or "simulated pickup"
-        mission = save_mission(
-            {
-                **result,
-                "patient_id": None,
-                "patient_name": "Admin simulation",
-                "patient_email": "",
-                "pickup": {
-                    "name": pickup_name,
-                    "lat": req.pickup_lat,
-                    "lng": req.pickup_lng,
-                },
-                "ambulance_id": req.ambulance_id,
-                "hospital_name": dest_name,
-                "hospital": {
-                    "name": dest_name,
-                    "lat": req.dest_lat,
-                    "lng": req.dest_lng,
-                },
-                "route": result.get("route") or [],
-                "pickup_route": result.get("pickup_route") or [],
-                "eta_minutes": result.get("eta_minutes"),
-                "pickup_minutes": result.get("pickup_minutes"),
-                "transport_minutes": result.get("transport_minutes"),
-                "phase": "pickup",
-                "priority": 1,
-                "priority_label": "simulation",
-                "notes": "Pushed from admin route simulation",
-            }
-        )
-        push_alert(
-            "driver",
-            "SIMULATION JOB",
-            f"Admin simulation: pick up at {pickup_name}, then drop at {dest_name}.",
+        _push_sim_job(
+            result,
             ambulance_id=req.ambulance_id,
-            mission_id=mission.get("id"),
-            extra={"pickup": pickup_name, "drop": dest_name, "patient_name": "Admin simulation"},
+            ambulance_lat=req.ambulance_lat,
+            ambulance_lng=req.ambulance_lng,
+            pickup_lat=req.pickup_lat,
+            pickup_lng=req.pickup_lng,
+            pickup_name=req.pickup_address or "simulated pickup",
+            dest_name=dest_address or "simulated destination",
+            dest_lat=dest_lat,
+            dest_lng=dest_lng,
+            hospital=assigned_hospital,
+            emergency_category=req.emergency_category,
+            flags=flags_1,
+            traffic_points=traffic,
+            slot=1,
         )
-        arm_corridor(mission)
-        result["pushed"] = True
-        result["mission_id"] = mission.get("id")
     return {"status": "success", "data": result}
 
 

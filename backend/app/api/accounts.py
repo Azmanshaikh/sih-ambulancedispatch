@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.security import get_current_user, require_roles
-from app.services.corridor import apply_condition_score, display_priority_label, priority_band_of, resolve_conflict
+from app.services.dispatch_optimizer import maybe_emergency_hospital_reroute
 from app.services.fleet import BMSIT, get_ambulance, get_ambulances, get_hospital
 from app.services.otp import issue_otp, list_active_otps, verify_otp
 from app.services.profiles import (
@@ -328,6 +328,13 @@ async def live_mission(user: dict[str, Any] = Depends(require_roles("driver", "d
             "priority_band": band,
             "priority_color": mission.get("priority_color"),
             "report": mission.get("report"),
+            "emergency_reroute": mission.get("emergency_reroute"),
+            "reason": mission.get("reason"),
+            "decision": mission.get("decision"),
+            "candidate_routes": mission.get("candidate_routes"),
+            "hospital_id": mission.get("hospital_id"),
+            "simulation": bool(mission.get("simulation")),
+            "eta_total_minutes": mission.get("eta_minutes"),
         },
     }
 
@@ -345,6 +352,8 @@ async def mission_condition(body: ConditionBody, user: dict[str, Any] = Depends(
     if not mission:
         raise HTTPException(status_code=404, detail="No active mission")
     apply_condition_score(mission, score)
+    previous_hospital = (mission.get("hospital") or {}).get("name") or mission.get("hospital_name")
+    maybe_emergency_hospital_reroute(mission, score)
     resolved = resolve_conflict(
         {
             "ambulance_id": mission.get("ambulance_id"),
@@ -369,6 +378,26 @@ async def mission_condition(body: ConditionBody, user: dict[str, Any] = Depends(
         ambulance_id=mission.get("ambulance_id"),
         mission_id=mission.get("id"),
     )
+    reroute = mission.get("emergency_reroute") or {}
+    if score >= 8 and reroute.get("changed"):
+        push_alert(
+            "driver",
+            "EMERGENCY REROUTE",
+            (
+                f"Danger Rating: {score}/10. Previous Hospital: {reroute.get('previous_hospital') or previous_hospital}. "
+                f"New Hospital: {reroute.get('new_hospital')}. {reroute.get('reason')}"
+            ),
+            ambulance_id=mission.get("ambulance_id"),
+            mission_id=mission.get("id"),
+            extra={"hospital_name": reroute.get("new_hospital"), "danger_rating": score},
+        )
+        push_alert(
+            "staff",
+            "EMERGENCY REROUTE",
+            f"Unit {mission.get('ambulance_id')} redirected to {reroute.get('new_hospital')} (danger {score}/10).",
+            ambulance_id=mission.get("ambulance_id"),
+            mission_id=mission.get("id"),
+        )
     return {
         "status": "success",
         "condition_score": mission.get("condition_score"),
@@ -376,6 +405,7 @@ async def mission_condition(body: ConditionBody, user: dict[str, Any] = Depends(
         "priority_band": band,
         "priority_color": mission.get("priority_color"),
         "priority_label": display_priority_label(mission),
+        "emergency_reroute": reroute or None,
         "mission": enrich_mission(mission),
     }
 

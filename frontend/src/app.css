@@ -126,7 +126,27 @@ body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   border-radius: 999px;
-  color: var(--clr-muted);
+  color: var(--clr-ink);
+}
+.nb-chip.nb-red {
+  background: var(--clr-danger-bg);
+  border-color: #FECACA;
+  color: #0F172A;
+}
+.nb-chip.nb-blue {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+  color: #0F172A;
+}
+.nb-chip.nb-green {
+  background: var(--clr-success-bg);
+  border-color: #BBF7D0;
+  color: #0F172A;
+}
+.nb-chip.nb-yellow {
+  background: var(--clr-warning-bg);
+  border-color: #FDE68A;
+  color: #0F172A;
 }
 .chip-success {
   background: var(--clr-success-bg);
@@ -224,6 +244,10 @@ body {
   color: var(--clr-ink);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
+.nb-input::placeholder {
+  color: #475569;
+  opacity: 1;
+}
 .nb-input:focus {
   outline: none;
   border-color: var(--clr-primary);
@@ -260,6 +284,16 @@ body {
   box-shadow: var(--sh-md);
   backdrop-filter: blur(8px);
 }
+.glass.nb-red,
+.glass.nb-blue,
+.glass.nb-green,
+.glass.nb-yellow {
+  color: #0F172A;
+}
+.glass.nb-red { background: rgba(254, 242, 242, 0.95); }
+.glass.nb-blue { background: rgba(239, 246, 255, 0.95); }
+.glass.nb-green { background: rgba(236, 253, 245, 0.95); }
+.glass.nb-yellow { background: rgba(255, 251, 235, 0.95); }
 
 .no-sb::-webkit-scrollbar {
   display: none;
@@ -351,6 +385,16 @@ body {
   transform: scale(0.98);
 }
 .fab .material-symbols-outlined { font-size: 22px; }
+.fab.nb-blue {
+  background: #EFF6FF;
+  color: #0F172A;
+  border-color: #BFDBFE;
+}
+.fab.nb-yellow {
+  background: var(--clr-warning-bg);
+  color: #0F172A;
+  border-color: #FDE68A;
+}
 
 /* ── Leaflet overrides — medical theme ── */
 .leaflet-container {

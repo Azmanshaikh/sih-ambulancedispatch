@@ -186,7 +186,7 @@
 
     <div class="absolute top-5 left-5 space-y-3 z-10 pointer-events-none max-w-[calc(100%-2.5rem)]">
       <div class="glass p-5 w-80 max-w-full pointer-events-auto">
-        <p class="nb-chip nb-red mb-2" style="color:#fff;">{selected ? (selected.phase === 'drop' ? t('navPage.toHospital') : t('navPage.toPickup')) : t('navPage.standby')}</p>
+        <p class="nb-chip nb-red mb-2" >{selected ? (selected.phase === 'drop' ? t('navPage.toHospital') : t('navPage.toPickup')) : t('navPage.standby')}</p>
         <h2 class="text-xl font-black text-black mb-4 uppercase">
           {selected ? (selected.hospital_name || selected.hospital?.name || t('navPage.activeMission')) : t('navPage.noMission')}
         </h2>

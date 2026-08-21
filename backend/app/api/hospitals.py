@@ -17,6 +17,12 @@ class Hospital(BaseModel):
     phone: str
     lat: float
     lng: float
+    emergency_available: bool = True
+    icu_available: bool = False
+    icu_beds: int = 0
+    status: str = "operational"
+    capacity: int | None = None
+    simulation: bool = False
 
 
 class HospitalOption(BaseModel):

@@ -153,7 +153,7 @@
   {#if alertBanner}
     <div class="absolute inset-0 z-30 flex items-center justify-center p-4" style="background:rgba(17,17,17,0.82);">
       <div class="nb-card-lg bg-white p-8 max-w-md w-[90%] text-center" style="border:4px solid #111;">
-        <p class="nb-chip nb-red mx-auto mb-3" style="color:#fff;">{alertBanner.title}</p>
+        <p class="nb-chip nb-red mx-auto mb-3" >{alertBanner.title}</p>
         <h2 class="text-2xl font-black mb-3 uppercase">{t('driver.assigned')}</h2>
         <p class="text-sm text-black mb-2 font-semibold">{alertBanner.body}</p>
         {#if alertBanner.pickup}
@@ -184,7 +184,7 @@
     <div class="absolute top-5 left-5 z-10 w-80 max-w-[calc(100%-2.5rem)] pointer-events-none">
       <div class="glass p-5 pointer-events-auto">
         {#if !mission}
-          <p class="nb-chip nb-red mb-2" style="color:#fff;">{t('driver.standby')}</p>
+          <p class="nb-chip nb-red mb-2" >{t('driver.standby')}</p>
           <h2 class="text-xl font-black mb-2 uppercase">{t('driver.noAssignment')}</h2>
           <p class="text-xs text-[#4B4B4B] font-semibold mb-3">{t('driver.alertHint')}</p>
           {#if unitId}
@@ -204,7 +204,7 @@
             </select>
           {/if}
         {:else}
-          <p class="nb-chip nb-red mb-2" style="color:#fff;">
+          <p class="nb-chip nb-red mb-2" >
             {mission.phase === 'complete' ? t('driver.tripComplete') : mission.phase === 'drop' ? t('driver.toDrop') : t('driver.toPickup')}
           </p>
           <h2 class="text-lg font-black mb-2 uppercase">{mission.pickup_person}</h2>
@@ -216,7 +216,7 @@
               <button class="btn btn-primary w-full mb-2" onclick={arrivedPickup}>{t('driver.arrivedPickup')}</button>
             {:else}
               <p class="text-xs text-black font-semibold mb-1">{t('driver.onBoard')}</p>
-              <p class="nb-chip nb-blue mt-3 mb-1" style="color:#fff;">{t('driver.destination')}</p>
+              <p class="nb-chip nb-blue mt-3 mb-1" >{t('driver.destination')}</p>
               <p class="text-sm font-black mb-3">{mission.destination}</p>
             {/if}
             <button class="btn btn-secondary w-full py-3" onclick={endTrip}>

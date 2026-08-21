@@ -93,7 +93,7 @@
           <p class="text-xs font-bold mt-2">{t('hospitals.headStaff')}</p>
         {/if}
       </div>
-      <div class="nb-chip nb-green" style="color:#fff;">
+      <div class="nb-chip nb-green" >
         <span class="blink">●</span>
         {t('hospitals.aiActive')}
       </div>
@@ -116,9 +116,9 @@
               <h3 class="text-lg font-black text-black flex items-center gap-2 flex-wrap">
                 🏥 {h.name}
                 {#if myHospitalId === h.id}
-                  <span class="nb-chip nb-red" style="color:#fff;">{t('hospitals.yourHospitalBadge')}</span>
+                  <span class="nb-chip nb-red" >{t('hospitals.yourHospitalBadge')}</span>
                 {:else if i === 0 && myHospitalId == null}
-                  <span class="nb-chip nb-red" style="color:#fff;">{t('hospitals.topPick')}</span>
+                  <span class="nb-chip nb-red" >{t('hospitals.topPick')}</span>
                 {/if}
               </h3>
               <p class="text-xs text-[#4B4B4B] mt-1 font-semibold">{h.specializations.join(', ')}</p>
